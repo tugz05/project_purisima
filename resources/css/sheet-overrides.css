@@ -1,0 +1,30 @@
+/* Global sheet width overrides for Barangay Officials */
+[data-slot="sheet-content"] {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 100vw !important;
+}
+
+@media (min-width: 640px) {
+    [data-slot="sheet-content"] {
+        width: 800px !important;
+        max-width: 800px !important;
+        min-width: 800px !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    [data-slot="sheet-content"] {
+        width: 1000px !important;
+        max-width: 1000px !important;
+        min-width: 1000px !important;
+    }
+}
+
+@media (min-width: 1280px) {
+    [data-slot="sheet-content"] {
+        width: 1200px !important;
+        max-width: 1200px !important;
+        min-width: 1200px !important;
+    }
+}

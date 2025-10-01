@@ -21,6 +21,15 @@ import { LoaderCircle } from 'lucide-vue-next';
             v-slot="{ errors, processing }"
             class="flex flex-col gap-6"
         >
+            <div class="grid gap-3">
+                <Button as-child variant="outline" class="w-full" tabindex="0">
+                    <a href="/auth/google/redirect">Sign up with Google</a>
+                </Button>
+                <Button as-child variant="outline" class="w-full" tabindex="0">
+                    <a href="/auth/facebook/redirect">Sign up with Facebook</a>
+                </Button>
+            </div>
+
             <div class="grid gap-6">
                 <div class="grid gap-2">
                     <Label for="name">Name</Label>

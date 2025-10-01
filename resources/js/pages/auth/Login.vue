@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthBase from '@/layouts/AuthLayout.vue';
-import { register } from '@/routes';
+import { register, oauthRedirect } from '@/routes';
 import { request } from '@/routes/password';
 import { Form, Head } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
@@ -32,6 +32,15 @@ defineProps<{
             v-slot="{ errors, processing }"
             class="flex flex-col gap-6"
         >
+            <div class="grid gap-3">
+                <Button as-child variant="outline" class="w-full" :tabindex="0">
+                    <a :href="oauthRedirect('google').url">Continue with Google</a>
+                </Button>
+                <Button as-child variant="outline" class="w-full" :tabindex="0">
+                    <a :href="oauthRedirect('facebook').url">Continue with Facebook</a>
+                </Button>
+            </div>
+
             <div class="grid gap-6">
                 <div class="grid gap-2">
                     <Label for="email">Email address</Label>

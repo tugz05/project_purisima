@@ -39,6 +39,16 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
 
+        {{-- CSRF Token --}}
+        <meta name="csrf-token" content="{{ csrf_token() }}">
+
+        {{-- User Role for JS components --}}
+        @auth
+        <meta name="user-role" content="{{ Auth::user()->role }}">
+        @else
+        <meta name="user-role" content="guest">
+        @endauth
+
         @vite(['resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])
         @inertiaHead
     </head>
