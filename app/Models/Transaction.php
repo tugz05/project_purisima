@@ -14,11 +14,12 @@ class Transaction extends Model
         'transaction_id',
         'resident_id',
         'staff_id',
+        'document_type_id',
         'type',
         'title',
-        'description',
         'status',
         'staff_notes',
+        'officer_of_the_day',
         'rejection_reason',
         'required_documents',
         'submitted_documents',
@@ -37,6 +38,14 @@ class Transaction extends Model
         'submitted_at',
         'processed_at',
         'completed_at',
+        'use_ai_generation',
+        'ai_prompt_template',
+        'ai_generated_content',
+        'ai_generated_at',
+        'generated_document_data',
+        'generated_document_path',
+        'document_generated_at',
+        'resident_input_data',
     ];
 
     protected $casts = [
@@ -51,6 +60,12 @@ class Transaction extends Model
         'completed_at' => 'datetime',
         'payment_date' => 'datetime',
         'payment_verified_at' => 'datetime',
+        'use_ai_generation' => 'boolean',
+        'ai_generated_content' => 'array',
+        'ai_generated_at' => 'datetime',
+        'generated_document_data' => 'array',
+        'document_generated_at' => 'datetime',
+        'resident_input_data' => 'array',
     ];
 
     public function resident(): BelongsTo
@@ -63,9 +78,31 @@ class Transaction extends Model
         return $this->belongsTo(User::class, 'staff_id');
     }
 
+    /**
+     * Get the document type relationship
+     * Primary: Uses document_type_id (foreign key)
+     * Fallback: Uses type code if document_type_id is not set
+     */
     public function documentType(): BelongsTo
     {
-        return $this->belongsTo(DocumentType::class, 'type', 'code');
+        // Primary relationship using document_type_id
+        return $this->belongsTo(DocumentType::class, 'document_type_id');
+    }
+
+    /**
+     * Get document type by code (fallback for backward compatibility)
+     */
+    public function getDocumentTypeByCodeAttribute()
+    {
+        if ($this->document_type_id) {
+            return $this->documentType;
+        }
+        
+        if ($this->type) {
+            return DocumentType::where('code', $this->type)->first();
+        }
+        
+        return null;
     }
 
     public function paymentVerifier(): BelongsTo
@@ -141,6 +178,24 @@ class Transaction extends Model
         static::creating(function ($transaction) {
             if (empty($transaction->transaction_id)) {
                 $transaction->transaction_id = 'TXN-' . strtoupper(uniqid());
+            }
+            
+            // Auto-populate document_type_id from type code if not set
+            if (empty($transaction->document_type_id) && !empty($transaction->type)) {
+                $documentType = DocumentType::where('code', $transaction->type)->first();
+                if ($documentType) {
+                    $transaction->document_type_id = $documentType->id;
+                }
+            }
+        });
+
+        static::updating(function ($transaction) {
+            // Auto-populate document_type_id from type code if not set
+            if (empty($transaction->document_type_id) && !empty($transaction->type)) {
+                $documentType = DocumentType::where('code', $transaction->type)->first();
+                if ($documentType) {
+                    $transaction->document_type_id = $documentType->id;
+                }
             }
         });
     }

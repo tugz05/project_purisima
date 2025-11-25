@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Eye, Filter, Clock, CheckCircle, XCircle, AlertCircle, UserPlus } from 'lucide-vue-next';
+import { Search, Eye, Filter, Clock, CheckCircle, XCircle, AlertCircle, UserPlus, FileText } from 'lucide-vue-next';
 import StaffLayout from '@/layouts/staff/Layout.vue';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { useFormHandlers } from '@/composables/useFormHandlers';
@@ -45,6 +45,12 @@ interface Props {
         search?: string;
         status?: string;
         type?: string;
+    };
+    statistics?: {
+        pending?: number;
+        in_progress?: number;
+        completed?: number;
+        rejected?: number;
     };
 }
 
@@ -150,13 +156,45 @@ const getStatusColor = (status: string) => {
     <StaffLayout :breadcrumbs="breadcrumbs">
         <div class="bg-gradient-to-br from-gray-50 to-blue-50/30 min-h-full w-full">
             <div class="mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 md:py-6 max-w-none">
-                <!-- Header Section -->
-                <div class="mb-6 md:mb-8">
-                    <div class="space-y-2">
-                        <h1 class="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 bg-gradient-to-r from-gray-900 to-blue-900 bg-clip-text text-transparent">
-                            Transactions
-                        </h1>
-                        <p class="text-lg md:text-xl text-gray-600 font-medium">Manage document requests and processing</p>
+                <!-- Enhanced Header with Gradient -->
+                <div class="relative overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-xl mb-6 rounded-2xl">
+                    <div class="absolute inset-0 bg-black/10"></div>
+                    <div class="absolute inset-0">
+                        <div class="absolute top-0 left-0 w-72 h-72 bg-white/10 rounded-full -translate-x-36 -translate-y-36"></div>
+                        <div class="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-48 translate-y-48"></div>
+                    </div>
+                    <div class="relative px-4 sm:px-6 lg:px-8 py-8">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+                            <div class="text-white">
+                                <div class="flex items-center gap-4 mb-4">
+                                    <div class="p-3 bg-white/20 rounded-2xl backdrop-blur-sm">
+                                        <FileText class="h-8 w-8" />
+                                    </div>
+                                    <div>
+                                        <h1 class="text-4xl font-bold">Transactions</h1>
+                                        <p class="text-blue-100 text-lg mt-1">Manage document requests and processing</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-6 text-sm text-blue-100">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                                        <span>{{ statistics.pending || 0 }} Pending</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-2 h-2 bg-blue-400 rounded-full"></div>
+                                        <span>{{ statistics.in_progress || 0 }} In Progress</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                                        <span>{{ statistics.completed || 0 }} Completed</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-2 h-2 bg-red-400 rounded-full"></div>
+                                        <span>{{ statistics.rejected || 0 }} Rejected</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

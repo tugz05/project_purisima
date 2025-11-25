@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Transaction;
+use App\Models\DocumentType;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -37,14 +38,23 @@ class TransactionService
                 }
             }
 
+            // Get document type to populate document_type_id
+            $documentType = null;
+            if (isset($data['type'])) {
+                $documentType = DocumentType::where('code', $data['type'])->first();
+            } elseif (isset($data['document_type_id'])) {
+                $documentType = DocumentType::find($data['document_type_id']);
+            }
+
             $transaction = Transaction::create([
                 'resident_id' => $resident->id,
-                'type' => $data['type'],
+                'document_type_id' => $documentType?->id,
+                'type' => $data['type'] ?? $documentType?->code,
                 'title' => $data['title'],
-                'description' => $data['description'] ?? null,
                 'required_documents' => $data['required_documents'] ?? [],
                 'submitted_documents' => $submittedDocuments,
-                'fee_amount' => $data['fee_amount'] ?? 0,
+                'resident_input_data' => $data['required_fields'] ?? [],
+                'fee_amount' => $data['fee_amount'] ?? $documentType?->fee_amount ?? 0,
             ]);
 
             return $transaction;
@@ -75,11 +85,59 @@ class TransactionService
                 $updateData['staff_notes'] = $data['staff_notes'];
             }
 
+            // Handle officer_of_the_day - ALWAYS process it if present in data
+            if (array_key_exists('officer_of_the_day', $data)) {
+                $officerValue = $data['officer_of_the_day'];
+                // Convert empty string to null, otherwise trim and save
+                if (is_string($officerValue)) {
+                    $trimmed = trim($officerValue);
+                    $updateData['officer_of_the_day'] = $trimmed !== '' ? $trimmed : null;
+                } else {
+                    $updateData['officer_of_the_day'] = $officerValue ?: null;
+                }
+                
+                \Log::info('TransactionService: Processing officer_of_the_day', [
+                    'raw_value' => $officerValue,
+                    'raw_type' => gettype($officerValue),
+                    'processed_value' => $updateData['officer_of_the_day'],
+                    'will_be_in_updateData' => isset($updateData['officer_of_the_day']),
+                ]);
+            } else {
+                \Log::warning('TransactionService: officer_of_the_day NOT in data array', [
+                    'available_keys' => array_keys($data),
+                    'data_keys_count' => count($data),
+                    'data_contents' => $data,
+                ]);
+            }
+
             if (isset($data['rejection_reason'])) {
                 $updateData['rejection_reason'] = $data['rejection_reason'];
             }
 
-            $transaction->update($updateData);
+            if (isset($data['document_content'])) {
+                $updateData['generated_document_data'] = [
+                    'content' => $data['document_content'],
+                    'generated_at' => now()->toIso8601String(),
+                    'generated_by' => $staff?->id,
+                ];
+            }
+
+            \Log::info('TransactionService: Final updateData before save', [
+                'updateData_keys' => array_keys($updateData),
+                'officer_of_the_day_in_updateData' => isset($updateData['officer_of_the_day']),
+                'officer_value' => $updateData['officer_of_the_day'] ?? 'NOT SET',
+                'full_updateData' => $updateData,
+            ]);
+
+            // Perform the update
+            $result = $transaction->update($updateData);
+            
+            \Log::info('TransactionService: After update', [
+                'transaction_id' => $transaction->id,
+                'update_result' => $result,
+                'officer_of_the_day_before_refresh' => $transaction->officer_of_the_day,
+                'officer_of_the_day_after_refresh' => $transaction->fresh()->officer_of_the_day,
+            ]);
 
             return $transaction->fresh();
         });
@@ -90,7 +148,7 @@ class TransactionService
      */
     public function getResidentTransactions(User $resident, array $filters = []): Collection
     {
-        $query = $resident->transactions()->with('staff');
+        $query = $resident->transactions()->with(['staff', 'documentType']);
 
         if (isset($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -98,6 +156,10 @@ class TransactionService
 
         if (isset($filters['type'])) {
             $query->where('type', $filters['type']);
+        }
+
+        if (isset($filters['document_type_id'])) {
+            $query->where('document_type_id', $filters['document_type_id']);
         }
 
         return $query->orderBy('created_at', 'desc')->get();
@@ -108,7 +170,7 @@ class TransactionService
      */
     public function getStaffTransactions(array $filters = [], int $perPage = 15)
     {
-        $query = Transaction::with(['resident', 'staff']);
+        $query = Transaction::with(['resident', 'staff', 'documentType']);
 
         if (isset($filters['status']) && $filters['status'] && $filters['status'] !== 'all') {
             $query->where('status', $filters['status']);
@@ -116,6 +178,14 @@ class TransactionService
 
         if (isset($filters['type']) && $filters['type'] && $filters['type'] !== 'all') {
             $query->where('type', $filters['type']);
+        }
+
+        if (isset($filters['document_type_id']) && $filters['document_type_id'] && $filters['document_type_id'] !== 'all') {
+            $query->where('document_type_id', $filters['document_type_id']);
+        }
+
+        if (isset($filters['payment_status']) && $filters['payment_status'] && $filters['payment_status'] !== 'all') {
+            $query->where('payment_status', $filters['payment_status']);
         }
 
         if (isset($filters['staff_id']) && $filters['staff_id']) {
@@ -128,11 +198,14 @@ class TransactionService
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('transaction_id', 'like', "%{$searchTerm}%")
                   ->orWhere('title', 'like', "%{$searchTerm}%")
-                  ->orWhere('description', 'like', "%{$searchTerm}%")
                   ->orWhereHas('resident', function ($residentQuery) use ($searchTerm) {
                       $residentQuery->where('first_name', 'like', "%{$searchTerm}%")
                                    ->orWhere('last_name', 'like', "%{$searchTerm}%")
                                    ->orWhere('name', 'like', "%{$searchTerm}%");
+                  })
+                  ->orWhereHas('documentType', function ($docTypeQuery) use ($searchTerm) {
+                      $docTypeQuery->where('name', 'like', "%{$searchTerm}%")
+                                   ->orWhere('code', 'like', "%{$searchTerm}%");
                   });
             });
         }
@@ -181,6 +254,7 @@ class TransactionService
                         'name' => $documentType->name,
                         'description' => $documentType->description,
                         'required_documents' => $documentType->required_documents ?? [],
+                        'required_fields' => $documentType->required_fields ?? [],
                         'fee' => $documentType->fee_amount,
                         'processing_days' => $documentType->processing_days,
                         'requires_payment' => $documentType->requires_payment,

@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register custom route middleware
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'profile.completed' => \App\Http\Middleware\EnsureProfileCompleted::class,
         ]);
 
         // Trust ngrok and other proxies so HTTPS is correctly detected behind them

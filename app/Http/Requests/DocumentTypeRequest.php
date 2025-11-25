@@ -30,6 +30,8 @@ class DocumentTypeRequest extends FormRequest
             'fee_amount' => ['required', 'numeric', 'min:0'],
             'required_documents' => ['nullable', 'array'],
             'required_documents.*' => ['string', 'max:255'],
+            'required_fields' => ['nullable', 'array'],
+            'required_fields.*' => ['string', 'max:255'],
             'document_templates' => ['nullable', 'array'],
             'document_templates.*' => ['file', 'mimes:pdf,doc,docx,jpg,jpeg,png', 'max:10240'], // 10MB max
             'processing_steps' => ['nullable', 'array'],

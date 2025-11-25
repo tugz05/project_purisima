@@ -15,7 +15,7 @@ class ResidentProfileService
     {
         // Only allow known fields
         $allowed = [
-            'first_name','middle_name','last_name','phone','birth_date','sex','civil_status','occupation',
+            'first_name','middle_name','last_name','suffix','phone','birth_date','sex','civil_status','occupation',
             'purok','barangay','municipality','province','country',
         ];
 
@@ -54,7 +54,7 @@ class ResidentProfileService
     public function update(User $user, array $data): User
     {
         $allowed = [
-            'first_name','middle_name','last_name','phone','birth_date','sex','civil_status','occupation',
+            'first_name','middle_name','last_name','suffix','phone','birth_date','sex','civil_status','occupation',
             'purok','barangay','municipality','province','country',
         ];
 

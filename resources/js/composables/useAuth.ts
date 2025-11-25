@@ -8,6 +8,7 @@ export interface User {
     first_name?: string;
     last_name?: string;
     middle_name?: string;
+    suffix?: string;
     phone?: string;
     birth_date?: string;
     sex?: string;
@@ -16,6 +17,7 @@ export interface User {
     purok?: string;
     photo_url?: string;
     email_verified_at?: string;
+    profile_completed_at?: string;
     created_at: string;
     updated_at: string;
 }
@@ -60,6 +62,10 @@ export function useAuth() {
         return parts.length > 0 ? parts.join(' ') : user.value.name || 'User';
     });
 
+    const isProfileCompleted = computed(() => {
+        return !!user.value.profile_completed_at;
+    });
+
     return {
         user,
         isAuthenticated,
@@ -67,5 +73,6 @@ export function useAuth() {
         userInitials,
         displayName,
         fullName,
+        isProfileCompleted,
     };
 }

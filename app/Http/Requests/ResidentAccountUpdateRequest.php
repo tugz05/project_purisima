@@ -17,6 +17,7 @@ class ResidentAccountUpdateRequest extends FormRequest
             'first_name' => ['nullable','string','max:100'],
             'middle_name' => ['nullable','string','max:100'],
             'last_name' => ['nullable','string','max:100'],
+            'suffix' => ['nullable','string','max:50'],
             'phone' => ['nullable','string','max:50'],
             'birth_date' => ['nullable','date'],
             'sex' => ['nullable','in:male,female,other'],

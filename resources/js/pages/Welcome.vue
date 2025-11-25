@@ -7,7 +7,7 @@ import {
   Send, AlertTriangle, MapPin, Phone, Mail, Globe, Accessibility, Lock,
   Menu, X, CheckCircle2, Info, Sparkles, User, Calendar, Award, Building2,
   Clock, CheckCircle, Star, Heart, Target, Zap, Globe2, Database, Eye,
-  ArrowRight
+  ArrowRight, Navigation, Radio
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 
@@ -365,7 +365,7 @@ const closeAnnouncementView = () => {
 </script>
 
 <template>
-  <Head title="PURISIMA – Barangay Safety & Incident Management">
+  <Head title="Uni Respond – Barangay Safety & Incident Management">
     <link rel="preconnect" href="https://rsms.me/" />
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
   </Head>
@@ -397,11 +397,15 @@ const closeAnnouncementView = () => {
     <header class="sticky top-0 z-40 border-b border-[#E0F2FE] bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/75">
       <nav class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6" aria-label="Primary">
         <div class="flex items-center gap-3">
-          <img src="/images/seal.svg" alt="Barangay Seal" class="h-8 w-8 animate-float" @error="$event.target.style.display='none'" />
+          <img 
+            src="/images/logo/unirespond.jpg" 
+            alt="Uni Respond Logo" 
+            class="h-10 w-10 rounded-lg object-contain animate-float" 
+            @error="$event.target.style.display='none'" 
+          />
           <div class="leading-tight">
             <div class="flex items-center gap-2">
-              <Shield class="h-5 w-5 text-[#0284C7]" />
-              <span class="text-sm font-semibold tracking-wide text-[#0C4A6E]">PURISIMA</span>
+              <span class="text-sm font-bold tracking-wide text-[#0C4A6E]">Uni Respond</span>
             </div>
             <p class="text-[11px] text-[#155e75] opacity-80">Barangay Safety & Incident Management</p>
           </div>
@@ -516,29 +520,186 @@ const closeAnnouncementView = () => {
         </div>
       </section>
 
-      <!-- Feature cards -->
-      <section class="-mt-10 px-6 sm:-mt-12">
-        <div class="mx-auto grid max-w-7xl grid-cols-1 gap-5 md:grid-cols-3">
-          <div data-reveal class="reveal rounded-lg bg-white p-6 shadow-xl ring-1 ring-black/5">
-            <div class="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#E0F2FE] text-[#0284C7]">
-              <FileText class="h-5 w-5" />
+      <!-- Primary Features: Calamity Reports & Location Tracking -->
+      <section class="relative px-6 py-20 overflow-hidden bg-gradient-to-br from-red-50 via-orange-50 to-amber-50">
+        <!-- Animated background elements -->
+        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+          <div class="absolute top-10 left-10 w-96 h-96 bg-red-200/20 rounded-full blur-3xl animate-pulse"></div>
+          <div class="absolute bottom-10 right-10 w-96 h-96 bg-orange-200/20 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+        </div>
+
+        <div class="relative mx-auto max-w-7xl">
+          <!-- Section Header -->
+          <div class="text-center mb-16">
+            <div class="inline-flex items-center justify-center gap-3 mb-4">
+              <div class="p-3 bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl shadow-lg">
+                <AlertTriangle class="h-8 w-8 text-white" />
+              </div>
+              <h2 class="text-4xl md:text-5xl font-bold text-gray-900">Primary Features</h2>
             </div>
-            <div class="mb-1 font-semibold">Our Campaign</div>
-            <p class="text-[13px] text-[#475569]">Transparent incident logging and public awareness for a safer community.</p>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+              Real-time calamity reporting and location tracking for faster emergency response
+            </p>
           </div>
-          <div data-reveal class="reveal rounded-lg bg-[#0EA5E9] p-6 text-white shadow-xl ring-1 ring-black/5">
-            <div class="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-              <Send class="h-5 w-5" />
+
+          <!-- Feature Cards -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            <!-- Calamity Reports Feature -->
+            <div data-reveal class="reveal group relative bg-white rounded-3xl p-8 md:p-10 shadow-2xl border-2 border-red-100 hover:border-red-300 transition-all duration-500 transform hover:-translate-y-2 overflow-hidden">
+              <!-- Background decoration -->
+              <div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-red-100/30 to-orange-100/30 rounded-full -translate-y-32 translate-x-32"></div>
+              
+              <div class="relative">
+                <div class="flex items-center gap-4 mb-6">
+                  <div class="p-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl shadow-xl group-hover:scale-110 transition-transform duration-300">
+                    <AlertTriangle class="h-10 w-10 text-white" />
+                  </div>
+                  <div>
+                    <h3 class="text-3xl font-bold text-gray-900 mb-1">Calamity Reports</h3>
+                    <p class="text-sm text-gray-500">Emergency incident reporting system</p>
+                  </div>
+                </div>
+                
+                <p class="text-gray-600 mb-6 text-lg leading-relaxed">
+                  Report emergencies instantly with automatic location sharing, detailed needs assessment, and real-time status tracking.
+                </p>
+
+                <div class="space-y-4 mb-6">
+                  <div class="flex items-start gap-3 p-4 bg-red-50 rounded-xl border border-red-100">
+                    <MapPin class="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div class="font-semibold text-gray-900 mb-1">Automatic Location Sharing</div>
+                      <p class="text-sm text-gray-600">Your location is automatically captured and shared with responders</p>
+                    </div>
+                  </div>
+                  
+                  <div class="flex items-start gap-3 p-4 bg-orange-50 rounded-xl border border-orange-100">
+                    <Heart class="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div class="font-semibold text-gray-900 mb-1">Needs Assessment</div>
+                      <p class="text-sm text-gray-600">Specify your needs: food, water, medicine, shelter, and more</p>
+                    </div>
+                  </div>
+                  
+                  <div class="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-100">
+                    <Users class="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div class="font-semibold text-gray-900 mb-1">Vulnerable Groups</div>
+                      <p class="text-sm text-gray-600">Indicate if you have elderly, children, PWD, or pregnant individuals</p>
+                    </div>
+                  </div>
+                  
+                  <div class="flex items-start gap-3 p-4 bg-red-50 rounded-xl border border-red-100">
+                    <Clock class="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div class="font-semibold text-gray-900 mb-1">Real-time Status Updates</div>
+                      <p class="text-sm text-gray-600">Track your report status from pending to resolved</p>
+                    </div>
+                  </div>
+                </div>
+
+                <Link 
+                  :href="isAuthed ? '/resident/calamity' : register().url" 
+                  class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold rounded-xl hover:shadow-xl transition-all duration-300 group"
+                >
+                  <AlertTriangle class="h-5 w-5 group-hover:animate-pulse" />
+                  {{ isAuthed ? 'View Reports' : 'Get Started' }}
+                  <Send class="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </div>
             </div>
-            <div class="mb-1 font-semibold">Become Volunteer</div>
-            <p class="text-[13px] opacity-90">Join coordination efforts and help respond to local incidents.</p>
+
+            <!-- Location Tracking Feature -->
+            <div data-reveal class="reveal group relative bg-white rounded-3xl p-8 md:p-10 shadow-2xl border-2 border-blue-100 hover:border-blue-300 transition-all duration-500 transform hover:-translate-y-2 overflow-hidden">
+              <!-- Background decoration -->
+              <div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-100/30 to-cyan-100/30 rounded-full -translate-y-32 translate-x-32"></div>
+              
+              <div class="relative">
+                <div class="flex items-center gap-4 mb-6">
+                  <div class="p-5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl shadow-xl group-hover:scale-110 transition-transform duration-300">
+                    <Navigation class="h-10 w-10 text-white" />
+                  </div>
+                  <div>
+                    <h3 class="text-3xl font-bold text-gray-900 mb-1">Location Tracking</h3>
+                    <p class="text-sm text-gray-500">Real-time location sharing & monitoring</p>
+                  </div>
+                </div>
+                
+                <p class="text-gray-600 mb-6 text-lg leading-relaxed">
+                  See staff and residents on an interactive map. Share your location in real-time for coordinated emergency response.
+                </p>
+
+                <div class="space-y-4 mb-6">
+                  <div class="flex items-start gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <div class="h-5 w-5 rounded-full bg-green-500 border-2 border-white shadow-sm mt-0.5 flex-shrink-0"></div>
+                    <div>
+                      <div class="font-semibold text-gray-900 mb-1">Staff Locations (Green)</div>
+                      <p class="text-sm text-gray-600">View all staff members on the map for quick coordination</p>
+                    </div>
+                  </div>
+                  
+                  <div class="flex items-start gap-3 p-4 bg-cyan-50 rounded-xl border border-cyan-100">
+                    <div class="h-5 w-5 rounded-full bg-blue-500 border-2 border-white shadow-sm mt-0.5 flex-shrink-0"></div>
+                    <div>
+                      <div class="font-semibold text-gray-900 mb-1">Resident Locations (Blue)</div>
+                      <p class="text-sm text-gray-600">See where other residents are located during emergencies</p>
+                    </div>
+                  </div>
+                  
+                  <div class="flex items-start gap-3 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                    <Radio class="h-5 w-5 text-indigo-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div class="font-semibold text-gray-900 mb-1">Real-time Updates</div>
+                      <p class="text-sm text-gray-600">Locations update automatically every 5 seconds</p>
+                    </div>
+                  </div>
+                  
+                  <div class="flex items-start gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <Shield class="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div class="font-semibold text-gray-900 mb-1">Privacy Controls</div>
+                      <p class="text-sm text-gray-600">Control when and with whom you share your location</p>
+                    </div>
+                  </div>
+                </div>
+
+                <Link 
+                  :href="isAuthed ? '/resident/calamity/map' : register().url" 
+                  class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-xl hover:shadow-xl transition-all duration-300 group"
+                >
+                  <Navigation class="h-5 w-5 group-hover:animate-spin" />
+                  {{ isAuthed ? 'View Map' : 'Get Started' }}
+                  <Send class="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </div>
+            </div>
           </div>
-          <div data-reveal class="reveal rounded-lg bg-white p-6 shadow-xl ring-1 ring-black/5">
-            <div class="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#E0F2FE] text-[#2563EB]">
-              <Users class="h-5 w-5" />
+
+          <!-- How It Works -->
+          <div class="bg-white/80 backdrop-blur-sm rounded-3xl p-8 md:p-12 shadow-xl border border-gray-200">
+            <h3 class="text-2xl font-bold text-gray-900 text-center mb-8">How It Works</h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div class="text-center">
+                <div class="inline-flex items-center justify-center h-16 w-16 rounded-full bg-gradient-to-r from-red-500 to-orange-500 text-white text-2xl font-bold mb-4 shadow-lg">1</div>
+                <h4 class="font-semibold text-gray-900 mb-2">Report Emergency</h4>
+                <p class="text-sm text-gray-600">Tap the emergency button and share your location automatically</p>
+              </div>
+              <div class="text-center">
+                <div class="inline-flex items-center justify-center h-16 w-16 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white text-2xl font-bold mb-4 shadow-lg">2</div>
+                <h4 class="font-semibold text-gray-900 mb-2">Specify Needs</h4>
+                <p class="text-sm text-gray-600">Tell us what you need: food, water, medicine, shelter, etc.</p>
+              </div>
+              <div class="text-center">
+                <div class="inline-flex items-center justify-center h-16 w-16 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-2xl font-bold mb-4 shadow-lg">3</div>
+                <h4 class="font-semibold text-gray-900 mb-2">Track on Map</h4>
+                <p class="text-sm text-gray-600">Staff can see your location and dispatch help immediately</p>
+              </div>
+              <div class="text-center">
+                <div class="inline-flex items-center justify-center h-16 w-16 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 text-white text-2xl font-bold mb-4 shadow-lg">4</div>
+                <h4 class="font-semibold text-gray-900 mb-2">Get Assistance</h4>
+                <p class="text-sm text-gray-600">Receive help from staff who can track your location in real-time</p>
+              </div>
             </div>
-            <div class="mb-1 font-semibold">Join Our Team</div>
-            <p class="text-[13px] text-[#475569]">Partner with officials and enforcers to deliver faster response.</p>
           </div>
         </div>
       </section>
@@ -1092,8 +1253,13 @@ const closeAnnouncementView = () => {
         <div class="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-6 py-10 md:grid-cols-4">
           <div class="space-y-2">
             <div class="flex items-center gap-2">
-              <img src="/images/seal.svg" alt="Barangay Seal" class="h-8 w-8" @error="$event.target.style.display='none'" />
-              <span class="text-sm font-semibold tracking-wide text-[#0C4A6E]">PURISIMA</span>
+              <img 
+                src="/images/logo/unirespond.jpg" 
+                alt="Uni Respond Logo" 
+                class="h-8 w-8 rounded-lg object-contain" 
+                @error="$event.target.style.display='none'" 
+              />
+              <span class="text-sm font-semibold tracking-wide text-[#0C4A6E]">Uni Respond</span>
             </div>
             <p class="text-[12px] text-[#0C4A6E]/80">Barangay Safety & Incident Management</p>
             <div class="mt-3 space-y-1 text-[13px] text-[#0f172a]">
@@ -1134,7 +1300,7 @@ const closeAnnouncementView = () => {
         </div>
         <div class="border-t border-[#E0F2FE] bg-white">
           <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-6 py-4 text-center text-[12px] text-[#0f172a] sm:flex-row">
-            <span>© {{ new Date().getFullYear() }} Barangay Purisima. All rights reserved.</span>
+            <span>© {{ new Date().getFullYear() }} Uni Respond. All rights reserved.</span>
             <span>Built for public service • v1.0</span>
           </div>
         </div>

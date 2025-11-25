@@ -222,10 +222,37 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
     Route::get('transactions/{transaction}', [\App\Http\Controllers\Staff\TransactionController::class, 'show'])->name('transactions.show');
     Route::put('transactions/{transaction}', [\App\Http\Controllers\Staff\TransactionController::class, 'update'])->name('transactions.update');
     Route::post('transactions/{transaction}/assign', [\App\Http\Controllers\Staff\TransactionController::class, 'assign'])->name('transactions.assign');
+    Route::post('transactions/{transaction}/load-template', [\App\Http\Controllers\Staff\TransactionController::class, 'loadTemplate'])->name('transactions.load-template');
+    Route::post('transactions/{transaction}/generate-ai', [\App\Http\Controllers\Staff\TransactionController::class, 'generateWithAI'])->name('transactions.generate-ai');
+    Route::get('transactions/{transaction}/print-certificate', [\App\Http\Controllers\Staff\TransactionController::class, 'printCertificate'])->name('transactions.print-certificate');
+
+    // Payment processing routes
+    Route::get('transactions/{transaction}/payment', [\App\Http\Controllers\Staff\PaymentController::class, 'show'])->name('payments.show');
+    Route::post('transactions/{transaction}/payment', [\App\Http\Controllers\Staff\PaymentController::class, 'process'])->name('payments.process');
+    Route::post('transactions/{transaction}/payment/failed', [\App\Http\Controllers\Staff\PaymentController::class, 'markFailed'])->name('payments.mark-failed');
+    Route::post('transactions/{transaction}/payment/refund', [\App\Http\Controllers\Staff\PaymentController::class, 'refund'])->name('payments.refund');
+    Route::post('transactions/{transaction}/payment/reset', [\App\Http\Controllers\Staff\PaymentController::class, 'reset'])->name('payments.reset');
+    Route::get('payments/statistics', [\App\Http\Controllers\Staff\PaymentController::class, 'statistics'])->name('payments.statistics');
 
     // Document Type management routes
     Route::resource('document-types', \App\Http\Controllers\Staff\DocumentTypeController::class);
-    Route::post('document-types/{documentType}/toggle-status', [\App\Http\Controllers\Staff\DocumentTypeController::class, 'toggleStatus'])->name('document-types.toggle-status');
+    
+    // Certificate Template management routes (nested under document-types)
+    Route::prefix('document-types/{documentType}')->name('document-types.')->group(function () {
+        Route::get('certificate-templates', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'index'])->name('certificate-templates.index');
+        Route::get('certificate-templates/create', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'create'])->name('certificate-templates.create');
+        Route::post('certificate-templates', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'store'])->name('certificate-templates.store');
+        Route::get('certificate-templates/{certificateTemplate}', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'show'])->name('certificate-templates.show');
+        Route::get('certificate-templates/{certificateTemplate}/edit', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'edit'])->name('certificate-templates.edit');
+        Route::put('certificate-templates/{certificateTemplate}', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'update'])->name('certificate-templates.update');
+        Route::delete('certificate-templates/{certificateTemplate}', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'destroy'])->name('certificate-templates.destroy');
+        Route::post('certificate-templates/{certificateTemplate}/set-default', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'setDefault'])->name('certificate-templates.set-default');
+        Route::post('certificate-templates/{certificateTemplate}/preview', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'preview'])->name('certificate-templates.preview');
+        Route::get('certificate-templates/{certificateTemplate}/fields', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'getFields'])->name('certificate-templates.fields');
+    });
+
+    // Document Request processing routes (individual requests from residents)
+    Route::resource('document-requests', \App\Http\Controllers\Staff\DocumentRequestController::class);
 
     // Barangay Officials management routes
     Route::resource('barangay-officials', \App\Http\Controllers\Staff\BarangayOfficialController::class);
@@ -235,6 +262,21 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
     Route::post('announcements/{announcement}/toggle-publication', [\App\Http\Controllers\Staff\AnnouncementController::class, 'togglePublication'])->name('announcements.toggle-publication');
     Route::post('announcements/{announcement}/toggle-featured', [\App\Http\Controllers\Staff\AnnouncementController::class, 'toggleFeatured'])->name('announcements.toggle-featured');
     Route::delete('announcements/{announcement}/attachments', [\App\Http\Controllers\Staff\AnnouncementController::class, 'deleteAttachment'])->name('announcements.delete-attachment');
+
+    // Resident management routes
+    Route::get('residents', [\App\Http\Controllers\Staff\ResidentController::class, 'index'])->name('residents.index');
+    
+    // Calamity Report management routes
+    Route::get('calamity', [\App\Http\Controllers\Staff\CalamityReportController::class, 'index'])->name('calamity.index');
+    Route::get('calamity/map', [\App\Http\Controllers\Staff\CalamityReportController::class, 'map'])->name('calamity.map');
+    Route::get('calamity/active-reports', [\App\Http\Controllers\Staff\CalamityReportController::class, 'getActiveReports'])->name('calamity.active-reports');
+    
+    // Location tracking routes
+    Route::post('location/update', [\App\Http\Controllers\Staff\LocationController::class, 'update'])->name('location.update');
+    Route::get('location/residents', [\App\Http\Controllers\Staff\LocationController::class, 'getResidentLocations'])->name('location.residents');
+    Route::get('calamity/{calamityReport}', [\App\Http\Controllers\Staff\CalamityReportController::class, 'show'])->name('calamity.show');
+    Route::put('calamity/{calamityReport}', [\App\Http\Controllers\Staff\CalamityReportController::class, 'update'])->name('calamity.update');
+    
     Route::post('announcements/reorder', [\App\Http\Controllers\Staff\AnnouncementController::class, 'reorder'])->name('announcements.reorder');
 
     // Notification routes
@@ -272,19 +314,32 @@ Route::middleware(['auth', 'role:enforcer'])->prefix('enforcer')->name('enforcer
     })->name('dashboard');
 });
 
+// Onboarding and account routes (excluded from profile completion check)
 Route::middleware(['auth', 'role:resident'])->prefix('resident')->name('resident.')->group(function () {
+    Route::get('onboarding', [OnboardingController::class, 'show'])->name('onboarding.show');
+    Route::post('onboarding', [OnboardingController::class, 'store'])->name('onboarding.store');
+    
+    Route::get('account', [AccountController::class, 'edit'])->name('account.edit');
+    Route::post('account', [AccountController::class, 'update'])->name('account.update');
+});
+
+// All other resident routes (require profile completion)
+Route::middleware(['auth', 'role:resident', 'profile.completed'])->prefix('resident')->name('resident.')->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('resident/Dashboard');
     })->name('dashboard');
 
-    Route::get('onboarding', [OnboardingController::class, 'show'])->name('onboarding.show');
-    Route::post('onboarding', [OnboardingController::class, 'store'])->name('onboarding.store');
-
-    Route::get('account', [AccountController::class, 'edit'])->name('account.edit');
-    Route::post('account', [AccountController::class, 'update'])->name('account.update');
-
     // Transaction routes
     Route::resource('transactions', \App\Http\Controllers\Resident\TransactionController::class);
+
+    // Calamity Report routes
+    // Map route must be defined BEFORE resource route to avoid route conflict
+    Route::get('calamity/map', [\App\Http\Controllers\Resident\LocationController::class, 'map'])->name('calamity.map');
+    Route::resource('calamity', \App\Http\Controllers\Resident\CalamityReportController::class)->except(['create', 'edit', 'destroy']);
+    Route::post('calamity/{calamityReport}/update-location', [\App\Http\Controllers\Resident\CalamityReportController::class, 'updateLocation'])->name('calamity.update-location');
+    
+    // Location tracking routes
+    Route::post('location/update', [\App\Http\Controllers\Resident\LocationController::class, 'update'])->name('location.update');
 
         // Messaging routes
         Route::prefix('messaging')->name('messaging.')->group(function () {

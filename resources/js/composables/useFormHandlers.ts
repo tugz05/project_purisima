@@ -87,6 +87,7 @@ export function useFormHandlers() {
             title: '',
             description: '',
             required_documents: [] as string[],
+            required_fields: {} as Record<string, string>,
             submitted_documents: {} as Record<string, File[]>,
             fee_amount: 0,
         });

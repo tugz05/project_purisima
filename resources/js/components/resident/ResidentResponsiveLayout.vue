@@ -60,10 +60,13 @@ onUnmounted(() => {
         <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                        <span class="text-white font-bold text-sm">P</span>
-                    </div>
-                    <h1 class="text-lg font-semibold text-gray-900">Purisima</h1>
+                    <img 
+                        src="/images/logo/unirespond.jpg" 
+                        alt="Uni Respond Logo" 
+                        class="h-8 w-8 rounded-lg object-contain"
+                        @error="$event.target.style.display='none'"
+                    />
+                    <h1 class="text-lg font-semibold text-gray-900">Uni Respond</h1>
                 </div>
                 <div class="flex items-center gap-2">
                     <img

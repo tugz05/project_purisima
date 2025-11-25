@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { watch, nextTick, ref } from 'vue';
+import { watch, nextTick, ref, onBeforeUnmount } from 'vue';
 import resident from '@/routes/resident';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,8 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Plus, FileText, Clock, Eye, Edit, ArrowLeft, CheckCircle, XCircle, AlertCircle, User, Calendar, DollarSign, Upload, X } from 'lucide-vue-next';
+import { Plus, FileText, Clock, Eye, Edit, ArrowLeft, CheckCircle, XCircle, AlertCircle, User, Calendar, DollarSign, Upload, X, Camera, RotateCcw } from 'lucide-vue-next';
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { useTransactions } from '@/composables/useTransactions';
@@ -41,6 +40,7 @@ interface TransactionType {
     name: string;
     fee: number;
     required_documents: string[];
+    required_fields?: string[];
 }
 
 interface Props {
@@ -87,6 +87,15 @@ const editSheetOpen = ref(false);
 const selectedTransaction = ref<Transaction | null>(null);
 const editForm = ref<any>(null);
 
+// Camera states for each document type
+const cameraStates = ref<Record<string, {
+    isActive: boolean;
+    stream: MediaStream | null;
+    videoElement: HTMLVideoElement | null;
+    mode: 'upload' | 'camera' | 'preview';
+    capturedImage: string | null; // Base64 data URL for preview
+}>>({});
+
 // Breadcrumbs
 const breadcrumbs = residentTransactionsBreadcrumbs.value;
 
@@ -111,6 +120,147 @@ const submitCreate = () => {
 const applyFilters = () => {
     applyFiltersUtil(filterForm, resident.transactions.index().url);
 };
+
+// Camera functions
+const initializeCameraState = (docType: string) => {
+    if (!cameraStates.value[docType]) {
+        cameraStates.value[docType] = {
+            isActive: false,
+            stream: null,
+            videoElement: null,
+            mode: 'upload',
+            capturedImage: null
+        };
+    }
+};
+
+const switchToCamera = async (docType: string) => {
+    initializeCameraState(docType);
+    cameraStates.value[docType].mode = 'camera';
+    
+    try {
+        // Try to get back camera first (for mobile devices)
+        let stream: MediaStream | null = null;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'environment' }
+            });
+        } catch (e) {
+            // Fallback to any available camera
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: true 
+            });
+        }
+        
+        cameraStates.value[docType].stream = stream;
+        cameraStates.value[docType].isActive = true;
+        
+        await nextTick();
+        const video = document.getElementById(`camera-${docType}`) as HTMLVideoElement;
+        if (video) {
+            video.srcObject = stream;
+            await video.play();
+            cameraStates.value[docType].videoElement = video;
+        }
+    } catch (error) {
+        console.error('Error accessing camera:', error);
+        alert('Unable to access camera. Please check permissions and try again.');
+        cameraStates.value[docType].mode = 'upload';
+        cameraStates.value[docType].isActive = false;
+    }
+};
+
+const switchToUpload = (docType: string) => {
+    initializeCameraState(docType);
+    stopCamera(docType);
+    cameraStates.value[docType].mode = 'upload';
+};
+
+const stopCamera = (docType: string) => {
+    if (cameraStates.value[docType]?.stream) {
+        cameraStates.value[docType].stream.getTracks().forEach(track => track.stop());
+        cameraStates.value[docType].stream = null;
+        cameraStates.value[docType].isActive = false;
+        
+        if (cameraStates.value[docType].videoElement) {
+            cameraStates.value[docType].videoElement.srcObject = null;
+            cameraStates.value[docType].videoElement = null;
+        }
+    }
+};
+
+const capturePhoto = (docType: string) => {
+    const video = cameraStates.value[docType]?.videoElement;
+    if (!video) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    
+    if (ctx) {
+        ctx.drawImage(video, 0, 0);
+        
+        // Convert to data URL for preview
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        cameraStates.value[docType].capturedImage = dataUrl;
+        
+        // Stop camera and show preview
+        stopCamera(docType);
+        cameraStates.value[docType].mode = 'preview';
+    }
+};
+
+const confirmPhoto = (docType: string) => {
+    if (!cameraStates.value[docType]?.capturedImage) return;
+    
+    // Convert data URL to blob, then to File
+    fetch(cameraStates.value[docType].capturedImage!)
+        .then(res => res.blob())
+        .then(blob => {
+            const fileName = `${docType}_${Date.now()}.jpg`;
+            const file = new File([blob], fileName, { type: 'image/jpeg' });
+            addSubmittedDocument(createForm, docType, file);
+            
+            // Reset camera state
+            cameraStates.value[docType].capturedImage = null;
+            cameraStates.value[docType].mode = 'upload';
+        })
+        .catch(error => {
+            console.error('Error converting image to file:', error);
+            alert('Error processing image. Please try again.');
+        });
+};
+
+const retakePhoto = (docType: string) => {
+    cameraStates.value[docType].capturedImage = null;
+    switchToCamera(docType);
+};
+
+// Initialize camera state when document type changes
+watch(() => selectedType.value, () => {
+    if (selectedType.value && props.transactionTypes[selectedType.value]?.required_documents) {
+        props.transactionTypes[selectedType.value].required_documents.forEach((doc: string) => {
+            initializeCameraState(doc);
+        });
+    }
+});
+
+// Cleanup camera on component unmount or sheet close
+watch(() => sheetOpen.value, (isOpen) => {
+    if (!isOpen) {
+        Object.keys(cameraStates.value).forEach(docType => {
+            stopCamera(docType);
+        });
+    }
+});
+
+// Cleanup on component unmount
+onBeforeUnmount(() => {
+    Object.keys(cameraStates.value).forEach(docType => {
+        stopCamera(docType);
+    });
+});
 
 // View and Edit methods
 const openViewSheet = (transaction: Transaction) => {
@@ -228,17 +378,6 @@ watch(sheetOpen, (newValue) => {
                                             />
                                         </div>
 
-                                        <div v-if="selectedType" class="space-y-3">
-                                            <Label for="description" class="text-base font-bold text-gray-800">Description</Label>
-                                            <Textarea
-                                                id="description"
-                                                v-model="createForm.description"
-                                                placeholder="Additional details or special requirements"
-                                                rows="5"
-                                                class="resize-none border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 text-base"
-                                            />
-                                        </div>
-
                                         <div v-if="selectedType" class="space-y-4">
                                             <Label class="text-base font-bold text-gray-800">Required Documents</Label>
 
@@ -260,8 +399,32 @@ watch(sheetOpen, (newValue) => {
                                                         </div>
                                                     </div>
 
-                                                    <!-- Upload Area for this specific document -->
-                                                    <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-blue-400 transition-colors bg-white">
+                                                    <!-- Upload Mode Selection -->
+                                                    <div class="flex gap-2 mb-4">
+                                                        <Button
+                                                            type="button"
+                                                            :variant="(cameraStates[doc]?.mode || 'upload') === 'upload' ? 'default' : 'outline'"
+                                                            size="sm"
+                                                            @click="switchToUpload(doc)"
+                                                            class="flex-1"
+                                                        >
+                                                            <Upload class="h-4 w-4 mr-2" />
+                                                            Upload File
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            :variant="(cameraStates[doc]?.mode || 'upload') === 'camera' ? 'default' : 'outline'"
+                                                            size="sm"
+                                                            @click="switchToCamera(doc)"
+                                                            class="flex-1"
+                                                        >
+                                                            <Camera class="h-4 w-4 mr-2" />
+                                                            Use Camera
+                                                        </Button>
+                                                    </div>
+
+                                                    <!-- Upload Mode -->
+                                                    <div v-if="(cameraStates[doc]?.mode || 'upload') === 'upload'" class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-blue-400 transition-colors bg-white">
                                                         <input
                                                             type="file"
                                                             multiple
@@ -275,6 +438,80 @@ watch(sheetOpen, (newValue) => {
                                                             <p class="text-sm text-gray-600 mb-1 font-medium">Click to upload {{ doc.replace('_', ' ').toLowerCase() }}</p>
                                                             <p class="text-xs text-gray-500">PDF, DOC, DOCX, JPG, PNG (max 10MB each)</p>
                                                         </label>
+                                                    </div>
+
+                                                    <!-- Camera Mode -->
+                                                    <div v-if="(cameraStates[doc]?.mode || 'upload') === 'camera'" class="space-y-4">
+                                                        <div class="relative border-2 border-blue-300 rounded-xl overflow-hidden bg-black">
+                                                            <video
+                                                                :id="`camera-${doc}`"
+                                                                autoplay
+                                                                playsinline
+                                                                class="w-full h-auto max-h-[60vh] sm:max-h-96 object-contain"
+                                                            ></video>
+                                                            <div v-if="!cameraStates[doc]?.isActive" class="absolute inset-0 flex items-center justify-center bg-gray-900">
+                                                                <div class="text-center text-white">
+                                                                    <Camera class="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                                                    <p class="text-sm">Loading camera...</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="flex gap-2">
+                                                            <Button
+                                                                type="button"
+                                                                @click="capturePhoto(doc)"
+                                                                :disabled="!cameraStates[doc]?.isActive"
+                                                                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                                            >
+                                                                <Camera class="h-4 w-4 mr-2" />
+                                                                Capture Photo
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                @click="switchToUpload(doc)"
+                                                                class="flex-1"
+                                                            >
+                                                                <RotateCcw class="h-4 w-4 mr-2" />
+                                                                Cancel
+                                                            </Button>
+                                                        </div>
+                                                        <p class="text-xs text-gray-500 text-center">
+                                                            Make sure your document is clearly visible and well-lit
+                                                        </p>
+                                                    </div>
+
+                                                    <!-- Preview Mode -->
+                                                    <div v-if="(cameraStates[doc]?.mode || 'upload') === 'preview'" class="space-y-4">
+                                                        <div class="relative border-2 border-green-300 rounded-xl overflow-hidden bg-black">
+                                                            <img
+                                                                :src="cameraStates[doc]?.capturedImage"
+                                                                alt="Captured document"
+                                                                class="w-full h-auto max-h-[60vh] sm:max-h-96 object-contain"
+                                                            />
+                                                        </div>
+                                                        <div class="flex gap-2">
+                                                            <Button
+                                                                type="button"
+                                                                @click="confirmPhoto(doc)"
+                                                                class="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                                                            >
+                                                                <CheckCircle class="h-4 w-4 mr-2" />
+                                                                Confirm & Upload
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                @click="retakePhoto(doc)"
+                                                                class="flex-1"
+                                                            >
+                                                                <RotateCcw class="h-4 w-4 mr-2" />
+                                                                Retake
+                                                            </Button>
+                                                        </div>
+                                                        <p class="text-xs text-gray-500 text-center">
+                                                            Review your captured image. If it looks good, confirm to upload.
+                                                        </p>
                                                     </div>
 
                                                     <!-- Uploaded Files for this specific document -->
@@ -314,6 +551,30 @@ watch(sheetOpen, (newValue) => {
                                             <p class="text-sm text-blue-700 font-medium bg-blue-100 px-4 py-2 rounded-lg">
                                                 📋 Please upload all required documents before submitting your request.
                                             </p>
+                                        </div>
+
+                                        <!-- Required Fields Section -->
+                                        <div v-if="selectedType && transactionTypes[selectedType]?.required_fields?.length" class="space-y-4">
+                                            <Label class="text-base font-bold text-gray-800">Required Information</Label>
+                                            
+                                            <div class="space-y-4">
+                                                <div
+                                                    v-for="field in transactionTypes[selectedType].required_fields"
+                                                    :key="field"
+                                                    class="bg-gradient-to-r from-cyan-50 to-blue-50 border-2 border-cyan-200 rounded-2xl p-6"
+                                                >
+                                                    <Label :for="`field-${field}`" class="text-sm font-semibold text-gray-900 mb-2 block">
+                                                        {{ field }} <span class="text-red-500">*</span>
+                                                    </Label>
+                                                    <Input
+                                                        :id="`field-${field}`"
+                                                        v-model="createForm.required_fields[field]"
+                                                        :placeholder="`Enter ${field.toLowerCase()}`"
+                                                        class="w-full border-gray-300 focus:border-cyan-500 focus:ring-cyan-500"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <div v-if="selectedType && transactionTypes && transactionTypes[selectedType] && transactionTypes[selectedType].fee > 0" class="space-y-4">
@@ -632,17 +893,6 @@ watch(sheetOpen, (newValue) => {
                                                     v-model="editForm.title"
                                                     placeholder="Enter document title"
                                                     class="h-12 sm:h-14 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
-                                                />
-                                            </div>
-
-                                            <!-- Description -->
-                                            <div class="space-y-3">
-                                                <Label class="text-base font-bold text-gray-800">Description</Label>
-                                                <Textarea
-                                                    v-model="editForm.description"
-                                                    placeholder="Describe your request..."
-                                                    rows="4"
-                                                    class="border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 resize-none"
                                                 />
                                             </div>
                                         </form>

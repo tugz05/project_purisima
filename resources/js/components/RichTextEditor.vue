@@ -32,7 +32,7 @@
           :class="{ 'bg-gray-200': editor?.isActive('underline') }"
           class="h-8 w-8 p-0"
         >
-          <Underline class="w-4 h-4" />
+          <UnderlineIcon class="w-4 h-4" />
         </Button>
         <Button
           type="button"

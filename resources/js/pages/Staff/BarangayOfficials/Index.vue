@@ -315,43 +315,56 @@ const civilStatusOptions = [
     <StaffLayout :breadcrumbs="breadcrumbs">
         <div class="bg-gradient-to-br from-gray-50 to-blue-50/30 min-h-full w-full">
             <div class="mx-auto w-full px-2 sm:px-4 lg:px-6 py-2 md:py-4 max-w-full">
-                <!-- Header Section -->
-                <div class="mb-6">
-                    <div class="space-y-4">
-                        <!-- Page Title -->
-                        <div class="text-center sm:text-left">
-                            <h1 class="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 bg-gradient-to-r from-gray-900 to-blue-900 bg-clip-text text-transparent">
-                                Barangay Officials
-                            </h1>
-                            <p class="text-base md:text-lg text-gray-600 font-medium mt-1">Manage your barangay officials and their information</p>
+                <!-- Enhanced Header with Gradient -->
+                <div class="relative overflow-hidden bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 shadow-xl mb-6 rounded-2xl">
+                    <div class="absolute inset-0 bg-black/10"></div>
+                    <div class="absolute inset-0">
+                        <div class="absolute top-0 left-0 w-72 h-72 bg-white/10 rounded-full -translate-x-36 -translate-y-36"></div>
+                        <div class="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-48 translate-y-48"></div>
+                    </div>
+                    <div class="relative px-4 sm:px-6 lg:px-8 py-8">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+                            <div class="text-white">
+                                <div class="flex items-center gap-4 mb-4">
+                                    <div class="p-3 bg-white/20 rounded-2xl backdrop-blur-sm">
+                                        <Users class="h-8 w-8" />
+                                    </div>
+                                    <div>
+                                        <h1 class="text-4xl font-bold">Barangay Officials</h1>
+                                        <p class="text-purple-100 text-lg mt-1">Manage your barangay officials and their information</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-6 text-sm text-purple-100">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-2 h-2 bg-purple-300 rounded-full"></div>
+                                        <span>{{ props.officials.length }} Total Officials</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-2 h-2 bg-green-300 rounded-full"></div>
+                                        <span>{{ props.officials.filter(o => o.is_active).length }} Active</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-2 h-2 bg-violet-300 rounded-full"></div>
+                                        <span>{{ props.officials.filter(o => o.position === 'Captain').length }} Captains</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-2 h-2 bg-indigo-300 rounded-full"></div>
+                                        <span>{{ props.officials.filter(o => o.position === 'Councilor').length }} Councilors</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <Button @click="openCreateSheet" class="bg-white text-purple-600 hover:bg-purple-50 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                                    <Plus class="w-5 h-5 mr-2" />
+                                    Add New Official
+                                </Button>
+                            </div>
                         </div>
+                    </div>
+                </div>
 
-                        <!-- Quick Stats Overview -->
-                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
-                                <Users class="h-6 w-6 text-blue-600 mx-auto mb-2" />
-                                <p class="text-2xl font-bold text-gray-900">{{ props.officials.length }}</p>
-                                <p class="text-sm text-gray-600">Total Officials</p>
-                            </div>
-                            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
-                                <Calendar class="h-6 w-6 text-green-600 mx-auto mb-2" />
-                                <p class="text-2xl font-bold text-gray-900">{{ props.officials.filter(o => o.is_active).length }}</p>
-                                <p class="text-sm text-gray-600">Active</p>
-                            </div>
-                            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
-                                <Users class="h-6 w-6 text-purple-600 mx-auto mb-2" />
-                                <p class="text-2xl font-bold text-gray-900">{{ props.officials.filter(o => o.position === 'Captain').length }}</p>
-                                <p class="text-sm text-gray-600">Captains</p>
-                            </div>
-                            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
-                                <Users class="h-6 w-6 text-orange-600 mx-auto mb-2" />
-                                <p class="text-2xl font-bold text-gray-900">{{ props.officials.filter(o => o.position === 'Councilor').length }}</p>
-                                <p class="text-sm text-gray-600">Councilors</p>
-                            </div>
-                        </div>
-
-                        <!-- Action Bar -->
-                        <div class="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                <!-- Action Bar -->
+                <div class="flex flex-col sm:flex-row gap-4 items-center justify-between mb-6">
                             <!-- Search -->
                             <div class="flex-1 max-w-md">
                                 <div class="relative">
@@ -370,8 +383,6 @@ const civilStatusOptions = [
                                 Add New Official
                             </Button>
                         </div>
-                    </div>
-                </div>
 
                 <!-- Officials List -->
                 <div v-if="filteredOfficials.length > 0" class="space-y-4">

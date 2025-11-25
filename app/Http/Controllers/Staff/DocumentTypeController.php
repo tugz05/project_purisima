@@ -3,64 +3,36 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\DocumentTypeRequest;
 use App\Models\DocumentType;
+use App\Services\DocumentTypeService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DocumentTypeController extends Controller
 {
+    protected $documentTypeService;
+
+    public function __construct(DocumentTypeService $documentTypeService)
+    {
+        $this->documentTypeService = $documentTypeService;
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
-        $query = DocumentType::query();
+        $filters = [
+            'search' => $request->get('search'),
+            'active' => $request->get('active') !== null ? filter_var($request->get('active'), FILTER_VALIDATE_BOOLEAN) : null,
+            'category' => $request->get('category'),
+        ];
 
-        // Search functionality
-        if ($request->has('search') && $request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->search . '%')
-                  ->orWhere('code', 'like', '%' . $request->search . '%')
-                  ->orWhere('description', 'like', '%' . $request->search . '%');
-            });
-        }
-
-        // Filter by category
-        if ($request->has('category') && $request->category && $request->category !== 'all') {
-            $query->where('category', $request->category);
-        }
-
-        // Filter by status
-        if ($request->has('status') && $request->status !== 'all') {
-            if ($request->status === 'active') {
-                $query->where('is_active', true);
-            } elseif ($request->status === 'inactive') {
-                $query->where('is_active', false);
-            }
-        }
-
-        $documentTypes = $query->ordered()->paginate(5);
-
-        // Get categories for filter dropdown
-        $categories = DocumentType::distinct()
-            ->whereNotNull('category')
-            ->pluck('category')
-            ->sort()
-            ->values();
+        $documentTypes = $this->documentTypeService->getAll($filters);
 
         return Inertia::render('Staff/DocumentTypes/Index', [
-            'documentTypes' => [
-                'data' => $documentTypes->items(),
-                'current_page' => $documentTypes->currentPage(),
-                'last_page' => $documentTypes->lastPage(),
-                'per_page' => $documentTypes->perPage(),
-                'total' => $documentTypes->total(),
-                'from' => $documentTypes->firstItem(),
-                'to' => $documentTypes->lastItem(),
-            ],
-            'categories' => $categories,
-            'filters' => $request->only(['search', 'category', 'status']),
+            'documentTypes' => $documentTypes,
+            'filters' => $filters,
         ]);
     }
 
@@ -75,30 +47,32 @@ class DocumentTypeController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(DocumentTypeRequest $request)
+    public function store(Request $request)
     {
-        $data = $request->validated();
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'code' => 'nullable|string|max:255|unique:document_types,code',
+            'description' => 'nullable|string',
+            'fee_amount' => 'required|numeric|min:0',
+            'required_documents' => 'nullable|array',
+            'required_documents.*' => 'string',
+            'required_fields' => 'nullable|array',
+            'required_fields.*' => 'string',
+            'processing_steps' => 'nullable|array',
+            'processing_steps.*' => 'string',
+            'processing_days' => 'required|integer|min:1',
+            'is_active' => 'boolean',
+            'requires_payment' => 'boolean',
+            'requires_approval' => 'boolean',
+            'category' => 'nullable|string|max:255',
+            'sort_order' => 'nullable|integer|min:0',
+            'notes' => 'nullable|string',
+        ]);
 
-        // Handle document template uploads
-        if ($request->hasFile('document_templates')) {
-            $templates = [];
-            foreach ($request->file('document_templates') as $file) {
-                $path = $file->store('document-templates', 'public');
-                $templates[] = [
-                    'name' => $file->getClientOriginalName(),
-                    'path' => $path,
-                    'size' => $file->getSize(),
-                    'mime_type' => $file->getMimeType(),
-                ];
-            }
-            $data['document_templates'] = $templates;
-        }
-
-        $documentType = DocumentType::create($data);
+        $this->documentTypeService->create($validated);
 
         return redirect()->route('staff.document-types.index')
-            ->with('success', 'Document type created successfully.')
-            ->with('documentType', $documentType);
+            ->with('success', 'Document type created successfully.');
     }
 
     /**
@@ -106,10 +80,8 @@ class DocumentTypeController extends Controller
      */
     public function show(DocumentType $documentType)
     {
-        $documentType->load('transactions.resident');
-
         return Inertia::render('Staff/DocumentTypes/Show', [
-            'documentType' => $documentType,
+            'documentType' => $documentType->load('transactions'),
         ]);
     }
 
@@ -126,30 +98,32 @@ class DocumentTypeController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(DocumentTypeRequest $request, DocumentType $documentType)
+    public function update(Request $request, DocumentType $documentType)
     {
-        $data = $request->validated();
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'code' => 'nullable|string|max:255|unique:document_types,code,' . $documentType->id,
+            'description' => 'nullable|string',
+            'fee_amount' => 'required|numeric|min:0',
+            'required_documents' => 'nullable|array',
+            'required_documents.*' => 'string',
+            'required_fields' => 'nullable|array',
+            'required_fields.*' => 'string',
+            'processing_steps' => 'nullable|array',
+            'processing_steps.*' => 'string',
+            'processing_days' => 'required|integer|min:1',
+            'is_active' => 'boolean',
+            'requires_payment' => 'boolean',
+            'requires_approval' => 'boolean',
+            'category' => 'nullable|string|max:255',
+            'sort_order' => 'nullable|integer|min:0',
+            'notes' => 'nullable|string',
+        ]);
 
-        // Handle document template uploads
-        if ($request->hasFile('document_templates')) {
-            $templates = [];
-            foreach ($request->file('document_templates') as $file) {
-                $path = $file->store('document-templates', 'public');
-                $templates[] = [
-                    'name' => $file->getClientOriginalName(),
-                    'path' => $path,
-                    'size' => $file->getSize(),
-                    'mime_type' => $file->getMimeType(),
-                ];
-            }
-            $data['document_templates'] = $templates;
-        }
-
-        $documentType->update($data);
+        $this->documentTypeService->update($documentType, $validated);
 
         return redirect()->route('staff.document-types.index')
-            ->with('success', 'Document type updated successfully.')
-            ->with('documentType', $documentType->fresh());
+            ->with('success', 'Document type updated successfully.');
     }
 
     /**
@@ -157,30 +131,15 @@ class DocumentTypeController extends Controller
      */
     public function destroy(DocumentType $documentType)
     {
-        // Check if document type has transactions
-        if ($documentType->transactions()->count() > 0) {
+        try {
+            $this->documentTypeService->delete($documentType);
+
             return redirect()->route('staff.document-types.index')
-                ->with('error', 'Cannot delete document type that has existing transactions.');
+                ->with('success', 'Document type deleted successfully.');
+        } catch (\Exception $e) {
+            return redirect()->route('staff.document-types.index')
+                ->with('error', $e->getMessage());
         }
-
-        $documentType->delete();
-
-        return redirect()->route('staff.document-types.index')
-            ->with('success', 'Document type deleted successfully.');
-    }
-
-    /**
-     * Toggle the active status of a document type
-     */
-    public function toggleStatus(DocumentType $documentType)
-    {
-        $documentType->update([
-            'is_active' => !$documentType->is_active,
-        ]);
-
-        $status = $documentType->is_active ? 'activated' : 'deactivated';
-
-        return redirect()->route('staff.document-types.index')
-            ->with('success', "Document type {$status} successfully.");
     }
 }
+

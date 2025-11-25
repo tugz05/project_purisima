@@ -1,12 +1,27 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Link, usePage } from '@inertiajs/vue3';
-import { LayoutGrid, FileText, User, MessageSquare } from 'lucide-vue-next';
+import { Link, usePage, router } from '@inertiajs/vue3';
+import { LayoutGrid, FileText, User, AlertTriangle } from 'lucide-vue-next';
 import resident from '@/routes/resident';
 import { useAuth } from '@/composables/useAuth';
+import { toast } from 'vue-sonner';
 
-const { user } = useAuth();
+const { user, isProfileCompleted } = useAuth();
 const page = usePage();
+
+const handleNavClick = (href: string, e: Event) => {
+    // Allow navigation to onboarding and account
+    if (href === resident.onboarding.show().url || href === '/resident/account') {
+        return;
+    }
+    
+    // Block navigation if profile not completed
+    if (!isProfileCompleted.value) {
+        e.preventDefault();
+        toast.error('Please complete your profile first to access this feature.');
+        router.visit(resident.onboarding.show().url);
+    }
+};
 
 const navItems = [
     {
@@ -15,18 +30,17 @@ const navItems = [
         icon: LayoutGrid,
         active: computed(() => page.url === resident.dashboard().url),
     },
-            {
-                title: 'Support',
-                href: '/resident/messaging',
-                icon: MessageSquare,
-                active: computed(() => page.url.startsWith('/resident/messaging')),
-
-            },
     {
         title: 'Transactions',
         href: resident.transactions.index().url,
         icon: FileText,
         active: computed(() => page.url.startsWith('/resident/transactions')),
+    },
+    {
+        title: 'Calamity Reports',
+        href: '/resident/calamity',
+        icon: AlertTriangle,
+        active: computed(() => page.url.startsWith('/resident/calamity')),
     },
     {
         title: 'Account',
@@ -44,11 +58,15 @@ const navItems = [
                 v-for="item in navItems"
                 :key="item.title"
                 :href="item.href"
+                @click="handleNavClick(item.href, $event)"
                 class="flex flex-col items-center justify-center p-2 rounded-lg transition-all duration-200 min-w-0 flex-1"
                 :class="[
                     item.active.value
                         ? 'text-blue-600 bg-blue-50'
-                        : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
+                        : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50',
+                    !isProfileCompleted && item.href !== resident.onboarding.show().url && item.href !== '/resident/account'
+                        ? 'opacity-50 cursor-not-allowed'
+                        : ''
                 ]"
             >
                 <component

@@ -8,7 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, User, FileText, Calendar, DollarSign, Download, File, Eye, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2 } from 'lucide-vue-next';
+import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, User, FileText, Calendar, DollarSign, Download, File, Eye, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Save, Sparkles, FileCheck, Printer } from 'lucide-vue-next';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import RichTextEditor from '@/components/RichTextEditor.vue';
 import StaffLayout from '@/layouts/staff/Layout.vue';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { useUtils } from '@/composables/useUtils';
@@ -42,6 +44,7 @@ interface Transaction {
     processed_at: string;
     completed_at: string;
     staff_notes: string;
+    officer_of_the_day?: string;
     rejection_reason: string;
     required_documents: string[];
     submitted_documents: Array<{
@@ -51,11 +54,19 @@ interface Transaction {
         size: number;
         mime_type: string;
     }>;
+    generated_document_data?: {
+        content?: string;
+        generated_at?: string;
+        generated_by?: number;
+    };
+    resident_input_data?: Record<string, string>;
     resident: {
         id: number;
         name: string;
         email: string;
         phone: string;
+        address?: string;
+        purok?: string;
     };
     staff: {
         id: number;
@@ -67,8 +78,15 @@ interface Transaction {
     };
 }
 
+interface DefaultTemplate {
+    id: number;
+    name: string;
+    template_content: string;
+}
+
 interface Props {
     transaction: Transaction;
+    defaultTemplate?: DefaultTemplate | null;
 }
 
 const props = defineProps<Props>();
@@ -84,7 +102,9 @@ const breadcrumbs = staffTransactionShowBreadcrumbs.value(props.transaction.tran
 const form = useForm({
     status: props.transaction.status,
     staff_notes: props.transaction.staff_notes || '',
+    officer_of_the_day: props.transaction.officer_of_the_day || '',
     rejection_reason: props.transaction.rejection_reason || '',
+    document_content: props.transaction.generated_document_data?.content || '',
 });
 
 // File viewer modal state
@@ -97,6 +117,24 @@ const currentFile = ref<{
     mime_type: string;
 } | null>(null);
 
+// Certificate generation modal state
+const certificateSheetOpen = ref(false);
+const certificateForm = useForm({
+    status: props.transaction.status,
+    officer_of_the_day: props.transaction.officer_of_the_day || '',
+    document_content: props.transaction.generated_document_data?.content || '',
+});
+
+// Update form when sheet opens to ensure latest data is loaded
+const openCertificateSheet = () => {
+    // Refresh form data with latest transaction data
+    certificateForm.status = props.transaction.status;
+    certificateForm.officer_of_the_day = props.transaction.officer_of_the_day || '';
+    certificateForm.document_content = props.transaction.generated_document_data?.content || '';
+    certificateSheetOpen.value = true;
+};
+const isGeneratingAI = ref(false);
+
 // Zoom and pan state
 const zoomLevel = ref(100);
 const isDragging = ref(false);
@@ -106,6 +144,42 @@ const isFullscreen = ref(false);
 const imageRef = ref<HTMLImageElement | null>(null);
 
 // Methods
+const loadTemplateContent = async () => {
+    try {
+        const response = await fetch(`/staff/transactions/${props.transaction.id}/load-template`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            form.document_content = data.content;
+            toast.success(`Template "${data.template_name}" loaded successfully`);
+        } else {
+            const error = await response.json();
+            toast.error(error.error || 'Failed to load template');
+        }
+    } catch (error) {
+        console.error('Error loading template:', error);
+        toast.error('Failed to load template');
+    }
+};
+
+const saveDocumentContent = () => {
+    form.put(`/staff/transactions/${props.transaction.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success('Document content saved successfully');
+        },
+        onError: () => {
+            toast.error('Failed to save document content');
+        },
+    });
+};
+
 const submit = () => {
     form.put(`/staff/transactions/${props.transaction.id}`, {
         onSuccess: () => {
@@ -354,6 +428,88 @@ const canProcessPayment = () => {
     return props.transaction.payment_status === 'pending' || props.transaction.payment_status === 'failed';
 };
 
+
+const generateWithAI = async () => {
+    isGeneratingAI.value = true;
+    try {
+        const response = await fetch(`/staff/transactions/${props.transaction.id}/generate-ai`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.content) {
+                certificateForm.document_content = data.content;
+                toast.success('Certificate content generated successfully using AI!');
+            } else {
+                toast.error('No content generated');
+            }
+        } else {
+            const errorData = await response.json();
+            toast.error(errorData.error || 'Failed to generate content with AI');
+        }
+    } catch (error) {
+        console.error('Error generating with AI:', error);
+        toast.error('Error generating content with AI');
+    } finally {
+        isGeneratingAI.value = false;
+    }
+};
+
+const saveCertificate = () => {
+    // Ensure officer_of_the_day is always a string (never null/undefined)
+    const officerValue = String(certificateForm.officer_of_the_day || '').trim();
+    
+    // Explicitly set all form fields to ensure they're included
+    certificateForm.status = certificateForm.status || props.transaction.status;
+    certificateForm.officer_of_the_day = officerValue; // Always a string, even if empty
+    certificateForm.document_content = certificateForm.document_content || '';
+    
+    // Log what we're sending
+    const formData = certificateForm.data();
+    console.log('Saving certificate - Form data:', {
+        status: certificateForm.status,
+        officer_of_the_day: officerValue,
+        officer_type: typeof officerValue,
+        document_content_length: certificateForm.document_content?.length || 0,
+        all_form_keys: Object.keys(formData),
+        form_data_officer: formData.officer_of_the_day
+    });
+    
+    // Use transform to ensure all fields are sent, even if empty
+    certificateForm.transform((data) => {
+        // Return only the fields we need, ensuring officer_of_the_day is always included
+        return {
+            status: data.status,
+            officer_of_the_day: data.officer_of_the_day !== undefined ? String(data.officer_of_the_day || '') : '',
+            document_content: data.document_content || '',
+        };
+    }).put(`/staff/transactions/${props.transaction.id}`, {
+        preserveScroll: true,
+        onSuccess: (page) => {
+            // Update the form with the latest data from the response
+            if (page.props.transaction) {
+                certificateForm.officer_of_the_day = page.props.transaction.officer_of_the_day || '';
+                certificateForm.document_content = page.props.transaction.generated_document_data?.content || '';
+            }
+            toast.success('Certificate content saved successfully!');
+            certificateSheetOpen.value = false;
+        },
+        onError: (errors) => {
+            console.error('Save errors:', errors);
+            toast.error('Failed to save certificate content');
+        }
+    });
+};
+
+const printCertificate = () => {
+    window.open(`/staff/transactions/${props.transaction.id}/print-certificate`, '_blank');
+};
+
 // Keyboard event listener setup
 onMounted(() => {
     document.addEventListener('keydown', handleKeydown);
@@ -419,19 +575,39 @@ onUnmounted(() => {
                                         <User class="h-4 w-4 mr-2" />
                                         Reassign to Me
                                     </Button>
-                                    <Link
-                                        v-if="canProcessPayment()"
-                                        :href="`/staff/transactions/${props.transaction.id}/payment`"
-                                        class="inline-flex"
-                                    >
+                                    <div class="flex gap-2">
                                         <Button
+                                            v-if="props.transaction.status === 'in_progress' || props.transaction.status === 'completed'"
+                                            @click="openCertificateSheet"
                                             size="sm"
-                                            class="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                                            class="bg-teal-600 hover:bg-teal-700 text-white font-medium"
                                         >
-                                            <DollarSign class="h-4 w-4 mr-2" />
-                                            Process Payment
+                                            <FileCheck class="h-4 w-4 mr-2" />
+                                            Generate Certificate
                                         </Button>
-                                    </Link>
+                                        <Link
+                                            v-if="canProcessPayment()"
+                                            :href="`/staff/transactions/${props.transaction.id}/payment`"
+                                            class="inline-flex"
+                                        >
+                                            <Button
+                                                size="sm"
+                                                class="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                                            >
+                                                <DollarSign class="h-4 w-4 mr-2" />
+                                                Process Payment
+                                            </Button>
+                                        </Link>
+                                        <Button
+                                            v-if="(props.transaction.status === 'in_progress' || props.transaction.status === 'completed') && props.transaction.generated_document_data?.content"
+                                            @click="printCertificate"
+                                            size="sm"
+                                            class="bg-green-600 hover:bg-green-700 text-white font-medium"
+                                        >
+                                            <Printer class="h-4 w-4 mr-2" />
+                                            Print Certificate
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
@@ -819,6 +995,264 @@ onUnmounted(() => {
                 </div>
             </DialogContent>
         </Dialog>
+
+        <!-- Certificate Generation Sheet -->
+        <Sheet v-model:open="certificateSheetOpen">
+            <SheetContent class="p-0 flex flex-col h-full w-full sm:max-w-5xl overflow-hidden">
+                <!-- Professional Header -->
+                <SheetHeader class="p-6 pb-4 border-b border-gray-200 bg-gradient-to-r from-teal-50 via-emerald-50 to-teal-50">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-teal-100 rounded-lg">
+                                <FileCheck class="h-6 w-6 text-teal-700" />
+                            </div>
+                            <div>
+                                <SheetTitle class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                    Generate Certificate/Permit
+                                </SheetTitle>
+                                <SheetDescription class="text-gray-600 mt-1.5 text-sm">
+                                    Create and customize the official document for <span class="font-semibold text-gray-900">{{ props.transaction.document_type?.name || 'this transaction' }}</span>
+                                </SheetDescription>
+                            </div>
+                        </div>
+                    </div>
+                </SheetHeader>
+
+                <!-- Main Content Area -->
+                <div class="flex-1 overflow-y-auto">
+                    <div class="p-6 space-y-6">
+                        <!-- Quick Actions Bar -->
+                        <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+                            <div class="flex items-center gap-2">
+                                <div class="p-1.5 bg-blue-100 rounded-lg">
+                                    <Sparkles class="h-4 w-4 text-blue-700" />
+                                </div>
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-900">AI Generation</p>
+                                    <p class="text-xs text-gray-600">Generate certificate content using AI with all transaction data</p>
+                                </div>
+                            </div>
+                            <Button
+                                @click="generateWithAI"
+                                variant="outline"
+                                size="default"
+                                class="border-blue-300 text-blue-700 hover:bg-blue-100 hover:text-blue-800 font-medium shadow-sm"
+                                :disabled="isGeneratingAI"
+                            >
+                                <Sparkles class="h-4 w-4 mr-2" />
+                                {{ isGeneratingAI ? 'Generating...' : 'Generate using AI' }}
+                            </Button>
+                        </div>
+
+                        <!-- Two Column Layout -->
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <!-- Main Editor Column (2/3 width) -->
+                            <div class="lg:col-span-2 space-y-4">
+                                <!-- Document Content Section -->
+                                <Card class="shadow-sm border-gray-200">
+                                    <CardHeader class="pb-3 border-b border-gray-100">
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <CardTitle class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                                    <FileText class="h-5 w-5 text-teal-600" />
+                                                    Document Content
+                                                </CardTitle>
+                                                <CardDescription class="text-sm text-gray-600 mt-1">
+                                                    Compose and format your certificate or permit content
+                                                </CardDescription>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent class="pt-6">
+                                        <div class="space-y-3">
+                                            <div class="border-2 border-gray-200 rounded-lg overflow-hidden bg-white shadow-inner">
+                                                <RichTextEditor
+                                                    v-model="certificateForm.document_content"
+                                                    class="min-h-[550px]"
+                                                />
+                                            </div>
+                                            <div class="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                                <div class="p-1 bg-amber-100 rounded">
+                                                    <AlertCircle class="h-4 w-4 text-amber-700 flex-shrink-0 mt-0.5" />
+                                                </div>
+                                                <div class="flex-1">
+                                                    <p class="text-xs font-medium text-amber-900">Pro Tip</p>
+                                                    <p class="text-xs text-amber-800 mt-0.5">
+                                                        Use the formatting toolbar above to style your document. All changes are saved automatically when you click "Save Certificate".
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            <!-- Sidebar Column (1/3 width) -->
+                            <div class="lg:col-span-1 space-y-4">
+                                <!-- Resident Information Card -->
+                                <Card class="shadow-sm border-gray-200 bg-gradient-to-br from-gray-50 to-white">
+                                    <CardHeader class="pb-3 border-b border-gray-100">
+                                        <CardTitle class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                            <User class="h-4 w-4 text-blue-600" />
+                                            Resident Details
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent class="pt-4 space-y-4">
+                                        <div class="space-y-3">
+                                            <div>
+                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Full Name</Label>
+                                                <p class="text-sm font-semibold text-gray-900 mt-1">{{ props.transaction.resident?.name || 'N/A' }}</p>
+                                            </div>
+                                            <div>
+                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Address</Label>
+                                                <p class="text-sm text-gray-700 mt-1 leading-relaxed">{{ props.transaction.resident?.address || 'N/A' }}</p>
+                                            </div>
+                                            <div>
+                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Purok</Label>
+                                                <p class="text-sm text-gray-700 mt-1">{{ props.transaction.resident?.purok || 'N/A' }}</p>
+                                            </div>
+                                            <div v-if="props.transaction.resident?.email">
+                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</Label>
+                                                <p class="text-sm text-gray-700 mt-1">{{ props.transaction.resident.email }}</p>
+                                            </div>
+                                            <div v-if="props.transaction.resident?.phone">
+                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</Label>
+                                                <p class="text-sm text-gray-700 mt-1">{{ props.transaction.resident.phone }}</p>
+                                            </div>
+                                        </div>
+
+                                        <!-- Required Fields Information -->
+                                        <div v-if="props.transaction.resident_input_data && Object.keys(props.transaction.resident_input_data).length > 0" class="mt-4 pt-4 border-t border-gray-200">
+                                            <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 block">Required Information</Label>
+                                            <div class="space-y-2">
+                                                <div
+                                                    v-for="(value, field) in props.transaction.resident_input_data"
+                                                    :key="field"
+                                                    class="bg-white rounded-lg p-2.5 border border-gray-200"
+                                                >
+                                                    <Label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">{{ field }}</Label>
+                                                    <p class="text-sm text-gray-900 mt-1 font-medium">{{ value || 'N/A' }}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                <!-- Document Type Info -->
+                                <Card class="shadow-sm border-gray-200 bg-gradient-to-br from-teal-50 to-emerald-50">
+                                    <CardHeader class="pb-3 border-b border-teal-100">
+                                        <CardTitle class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                            <FileText class="h-4 w-4 text-teal-700" />
+                                            Document Type
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent class="pt-4">
+                                        <div class="space-y-2">
+                                            <div>
+                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Type</Label>
+                                                <p class="text-sm font-semibold text-gray-900 mt-1">{{ props.transaction.document_type?.name || 'N/A' }}</p>
+                                            </div>
+                                            <div v-if="props.transaction.document_type?.code">
+                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Code</Label>
+                                                <Badge variant="outline" class="mt-1 text-xs">{{ props.transaction.document_type.code }}</Badge>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                <!-- Officer of the Day -->
+                                <Card class="shadow-lg border-2 border-amber-300 bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-50">
+                                    <CardHeader class="pb-3 border-b-2 border-amber-200 bg-gradient-to-r from-amber-100 to-yellow-100">
+                                        <CardTitle class="text-base font-bold text-amber-900 flex items-center gap-2">
+                                            <div class="p-1.5 bg-amber-200 rounded-lg">
+                                                <User class="h-4 w-4 text-amber-800" />
+                                            </div>
+                                            Signatory Information
+                                            <Badge variant="outline" class="ml-auto bg-amber-200 text-amber-900 border-amber-300 font-semibold text-xs">
+                                                SPECIAL FIELD
+                                            </Badge>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent class="pt-4">
+                                        <div class="space-y-3">
+                                            <!-- Important Notice -->
+                                            <div class="bg-amber-100 border-l-4 border-amber-500 p-3 rounded-r-lg">
+                                                <div class="flex items-start gap-2">
+                                                    <AlertCircle class="h-4 w-4 text-amber-700 flex-shrink-0 mt-0.5" />
+                                                    <div class="flex-1">
+                                                        <p class="text-xs font-bold text-amber-900 uppercase tracking-wide">Non-Standard Field</p>
+                                                        <p class="text-xs text-amber-800 mt-1">
+                                                            This field is only used when the Punong Barangay is absent. Leave empty for standard certificates.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <Label for="certificate_officer_of_the_day" class="text-sm font-bold text-amber-900 mb-2 block flex items-center gap-2">
+                                                    <span>Officer of the Day</span>
+                                                    <Badge variant="outline" class="bg-amber-200 text-amber-900 border-amber-300 text-xs px-1.5 py-0">
+                                                        Optional
+                                                    </Badge>
+                                                </Label>
+                                                <Input
+                                                    id="certificate_officer_of_the_day"
+                                                    v-model="certificateForm.officer_of_the_day"
+                                                    placeholder="e.g., CHARLITA G. MONTENEGRO, RSW"
+                                                    class="w-full border-2 border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-400 text-sm font-medium bg-white shadow-sm"
+                                                />
+                                                <p class="text-xs text-amber-700 mt-2 font-medium">
+                                                    ⚠️ <strong>Important:</strong> This name will appear on the printed certificate as "Officer of the Day" if provided. Leave empty if Punong Barangay will sign.
+                                                </p>
+                                            </div>
+                                            <div class="pt-3 border-t-2 border-amber-200">
+                                                <Label class="text-xs font-bold text-amber-900 uppercase tracking-wide mb-2 block">Standard Signatory</Label>
+                                                <div class="bg-white rounded-lg p-2.5 border border-amber-200">
+                                                    <p class="text-sm font-bold text-gray-900">EMMANUEL P. ISIANG</p>
+                                                    <p class="text-xs text-gray-700 mt-0.5">Punong Barangay</p>
+                                                    <p class="text-xs text-gray-600 mt-0.5">President – <span class="text-red-600 underline">Liga ng mga Barangay</span></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Professional Footer Actions -->
+                <div class="border-t border-gray-200 bg-gray-50/50 p-6">
+                    <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+                        <div class="flex items-center gap-2 text-sm text-gray-600">
+                            <div class="p-1.5 bg-gray-200 rounded">
+                                <FileCheck class="h-3.5 w-3.5 text-gray-600" />
+                            </div>
+                            <span>All changes will be saved to the transaction record</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <Button
+                                @click="certificateSheetOpen = false"
+                                variant="outline"
+                                size="default"
+                                class="border-gray-300 text-gray-700 hover:bg-gray-100 font-medium min-w-[100px]"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                @click="saveCertificate"
+                                size="default"
+                                class="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-semibold shadow-md hover:shadow-lg transition-all min-w-[160px]"
+                                :disabled="certificateForm.processing"
+                            >
+                                <Save class="h-4 w-4 mr-2" />
+                                {{ certificateForm.processing ? 'Saving...' : 'Save Certificate' }}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </SheetContent>
+        </Sheet>
     </StaffLayout>
 </template>
 

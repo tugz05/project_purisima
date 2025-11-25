@@ -35,6 +35,11 @@ class AuthenticatedSessionController extends Controller
 
         $user = $request->user();
 
+        // Redirect to onboarding if resident profile is not completed
+        if ($user->role === 'resident' && empty($user->profile_completed_at)) {
+            return redirect()->route('resident.onboarding.show');
+        }
+
         $intended = match ($user->role) {
             'admin' => route('admin.dashboard', absolute: false),
             'staff' => route('staff.dashboard', absolute: false),

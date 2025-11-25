@@ -23,6 +23,7 @@ const form = useForm({
   first_name: user?.first_name || '',
   middle_name: user?.middle_name || '',
   last_name: user?.last_name || '',
+  suffix: user?.suffix || '',
   phone: user?.phone || '',
   birth_date: user?.birth_date || '',
   sex: user?.sex || '',
@@ -87,6 +88,10 @@ const submit = () => {
         <div>
           <label class="mb-1 block text-sm">Last name</label>
           <input v-model="form.last_name" class="w-full rounded border px-3 py-2" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm">Suffix</label>
+          <input v-model="form.suffix" class="w-full rounded border px-3 py-2" placeholder="Jr., Sr., II, III, etc." />
         </div>
         <div>
           <label class="mb-1 block text-sm">Phone</label>

@@ -20,9 +20,10 @@ class User extends Authenticatable
     protected $fillable = [
         'name', 'email', 'password', 'role',
         'provider', 'provider_id', 'photo_url',
-        'first_name', 'middle_name', 'last_name', 'phone', 'birth_date', 'sex', 'civil_status', 'occupation',
+        'first_name', 'middle_name', 'last_name', 'suffix', 'phone', 'birth_date', 'sex', 'civil_status', 'occupation',
         'purok', 'barangay', 'municipality', 'province', 'country',
         'profile_completed_at',
+        'latitude', 'longitude', 'location_shared', 'location_updated_at',
     ];
 
     /**
@@ -45,6 +46,10 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'latitude' => 'decimal:8',
+            'longitude' => 'decimal:8',
+            'location_shared' => 'boolean',
+            'location_updated_at' => 'datetime',
         ];
     }
 
@@ -117,5 +122,84 @@ class User extends Authenticatable
     public function typingIndicators()
     {
         return $this->hasMany(TypingIndicator::class);
+    }
+
+    /**
+     * Get the user's full name attribute.
+     * Automatically generates name from first_name, middle_name, last_name, and suffix.
+     */
+    public function getNameAttribute($value)
+    {
+        // Build name from individual components if they exist
+        $parts = array_filter([
+            $this->attributes['first_name'] ?? null,
+            $this->attributes['middle_name'] ?? null,
+            $this->attributes['last_name'] ?? null,
+            $this->attributes['suffix'] ?? null,
+        ]);
+
+        // If we have individual name parts, use them; otherwise use the stored name value
+        if (!empty($parts)) {
+            return implode(' ', $parts);
+        }
+
+        // Fallback to stored name value or empty string
+        return $value ?? '';
+    }
+
+    /**
+     * Set the name attribute and automatically populate individual name fields if not set.
+     */
+    public function setNameAttribute($value)
+    {
+        $this->attributes['name'] = $value;
+
+        // If individual name fields are not set, try to parse the name
+        if (empty($this->attributes['first_name']) && !empty($value)) {
+            $nameParts = explode(' ', trim($value), 4);
+            
+            if (count($nameParts) >= 1) {
+                $this->attributes['first_name'] = $nameParts[0];
+            }
+            if (count($nameParts) >= 2) {
+                $this->attributes['middle_name'] = $nameParts[1];
+            }
+            if (count($nameParts) >= 3) {
+                // Check if last part is a suffix (Jr., Sr., II, III, etc.)
+                $lastPart = $nameParts[count($nameParts) - 1];
+                $suffixPattern = '/^(Jr\.?|Sr\.?|II|III|IV|V|VI|VII|VIII|IX|X)$/i';
+                
+                if (preg_match($suffixPattern, $lastPart)) {
+                    $this->attributes['suffix'] = $lastPart;
+                    $this->attributes['last_name'] = count($nameParts) >= 3 ? $nameParts[count($nameParts) - 2] : null;
+                } else {
+                    $this->attributes['last_name'] = $lastPart;
+                }
+            }
+        }
+    }
+
+    /**
+     * Boot method to automatically update name when individual fields change.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function ($user) {
+            // If individual name fields are set, update the name attribute
+            if (!empty($user->first_name) || !empty($user->last_name)) {
+                $parts = array_filter([
+                    $user->first_name,
+                    $user->middle_name,
+                    $user->last_name,
+                    $user->suffix,
+                ]);
+
+                if (!empty($parts)) {
+                    $user->name = implode(' ', $parts);
+                }
+            }
+        });
     }
 }

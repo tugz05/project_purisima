@@ -19,8 +19,8 @@ class TransactionRequest extends FormRequest
         return [
             'type' => ['required', 'string', 'in:' . implode(',', $validTypes)],
             'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:1000'],
             'required_documents' => ['nullable', 'array'],
+            'required_fields' => ['nullable', 'array'],
             'submitted_documents' => ['nullable', 'array'],
             'submitted_documents.*' => ['nullable', 'array'],
             'submitted_documents.*.*' => ['file', 'mimes:pdf,doc,docx,jpg,jpeg,png', 'max:10240'], // 10MB max

@@ -13,7 +13,7 @@ class DocumentType extends Model
         'description',
         'fee_amount',
         'required_documents',
-        'document_templates',
+        'required_fields',
         'processing_steps',
         'processing_days',
         'is_active',
@@ -26,7 +26,7 @@ class DocumentType extends Model
 
     protected $casts = [
         'required_documents' => 'array',
-        'document_templates' => 'array',
+        'required_fields' => 'array',
         'processing_steps' => 'array',
         'fee_amount' => 'decimal:2',
         'is_active' => 'boolean',
@@ -45,6 +45,22 @@ class DocumentType extends Model
     }
 
     /**
+     * Get certificate templates for this document type
+     */
+    public function certificateTemplates(): HasMany
+    {
+        return $this->hasMany(CertificateTemplate::class);
+    }
+
+    /**
+     * Get default certificate template for this document type
+     */
+    public function defaultCertificateTemplate()
+    {
+        return $this->hasOne(CertificateTemplate::class)->where('is_default', true)->where('is_active', true);
+    }
+
+    /**
      * Scope to get only active document types
      */
     public function scopeActive($query)
@@ -53,7 +69,7 @@ class DocumentType extends Model
     }
 
     /**
-     * Scope to order by sort order
+     * Scope to order by sort order then name
      */
     public function scopeOrdered($query)
     {

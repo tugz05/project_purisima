@@ -5,7 +5,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, FileText, Users, Settings, FileType, UserCheck, Megaphone, Bell, MessageSquare } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, FileText, Users, Settings, FileType, UserCheck, Megaphone, Bell, MessageSquare, ClipboardList, CreditCard, AlertTriangle } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
 import staff from '@/routes/staff';
 
@@ -42,12 +42,13 @@ const mainNavItems: NavItem[] = [
             //     title: 'Messages',
             //     href: '/staff/messaging',
             //     icon: MessageSquare,
-            // },
+            //     },
     {
         title: 'Document Types',
         href: '/staff/document-types',
         icon: FileType,
     },
+
     {
         title: 'Barangay Officials',
         href: '/staff/barangay-officials',
@@ -60,8 +61,23 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Residents',
-        href: '#',
+        href: '/staff/residents',
         icon: Users,
+    },
+    {
+        title: 'Calamity Reports',
+        href: '/staff/calamity',
+        icon: AlertTriangle,
+        children: [
+            {
+                title: 'All Reports',
+                href: '/staff/calamity',
+            },
+            {
+                title: 'Map View',
+                href: '/staff/calamity/map',
+            },
+        ],
     },
     {
         title: 'Settings',
