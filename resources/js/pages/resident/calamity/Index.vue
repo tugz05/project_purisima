@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -57,6 +57,8 @@ const filterForm = useForm({
 const modalOpen = ref(false);
 const locationLoading = ref(false);
 const locationError = ref<string | null>(null);
+const locationPermissionStatus = ref<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown');
+const showPermissionInstructions = ref(false);
 
 const form = useForm({
     latitude: null as number | null,
@@ -89,13 +91,42 @@ const availableNeeds = [
     { value: 'other', label: 'Other' },
 ];
 
+// Check location permission status
+const checkLocationPermission = async () => {
+    if (!navigator.geolocation) {
+        locationPermissionStatus.value = 'denied';
+        return;
+    }
+
+    // Check if Permissions API is available (modern browsers)
+    if ('permissions' in navigator) {
+        try {
+            const result = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+            locationPermissionStatus.value = result.state as 'prompt' | 'granted' | 'denied';
+            
+            // Listen for permission changes
+            result.onchange = () => {
+                locationPermissionStatus.value = result.state as 'prompt' | 'granted' | 'denied';
+            };
+        } catch (e) {
+            // Permissions API not fully supported, fallback to requesting
+            locationPermissionStatus.value = 'prompt';
+        }
+    } else {
+        // Fallback for browsers without Permissions API
+        locationPermissionStatus.value = 'prompt';
+    }
+};
+
 const getCurrentLocation = () => {
     locationLoading.value = true;
     locationError.value = null;
+    showPermissionInstructions.value = false;
 
     if (!navigator.geolocation) {
         locationError.value = 'Geolocation is not supported by your browser.';
         locationLoading.value = false;
+        locationPermissionStatus.value = 'denied';
         return;
     }
 
@@ -104,6 +135,7 @@ const getCurrentLocation = () => {
             form.latitude = position.coords.latitude;
             form.longitude = position.coords.longitude;
             locationLoading.value = false;
+            locationPermissionStatus.value = 'granted';
             form.address = `${form.latitude.toFixed(6)}, ${form.longitude.toFixed(6)}`;
             toast.success('Location captured successfully!');
         },
@@ -111,30 +143,34 @@ const getCurrentLocation = () => {
             locationLoading.value = false;
             switch (error.code) {
                 case error.PERMISSION_DENIED:
-                    locationError.value = 'Location access denied. Please enable location permissions.';
+                    locationPermissionStatus.value = 'denied';
+                    locationError.value = 'Location access denied. Please enable location permissions in your browser settings.';
+                    showPermissionInstructions.value = true;
+                    toast.error('Location permission is required to submit an emergency report.');
                     break;
                 case error.POSITION_UNAVAILABLE:
-                    locationError.value = 'Location information unavailable.';
+                    locationError.value = 'Location information unavailable. Please check your device settings.';
                     break;
                 case error.TIMEOUT:
-                    locationError.value = 'Location request timed out.';
+                    locationError.value = 'Location request timed out. Please try again.';
                     break;
                 default:
                     locationError.value = 'An unknown error occurred while getting location.';
                     break;
             }
-            toast.error(locationError.value);
         },
         {
             enableHighAccuracy: true,
-            timeout: 10000,
+            timeout: 15000,
             maximumAge: 0,
         }
     );
 };
 
-const openModal = () => {
+const openModal = async () => {
     modalOpen.value = true;
+    // Check permission status first
+    await checkLocationPermission();
     // Auto-get location when modal opens
     getCurrentLocation();
 };
@@ -143,6 +179,8 @@ const closeModal = () => {
     modalOpen.value = false;
     form.reset();
     locationError.value = null;
+    showPermissionInstructions.value = false;
+    locationPermissionStatus.value = 'unknown';
 };
 
 const toggleNeed = (need: string) => {
@@ -221,6 +259,21 @@ const formatCalamityType = (type: string): string => {
 const applyFilters = () => {
     filterForm.get('/resident/calamity');
 };
+
+// Check location permission on component mount
+onMounted(async () => {
+    await checkLocationPermission();
+    
+    // Show a helpful message if permission is denied
+    if (locationPermissionStatus.value === 'denied') {
+        // Don't show toast immediately, wait for user to open modal
+    }
+});
+
+// Cleanup on unmount
+onUnmounted(() => {
+    // Cleanup if needed
+});
 </script>
 
 <template>
@@ -416,10 +469,13 @@ const applyFilters = () => {
                         <!-- Location Section -->
                         <div class="space-y-3 p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200">
                             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-                                <Label class="text-xs sm:text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                    <MapPin class="h-3 w-3 sm:h-4 sm:w-4" />
-                                    Your Location
-                                </Label>
+                                <div class="flex-1">
+                                    <Label class="text-xs sm:text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                        <MapPin class="h-3 w-3 sm:h-4 sm:w-4" />
+                                        Your Location <span class="text-red-500">*</span>
+                                    </Label>
+                                    <p class="text-xs text-gray-600 mt-1">Location permission is required for emergency assistance</p>
+                                </div>
                                 <Button
                                     type="button"
                                     @click="getCurrentLocation"
@@ -434,12 +490,35 @@ const applyFilters = () => {
                                 </Button>
                             </div>
                             
-                            <div v-if="locationError" class="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
+                            <!-- Permission Status Indicator -->
+                            <div v-if="locationPermissionStatus === 'denied'" class="p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                                <div class="flex items-start gap-2">
+                                    <AlertTriangle class="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                                    <div class="flex-1">
+                                        <p class="text-xs font-semibold text-amber-900 mb-1">Location Permission Required</p>
+                                        <p class="text-xs text-amber-800 mb-2">To submit an emergency report, please enable location access:</p>
+                                        <ul class="text-xs text-amber-800 space-y-1 list-disc list-inside">
+                                            <li><strong>Mobile:</strong> Go to Settings → Site Settings → Location → Allow</li>
+                                            <li><strong>Desktop:</strong> Click the lock icon in the address bar → Site Settings → Location → Allow</li>
+                                        </ul>
+                                        <button
+                                            type="button"
+                                            @click="getCurrentLocation"
+                                            class="mt-2 text-xs text-amber-900 underline font-semibold hover:text-amber-700"
+                                        >
+                                            Try again after enabling permission
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div v-if="locationError && locationPermissionStatus !== 'denied'" class="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
                                 {{ locationError }}
                             </div>
                             
-                            <div v-if="form.latitude && form.longitude" class="p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
-                                ✓ Location captured: {{ form.latitude.toFixed(4) }}, {{ form.longitude.toFixed(4) }}
+                            <div v-if="form.latitude && form.longitude" class="p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700 flex items-center gap-2">
+                                <CheckCircle class="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span>Location captured: {{ form.latitude.toFixed(4) }}, {{ form.longitude.toFixed(4) }}</span>
                             </div>
 
                             <div class="space-y-2">
