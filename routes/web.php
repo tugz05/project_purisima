@@ -329,6 +329,9 @@ Route::middleware(['auth', 'role:resident', 'profile.completed'])->prefix('resid
         return Inertia::render('resident/Dashboard');
     })->name('dashboard');
 
+    // Household Members routes
+    Route::resource('household-members', \App\Http\Controllers\Resident\HouseholdMemberController::class);
+
     // Transaction routes
     Route::resource('transactions', \App\Http\Controllers\Resident\TransactionController::class);
 

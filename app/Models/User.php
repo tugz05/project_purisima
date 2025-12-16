@@ -74,6 +74,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the household members for the user.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function householdMembers()
+    {
+        return $this->hasMany(HouseholdMember::class);
+    }
+
+    /**
      * Get the notifications for the user.
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany

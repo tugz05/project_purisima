@@ -8,119 +8,91 @@ use Illuminate\Support\Facades\Log;
 class AIDocumentGeneratorService
 {
     private string $apiKey;
-    private string $baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+    private string $baseUrl = 'https://api.openai.com/v1';
+    private string $model = 'gpt-4o';
 
     public function __construct()
     {
-        $this->apiKey = config('services.gemini.api_key');
+        $this->apiKey = config('services.openai.api_key');
+        $this->model = config('services.openai.model', 'gpt-4o');
     }
 
     /**
-     * Generate document content using Gemini AI
+     * Generate document content using OpenAI AI
      * This method ONLY uses AI generation - no fallback content
      */
     public function generateDocumentContent(array $documentType, array $residentData, array $requestData = [], array $requiredDocuments = []): string
     {
         // Validate API key
         if (empty($this->apiKey)) {
-            throw new \Exception('Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.');
+            throw new \Exception('OpenAI API key is not configured. Please set OPENAI_API_KEY in your .env file.');
         }
 
         $prompt = $this->buildPrompt($documentType, $residentData, $requestData, $requiredDocuments);
 
-        Log::info('Generating content with Gemini AI', [
+        Log::info('Generating content with OpenAI AI', [
             'document_type' => $documentType['name'] ?? 'Unknown',
-            'prompt_length' => strlen($prompt)
+            'prompt_length' => strlen($prompt),
+            'model' => $this->model
         ]);
 
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
-        ])->timeout(30)->post("{$this->baseUrl}/models/gemini-2.0-flash:generateContent?key={$this->apiKey}", [
-            'contents' => [
+            'Authorization' => 'Bearer ' . $this->apiKey,
+        ])->timeout(30)->post("{$this->baseUrl}/chat/completions", [
+            'model' => $this->model,
+            'messages' => [
                 [
-                    'parts' => [
-                        [
-                            'text' => $prompt
-                        ]
-                    ]
+                    'role' => 'system',
+                    'content' => 'You are an AI assistant specialized in generating concise, clear, and authentic official Philippine barangay certificate/permit content. Generate EXACTLY 3 paragraphs (approximately 60-100 words total) that are rich in Philippine local context, formal government language, and legal terminology. Use proper Philippine address formats, local terminology (Purok, Barangay, Municipality, Province), and formal government document language. Be brief and direct.'
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $prompt
                 ]
             ],
-            'generationConfig' => [
-                'temperature' => 0.4,
-                'topK' => 32,
-                'topP' => 1.0,
-                'maxOutputTokens' => 2048,
-            ],
-            'safetySettings' => [
-                [
-                    'category' => 'HARM_CATEGORY_HARASSMENT',
-                    'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'
-                ],
-                [
-                    'category' => 'HARM_CATEGORY_HATE_SPEECH',
-                    'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'
-                ],
-                [
-                    'category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                    'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'
-                ],
-                [
-                    'category' => 'HARM_CATEGORY_DANGEROUS_CONTENT',
-                    'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'
-                ]
-            ]
+            'temperature' => 0.4,
+            'max_tokens' => 800,
         ]);
 
         if (!$response->successful()) {
             $errorBody = $response->body();
             $errorData = $response->json();
 
-            Log::error('Gemini API Error', [
+            Log::error('OpenAI API Error', [
                 'status' => $response->status(),
                 'body' => $errorBody,
                 'response' => $errorData
             ]);
 
-            throw new \Exception('Gemini API request failed: ' . ($errorData['error']['message'] ?? $errorBody));
+            throw new \Exception('OpenAI API request failed: ' . ($errorData['error']['message'] ?? $errorBody));
         }
 
         $data = $response->json();
 
-        // Check if response has candidates
-        if (!isset($data['candidates']) || empty($data['candidates'])) {
-            Log::error('Gemini API: No candidates in response', ['response' => $data]);
-            throw new \Exception('Gemini API returned no content candidates. Response: ' . json_encode($data));
+        // Check if response has choices
+        if (!isset($data['choices']) || empty($data['choices'])) {
+            Log::error('OpenAI API: No choices in response', ['response' => $data]);
+            throw new \Exception('OpenAI API returned no content choices. Response: ' . json_encode($data));
         }
 
-        // Check for safety ratings that blocked content
-        if (isset($data['candidates'][0]['safetyRatings'])) {
-            $blocked = false;
-            foreach ($data['candidates'][0]['safetyRatings'] as $rating) {
-                if ($rating['blocked'] ?? false) {
-                    $blocked = true;
-                    Log::error('Gemini API: Content blocked by safety filter', ['rating' => $rating]);
-                    throw new \Exception('Content generation was blocked by safety filter: ' . ($rating['category'] ?? 'Unknown'));
-                }
-            }
-        }
-
-        // Extract content from Gemini response
-        $content = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+        // Extract content from OpenAI response
+        $content = $data['choices'][0]['message']['content'] ?? '';
 
         if (empty($content)) {
-            Log::error('Gemini API: Empty content in response', ['response' => $data]);
-            throw new \Exception('Gemini API returned empty content. Response: ' . json_encode($data));
+            Log::error('OpenAI API: Empty content in response', ['response' => $data]);
+            throw new \Exception('OpenAI API returned empty content. Response: ' . json_encode($data));
         }
 
         // Clean up the content - remove any unwanted headers or structure
         $content = $this->cleanGeneratedContent($content);
 
         if (empty($content) || strlen(strip_tags($content)) < 50) {
-            Log::error('Gemini API: Content too short after cleaning', ['original_length' => strlen($data['candidates'][0]['content']['parts'][0]['text'] ?? '')]);
+            Log::error('OpenAI API: Content too short after cleaning', ['original_length' => strlen($data['choices'][0]['message']['content'] ?? '')]);
             throw new \Exception('Generated content is too short or invalid after cleaning.');
         }
 
-        Log::info('Successfully generated content with Gemini AI', [
+        Log::info('Successfully generated content with OpenAI AI', [
             'content_length' => strlen($content)
         ]);
 
@@ -128,7 +100,7 @@ class AIDocumentGeneratorService
     }
 
     /**
-     * Build the prompt for Gemini AI
+     * Build the prompt for OpenAI AI
      * Optimized for generating only the main content body of the certificate
      */
     private function buildPrompt(array $documentType, array $residentData, array $requestData = [], array $requiredDocuments = []): string
@@ -136,20 +108,28 @@ class AIDocumentGeneratorService
         $documentName = $documentType['name'];
         $description = $documentType['description'] ?? '';
         $currentDate = now()->format('F d, Y');
+        $currentYear = now()->format('Y');
+        $barangay = $residentData['barangay'] ?? 'Barangay Purisima';
+        $municipality = $residentData['municipality'] ?? 'Tago';
+        $province = $residentData['province'] ?? 'Surigao del Sur';
+        $purok = $residentData['purok'] ?? '';
 
-        $prompt = "You are an AI assistant specialized in generating official Philippine barangay certificate/permit content. ";
-        $prompt .= "Generate ONLY the main body content text for a {$documentName}.\n\n";
+        $prompt = "You are an AI assistant specialized in generating concise, clear, and authentic official Philippine barangay certificate/permit content. ";
+        $prompt .= "Generate CONCISE but COMPLETE content (2-3 paragraphs, approximately 200-300 words) that is rich in Philippine local context, formal government language, and legal terminology.\n\n";
 
-        $prompt .= "IMPORTANT: Generate ONLY the main certification/certificate content. ";
-        $prompt .= "DO NOT include headers, document titles, salutations, signature blocks, or any structural elements. ";
-        $prompt .= "Generate ONLY the paragraph content that certifies or permits the information below.\n\n";
+        $prompt .= "IMPORTANT INSTRUCTIONS:\n";
+        $prompt .= "- Generate ONLY the main certification/certificate content body (NO headers, titles, signatures, or structural elements)\n";
+        $prompt .= "- The content should be CONCISE but COMPLETE (aim for 2-3 paragraphs, approximately 200-300 words)\n";
+        $prompt .= "- Use authentic Philippine government document language with proper legal terminology\n";
+        $prompt .= "- Include brief references to Philippine laws and local government units\n";
+        $prompt .= "- Make it professional, clear, and appropriate for official use\n\n";
 
         $prompt .= "DOCUMENT TYPE: {$documentName}\n";
         if ($description) {
             $prompt .= "DESCRIPTION: {$description}\n";
         }
 
-        $prompt .= "\nRESIDENT INFORMATION TO INCLUDE:\n";
+        $prompt .= "\nRESIDENT INFORMATION TO INCLUDE (USE ALL OF THESE IN DETAIL):\n";
         foreach ($residentData as $key => $value) {
             if (!empty($value) && !in_array($key, ['email', 'phone'])) {
                 $prompt .= "- {$key}: {$value}\n";
@@ -157,7 +137,7 @@ class AIDocumentGeneratorService
         }
 
         if (!empty($requestData)) {
-            $prompt .= "\nADDITIONAL INFORMATION PROVIDED BY RESIDENT:\n";
+            $prompt .= "\nADDITIONAL INFORMATION PROVIDED BY RESIDENT (ELABORATE ON THESE):\n";
             foreach ($requestData as $key => $value) {
                 if (!empty($value)) {
                     $prompt .= "- {$key}: {$value}\n";
@@ -166,37 +146,68 @@ class AIDocumentGeneratorService
         }
 
         if (!empty($requiredDocuments)) {
-            $prompt .= "\nREQUIRED DOCUMENTS SUBMITTED:\n";
+            $prompt .= "\nREQUIRED DOCUMENTS SUBMITTED (MENTION THESE):\n";
             foreach ($requiredDocuments as $doc) {
                 $prompt .= "- {$doc}\n";
             }
         }
 
-        $prompt .= "\nCONTENT REQUIREMENTS:\n";
-        $prompt .= "1. Start with 'TO WHOM IT MAY CONCERN:' followed by the certification/permit text\n";
-        $prompt .= "2. Include the resident's full name: " . ($residentData['name'] ?? 'N/A') . "\n";
-        $prompt .= "3. Include the resident's address: " . ($residentData['address'] ?? 'N/A') . "\n";
-        if (!empty($residentData['purok'])) {
-            $prompt .= "4. Mention Purok: " . $residentData['purok'] . "\n";
+        $day = now()->format('jS');
+        $month = now()->format('F');
+        $year = now()->format('Y');
+        
+        $prompt .= "\nCONTENT REQUIREMENTS (FOLLOW THIS EXACT FORMAT):\n";
+        $prompt .= "Generate EXACTLY 3 paragraphs following this structure:\n\n";
+        
+        $prompt .= "PARAGRAPH 1: Start with 'THIS IS TO CERTIFY that' followed by the certification statement. ";
+        $prompt .= "Include the resident's name: " . ($residentData['name'] ?? 'N/A') . ". ";
+        if (!empty($requestData)) {
+            $prompt .= "Include relevant business/activity details from the request data if applicable. ";
         }
-        $prompt .= "5. Include all relevant information from the additional fields provided above\n";
-        if (!empty($requiredDocuments)) {
-            $prompt .= "6. Acknowledge that required documents have been submitted\n";
+        $prompt .= "Include address: ";
+        if (!empty($purok)) {
+            $prompt .= "Purok {$purok}, ";
         }
-        $prompt .= "7. Include the issuance date: {$currentDate}\n";
-        $prompt .= "8. Include the location: Barangay Purisima, Tago, Surigao del Sur\n";
-        $prompt .= "9. Use formal, official Philippine government document language\n";
-        $prompt .= "10. Make it professional, legal, and appropriate for official use\n\n";
+        $prompt .= "{$barangay}, {$municipality}, {$province}, Philippines. ";
+        $prompt .= "Keep this paragraph factual and concise (2-3 sentences maximum).\n\n";
+        
+        $prompt .= "PARAGRAPH 2: Start with 'This certification is being issued upon the request of' followed by the purpose. ";
+        if (!empty($requestData['purpose'])) {
+            $prompt .= "Mention: " . $requestData['purpose'] . ". ";
+        }
+        $prompt .= "End with 'and for whatever legal purpose it may serve best.' ";
+        $prompt .= "Keep this paragraph to one sentence only.\n\n";
+        
+        $prompt .= "PARAGRAPH 3: Start with 'Issued this {$day} day of {$month}, {$year}' ";
+        $prompt .= "and end with 'at Barangay Hall of {$barangay}, {$municipality}, {$province}.' ";
+        $prompt .= "Keep this paragraph to one sentence only.\n\n";
+        
+        $prompt .= "IMPORTANT:\n";
+        $prompt .= "- Generate EXACTLY 3 paragraphs, no more, no less\n";
+        $prompt .= "- Do NOT include 'TO WHOM IT MAY CONCERN:' - start directly with 'THIS IS TO CERTIFY that'\n";
+        $prompt .= "- Each paragraph should be concise (1-2 sentences)\n";
+        $prompt .= "- Total word count should be approximately 60-100 words\n";
+        $prompt .= "- Use formal, official Philippine government document language\n";
+        $prompt .= "- Use proper Philippine address format\n";
+        $prompt .= "- Be direct and factual, avoid unnecessary elaboration\n\n";
 
         $prompt .= "OUTPUT FORMAT:\n";
         $prompt .= "- Use HTML paragraph tags (<p>) for each paragraph\n";
-        $prompt .= "- Use <strong> tags for names, dates, and important details\n";
+        $prompt .= "- Use <strong> tags for names, dates, addresses, and important details\n";
         $prompt .= "- Do NOT include headers, titles, signatures, or any structural elements\n";
         $prompt .= "- Do NOT include HTML head, body, style, or document structure tags\n";
-        $prompt .= "- Generate ONLY the main content paragraphs\n";
-        $prompt .= "- Start directly with the salutation and certification text\n\n";
+        $prompt .= "- Generate EXACTLY 3 paragraphs only\n";
+        $prompt .= "- Start directly with 'THIS IS TO CERTIFY that' (NO 'TO WHOM IT MAY CONCERN:')\n";
+        $prompt .= "- Keep paragraphs concise (1-2 sentences each)\n\n";
 
-        $prompt .= "Generate the certificate/permit MAIN CONTENT ONLY (HTML formatted paragraphs, no structure):";
+        $prompt .= "PHILIPPINE LOCAL CONTEXT TO INCLUDE:\n";
+        $prompt .= "- Brief reference to Local Government Code of 1991 (RA 7160)\n";
+        $prompt .= "- Barangay authority and governance\n";
+        $prompt .= "- Philippine address format and local terminology (Purok, Barangay, Municipality, Province)\n";
+        $prompt .= "- Formal Philippine government document language\n";
+        $prompt .= "- Legal validity and official recognition\n\n";
+
+        $prompt .= "Generate a CONCISE but COMPLETE certificate/permit content (2-3 paragraphs, approximately 200-300 words) with Philippine local context:";
 
         return $prompt;
     }
@@ -235,10 +246,17 @@ class AIDocumentGeneratorService
             'barangay' => $resident->barangay ?? 'Barangay Purisima',
             'municipality' => $resident->municipality ?? 'Tago',
             'province' => $resident->province ?? 'Surigao del Sur',
+            'punong_barangay' => 'EMMANUEL P. ISIANG',
+            'officer_of_the_day' => $transaction->officer_of_the_day ?? null,
         ];
 
         // Get required fields data
         $requestData = $transaction->resident_input_data ?? [];
+        
+        // Include officer of the day in request data if it exists
+        if (!empty($transaction->officer_of_the_day)) {
+            $requestData['officer_of_the_day'] = $transaction->officer_of_the_day;
+        }
 
         // Get required documents
         $requiredDocuments = $transaction->required_documents ?? [];

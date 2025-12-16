@@ -108,6 +108,29 @@ export function useBreadcrumbs() {
         ])
     );
 
+    const residentHouseholdMembersBreadcrumbs = computed(() =>
+        createBreadcrumbs([
+            { title: 'Dashboard', href: DASHBOARD_URL },
+            { title: 'Household Members', href: '/resident/household-members' },
+        ])
+    );
+
+    const residentHouseholdMemberCreateBreadcrumbs = computed(() =>
+        createBreadcrumbs([
+            { title: 'Dashboard', href: DASHBOARD_URL },
+            { title: 'Household Members', href: '/resident/household-members' },
+            { title: 'Add Member', href: '/resident/household-members/create' },
+        ])
+    );
+
+    const residentHouseholdMemberEditBreadcrumbs = computed(() => (memberId: string) =>
+        createBreadcrumbs([
+            { title: 'Dashboard', href: DASHBOARD_URL },
+            { title: 'Household Members', href: '/resident/household-members' },
+            { title: 'Edit Member', href: `/resident/household-members/${memberId}/edit` },
+        ])
+    );
+
     // Admin breadcrumbs
     const adminDashboardBreadcrumbs = computed(() => []);
 
@@ -144,6 +167,9 @@ export function useBreadcrumbs() {
         residentTransactionEditBreadcrumbs,
         residentAccountBreadcrumbs,
         residentOnboardingBreadcrumbs,
+        residentHouseholdMembersBreadcrumbs,
+        residentHouseholdMemberCreateBreadcrumbs,
+        residentHouseholdMemberEditBreadcrumbs,
 
         // Admin
         adminDashboardBreadcrumbs,

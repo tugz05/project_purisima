@@ -469,25 +469,17 @@ const saveCertificate = () => {
     certificateForm.officer_of_the_day = officerValue; // Always a string, even if empty
     certificateForm.document_content = certificateForm.document_content || '';
     
-    // Log what we're sending
-    const formData = certificateForm.data();
-    console.log('Saving certificate - Form data:', {
+    // Prepare the data object explicitly to ensure officer_of_the_day is always included
+    const submitData = {
         status: certificateForm.status,
-        officer_of_the_day: officerValue,
-        officer_type: typeof officerValue,
-        document_content_length: certificateForm.document_content?.length || 0,
-        all_form_keys: Object.keys(formData),
-        form_data_officer: formData.officer_of_the_day
-    });
+        officer_of_the_day: officerValue || null, // Use null instead of empty string to ensure it's sent
+        document_content: certificateForm.document_content || '',
+    };
     
     // Use transform to ensure all fields are sent, even if empty
-    certificateForm.transform((data) => {
-        // Return only the fields we need, ensuring officer_of_the_day is always included
-        return {
-            status: data.status,
-            officer_of_the_day: data.officer_of_the_day !== undefined ? String(data.officer_of_the_day || '') : '',
-            document_content: data.document_content || '',
-        };
+    certificateForm.transform(() => {
+        // Always return the explicitly prepared data
+        return submitData;
     }).put(`/staff/transactions/${props.transaction.id}`, {
         preserveScroll: true,
         onSuccess: (page) => {
@@ -1195,11 +1187,12 @@ onUnmounted(() => {
                                                         Optional
                                                     </Badge>
                                                 </Label>
-                                                <Input
+                                                <input
                                                     id="certificate_officer_of_the_day"
+                                                    type="text"
                                                     v-model="certificateForm.officer_of_the_day"
                                                     placeholder="e.g., CHARLITA G. MONTENEGRO, RSW"
-                                                    class="w-full border-2 border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-400 text-sm font-medium bg-white shadow-sm"
+                                                    class="w-full border-2 border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-400 text-sm font-medium bg-white shadow-sm h-9 rounded-md px-3 py-1 outline-none transition-[color,box-shadow]"
                                                 />
                                                 <p class="text-xs text-amber-700 mt-2 font-medium">
                                                     ⚠️ <strong>Important:</strong> This name will appear on the printed certificate as "Officer of the Day" if provided. Leave empty if Punong Barangay will sign.

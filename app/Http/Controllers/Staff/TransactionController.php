@@ -79,14 +79,17 @@ class TransactionController extends Controller
         // Get validated data and ensure officer_of_the_day is included
         $validated = $request->validated();
 
-        // Explicitly include officer_of_the_day if it's in the request (even if null/empty)
-        if ($request->has('officer_of_the_day')) {
-            $validated['officer_of_the_day'] = $request->input('officer_of_the_day');
+        // Explicitly include officer_of_the_day if it exists in the request (even if null/empty)
+        // Use array_key_exists to check for the key, not has() which returns false for empty strings
+        if (array_key_exists('officer_of_the_day', $request->all())) {
+            $officerValue = $request->input('officer_of_the_day');
+            // Convert empty string to null, otherwise use the trimmed value
+            $validated['officer_of_the_day'] = is_string($officerValue) && trim($officerValue) === '' ? null : $officerValue;
         }
 
         Log::info('Updating transaction', [
             'transaction_id' => $transaction->id,
-            'officer_of_the_day_in_request' => $request->has('officer_of_the_day'),
+            'officer_of_the_day_in_request' => array_key_exists('officer_of_the_day', $request->all()),
             'officer_of_the_day_value' => $request->input('officer_of_the_day'),
             'officer_of_the_day_in_validated' => $validated['officer_of_the_day'] ?? 'NOT IN VALIDATED',
             'validated_keys' => array_keys($validated),
@@ -198,6 +201,8 @@ class TransactionController extends Controller
     public function generateWithAI(Transaction $transaction, Request $request): JsonResponse
     {
         try {
+            // Refresh transaction to get latest data including officer_of_the_day
+            $transaction->refresh();
             $transaction->load(['resident', 'documentType']);
 
             if (!$transaction->documentType) {
@@ -211,7 +216,7 @@ class TransactionController extends Controller
 
             return response()->json([
                 'content' => $content,
-                'generated_by' => 'AI (Gemini)',
+                'generated_by' => 'AI (OpenAI)',
                 'success' => true,
             ]);
         } catch (\Exception $e) {

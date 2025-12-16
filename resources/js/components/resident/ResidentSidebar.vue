@@ -5,7 +5,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, router } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, FileText, Receipt, Building, UserCheck, FileCheck, CreditCard, FileX, Heart, Users, MessageSquare, AlertTriangle } from 'lucide-vue-next';
+import { LayoutGrid, FileText, Receipt, Building, UserCheck, FileCheck, CreditCard, FileX, Heart, Users, MessageSquare, AlertTriangle } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
 import resident from '@/routes/resident';
 import { useAuth } from '@/composables/useAuth';
@@ -71,23 +71,17 @@ const mainNavItems = computed<NavItem[]>(() => {
                 },
             ],
         },
+        {
+            title: 'Household Members',
+            href: '/resident/household-members',
+            icon: Users,
+        },
     ];
     
     return items;
 });
 
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Github Repo',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
-    },
-];
+const footerNavItems: NavItem[] = [];
 </script>
 
 <template>
