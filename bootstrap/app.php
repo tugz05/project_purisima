@@ -44,5 +44,29 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Handle Inertia requests - return JSON instead of trying to render exception views
+        $exceptions->respond(function (\Illuminate\Http\Request $request, \Throwable $e) {
+            // For Inertia requests or API requests, return JSON response
+            if ($request->expectsJson() || $request->header('X-Inertia') || $request->is('api/*')) {
+                $statusCode = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+                
+                // Handle validation exceptions
+                if ($e instanceof \Illuminate\Validation\ValidationException) {
+                    return response()->json([
+                        'message' => $e->getMessage(),
+                        'errors' => $e->errors(),
+                    ], 422);
+                }
+                
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'error' => config('app.debug') ? [
+                        'exception' => get_class($e),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                        'trace' => config('app.debug') ? $e->getTraceAsString() : null,
+                    ] : null,
+                ], $statusCode);
+            }
+        });
     })->create();

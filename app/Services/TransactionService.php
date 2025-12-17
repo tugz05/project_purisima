@@ -42,19 +42,27 @@ class TransactionService
             $documentType = null;
             if (isset($data['type'])) {
                 $documentType = DocumentType::where('code', $data['type'])->first();
+                if (!$documentType) {
+                    throw new \Exception("Document type with code '{$data['type']}' not found. Please select a valid document type.");
+                }
             } elseif (isset($data['document_type_id'])) {
                 $documentType = DocumentType::find($data['document_type_id']);
+                if (!$documentType) {
+                    throw new \Exception("Document type with ID '{$data['document_type_id']}' not found.");
+                }
+            } else {
+                throw new \Exception("Document type is required. Please select a valid document type.");
             }
 
             $transaction = Transaction::create([
                 'resident_id' => $resident->id,
-                'document_type_id' => $documentType?->id,
-                'type' => $data['type'] ?? $documentType?->code,
+                'document_type_id' => $documentType->id,
+                'type' => $data['type'] ?? $documentType->code,
                 'title' => $data['title'],
                 'required_documents' => $data['required_documents'] ?? [],
                 'submitted_documents' => $submittedDocuments,
                 'resident_input_data' => $data['required_fields'] ?? [],
-                'fee_amount' => $data['fee_amount'] ?? $documentType?->fee_amount ?? 0,
+                'fee_amount' => $data['fee_amount'] ?? $documentType->fee_amount ?? 0,
             ]);
 
             return $transaction;

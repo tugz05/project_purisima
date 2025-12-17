@@ -46,24 +46,33 @@ class TransactionController extends Controller
 
     public function store(TransactionRequest $request): RedirectResponse
     {
-        $transaction = $this->transactionService->create($request->validated(), $request->user());
+        try {
+            $transaction = $this->transactionService->create($request->validated(), $request->user());
 
-        // Create notification for all staff members about new transaction
-        $this->notificationService->createNotificationForAllStaff(
-            'transaction_created',
-            'New Transaction Request',
-            "New {$transaction->documentType->name} request from {$transaction->resident->name}",
-            [
-                'transaction_id' => $transaction->id,
-                'resident_name' => $transaction->resident->name,
-                'document_type' => $transaction->documentType->name,
-            ],
-            'normal',
-            'transaction'
-        );
+            // Load document type relationship
+            $transaction->load('documentType');
 
-        return redirect()->route('resident.transactions.index')
-            ->with('success', 'Transaction submitted successfully.');
+            // Create notification for all staff members about new transaction
+            $this->notificationService->createNotificationForAllStaff(
+                'transaction_created',
+                'New Transaction Request',
+                "New {$transaction->documentType->name} request from {$transaction->resident->name}",
+                [
+                    'transaction_id' => $transaction->id,
+                    'resident_name' => $transaction->resident->name,
+                    'document_type' => $transaction->documentType->name,
+                ],
+                'normal',
+                'transaction'
+            );
+
+            return redirect()->route('resident.transactions.index')
+                ->with('success', 'Transaction submitted successfully.');
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['error' => $e->getMessage()]);
+        }
     }
 
     public function show(Transaction $transaction): Response
