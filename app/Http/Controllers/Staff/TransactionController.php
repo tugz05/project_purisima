@@ -74,49 +74,63 @@ class TransactionController extends Controller
 
     public function update(StaffTransactionUpdateRequest $request, Transaction $transaction): RedirectResponse
     {
-        $oldStatus = $transaction->status;
+        try {
+            $oldStatus = $transaction->status;
 
-        // Get validated data and ensure officer_of_the_day is included
-        $validated = $request->validated();
+            // Get validated data and ensure officer_of_the_day is included
+            $validated = $request->validated();
 
-        // Explicitly include officer_of_the_day if it exists in the request (even if null/empty)
-        // Use array_key_exists to check for the key, not has() which returns false for empty strings
-        if (array_key_exists('officer_of_the_day', $request->all())) {
-            $officerValue = $request->input('officer_of_the_day');
-            // Convert empty string to null, otherwise use the trimmed value
-            $validated['officer_of_the_day'] = is_string($officerValue) && trim($officerValue) === '' ? null : $officerValue;
+            // Explicitly include officer_of_the_day if it exists in the request (even if null/empty)
+            // Use array_key_exists to check for the key, not has() which returns false for empty strings
+            if (array_key_exists('officer_of_the_day', $request->all())) {
+                $officerValue = $request->input('officer_of_the_day');
+                // Convert empty string to null, otherwise use the trimmed value
+                $validated['officer_of_the_day'] = is_string($officerValue) && trim($officerValue) === '' ? null : $officerValue;
+            }
+
+            Log::info('Updating transaction', [
+                'transaction_id' => $transaction->id,
+                'officer_of_the_day_in_request' => array_key_exists('officer_of_the_day', $request->all()),
+                'officer_of_the_day_value' => $request->input('officer_of_the_day'),
+                'officer_of_the_day_in_validated' => $validated['officer_of_the_day'] ?? 'NOT IN VALIDATED',
+                'validated_keys' => array_keys($validated),
+            ]);
+
+            $this->transactionService->updateStatus(
+                $transaction,
+                $request->status,
+                $request->user(),
+                $validated
+            );
+
+            // Refresh to verify it was saved
+            $transaction->refresh();
+            Log::info('After update - officer_of_the_day value', [
+                'saved_value' => $transaction->officer_of_the_day,
+                'transaction_id' => $transaction->id,
+            ]);
+
+            // Create notification for transaction status change
+            if ($oldStatus !== $request->status) {
+                // Load relationships before creating notification
+                $transaction->load(['documentType', 'resident']);
+                $this->createTransactionNotification($transaction, $request->status);
+            }
+
+            // Return with the updated transaction data
+            return redirect()->route('staff.transactions.show', $transaction->fresh())
+                ->with('success', 'Transaction updated successfully.');
+        } catch (\Exception $e) {
+            Log::error('Error updating transaction', [
+                'transaction_id' => $transaction->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['error' => 'Failed to update transaction: ' . $e->getMessage()]);
         }
-
-        Log::info('Updating transaction', [
-            'transaction_id' => $transaction->id,
-            'officer_of_the_day_in_request' => array_key_exists('officer_of_the_day', $request->all()),
-            'officer_of_the_day_value' => $request->input('officer_of_the_day'),
-            'officer_of_the_day_in_validated' => $validated['officer_of_the_day'] ?? 'NOT IN VALIDATED',
-            'validated_keys' => array_keys($validated),
-        ]);
-
-        $this->transactionService->updateStatus(
-            $transaction,
-            $request->status,
-            $request->user(),
-            $validated
-        );
-
-        // Refresh to verify it was saved
-        $transaction->refresh();
-        Log::info('After update - officer_of_the_day value', [
-            'saved_value' => $transaction->officer_of_the_day,
-            'transaction_id' => $transaction->id,
-        ]);
-
-        // Create notification for transaction status change
-        if ($oldStatus !== $request->status) {
-            $this->createTransactionNotification($transaction, $request->status);
-        }
-
-        // Return with the updated transaction data
-        return redirect()->route('staff.transactions.show', $transaction->fresh())
-            ->with('success', 'Transaction updated successfully.');
     }
 
     public function assign(Request $request, Transaction $transaction): RedirectResponse
@@ -275,6 +289,14 @@ class TransactionController extends Controller
      */
     private function createTransactionNotification(Transaction $transaction, string $status): void
     {
+        // Ensure relationships are loaded
+        if (!$transaction->relationLoaded('documentType')) {
+            $transaction->load('documentType');
+        }
+        if (!$transaction->relationLoaded('resident')) {
+            $transaction->load('resident');
+        }
+
         $notificationType = match($status) {
             'in_progress' => 'transaction_updated',
             'completed' => 'transaction_completed',
@@ -289,15 +311,19 @@ class TransactionController extends Controller
             default => 'normal',
         };
 
+        // Get safe values with null checks
+        $documentTypeName = $transaction->documentType?->name ?? 'Unknown Document Type';
+        $residentName = $transaction->resident?->name ?? 'Unknown Resident';
+
         // Notify all staff members about the transaction update
         $this->notificationService->createNotificationForAllStaff(
             $notificationType,
             "Transaction #{$transaction->id} Updated",
-            "Transaction #{$transaction->id} ({$transaction->documentType->name}) for {$transaction->resident->name} has been {$status}.",
+            "Transaction #{$transaction->id} ({$documentTypeName}) for {$residentName} has been {$status}.",
             [
                 'transaction_id' => $transaction->id,
-                'resident_name' => $transaction->resident->name,
-                'document_type' => $transaction->documentType->name,
+                'resident_name' => $residentName,
+                'document_type' => $documentTypeName,
                 'status' => $status,
             ],
             $priority,

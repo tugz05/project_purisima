@@ -122,7 +122,7 @@ class TransactionService
                 $updateData['rejection_reason'] = $data['rejection_reason'];
             }
 
-            if (isset($data['document_content'])) {
+            if (isset($data['document_content']) && trim($data['document_content']) !== '') {
                 $updateData['generated_document_data'] = [
                     'content' => $data['document_content'],
                     'generated_at' => now()->toIso8601String(),
