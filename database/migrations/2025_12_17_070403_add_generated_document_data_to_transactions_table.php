@@ -14,17 +14,17 @@ return new class extends Migration
         Schema::table('transactions', function (Blueprint $table) {
             // Add generated_document_data column if it doesn't exist
             if (!Schema::hasColumn('transactions', 'generated_document_data')) {
-                $table->json('generated_document_data')->nullable()->after('ai_generated_at');
+                $table->json('generated_document_data')->nullable();
             }
             
             // Add generated_document_path column if it doesn't exist
             if (!Schema::hasColumn('transactions', 'generated_document_path')) {
-                $table->string('generated_document_path')->nullable()->after('generated_document_data');
+                $table->string('generated_document_path')->nullable();
             }
             
             // Add document_generated_at column if it doesn't exist
             if (!Schema::hasColumn('transactions', 'document_generated_at')) {
-                $table->timestamp('document_generated_at')->nullable()->after('generated_document_path');
+                $table->timestamp('document_generated_at')->nullable();
             }
         });
     }
