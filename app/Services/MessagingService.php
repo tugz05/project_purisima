@@ -7,6 +7,7 @@ use App\Models\Message;
 use App\Models\TypingIndicator;
 use App\Models\User;
 use App\Events\MessageSent;
+use App\Support\BroadcastHelper;
 use App\Events\UserTyping;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -73,7 +74,7 @@ class MessagingService
             }
 
             // Broadcast the message
-            broadcast(new MessageSent($message, $conversation));
+            BroadcastHelper::safeBroadcast(new MessageSent($message, $conversation));
 
             return $message->load('sender');
         });
@@ -120,7 +121,7 @@ class MessagingService
         TypingIndicator::startTyping($conversation->id, $user->id);
 
         // Broadcast typing event
-        broadcast(new UserTyping($user, $conversation, true));
+        BroadcastHelper::safeBroadcast(new UserTyping($user, $conversation, true));
     }
 
     /**
@@ -136,7 +137,7 @@ class MessagingService
             $typingIndicator->stopTyping();
 
             // Broadcast typing stopped event
-            broadcast(new UserTyping($user, $conversation, false));
+            BroadcastHelper::safeBroadcast(new UserTyping($user, $conversation, false));
         }
     }
 

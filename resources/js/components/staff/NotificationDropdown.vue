@@ -167,6 +167,7 @@ import {
   Settings,
   User,
 } from 'lucide-vue-next';
+import { getPusher } from '@/pusher';
 
 interface Notification {
   id: number;
@@ -368,7 +369,7 @@ const getCategoryIcon = (category: string) => {
 
 // Poll for new notifications every 30 seconds
 let pollInterval: number | null = null;
-let echoChannel: any = null;
+let echoChannelName = '';
 
 onMounted(() => {
   checkUserRole();
@@ -380,10 +381,11 @@ onMounted(() => {
   try {
     const page = usePage();
     const uid = (page as any)?.props?.auth?.user?.id;
-    if ((window as any).Echo && uid) {
-      echoChannel = (window as any).Echo.private(`App.Models.User.${uid}`);
-      echoChannel.listen('.message.sent', (e: any) => {
-        // Ignore messages sent by self
+    const pusher = getPusher();
+    if (pusher && uid) {
+      echoChannelName = `private-App.Models.User.${uid}`;
+      const channel = pusher.subscribe(echoChannelName);
+      channel.bind('message.sent', (e: any) => {
         if (e?.message?.sender?.id && e.message.sender.id === uid) return;
         unreadCount.value = (unreadCount.value || 0) + 1;
         const badge = document.getElementById('header-unread-badge');
@@ -392,6 +394,9 @@ onMounted(() => {
           badge.textContent = String(current + 1);
           (badge as HTMLElement).style.display = 'inline-flex';
         }
+      });
+      channel.bind('notification.created', () => {
+        loadUnreadCount();
       });
     }
   } catch (_e) {}
@@ -402,8 +407,9 @@ onUnmounted(() => {
     clearInterval(pollInterval);
   }
   try {
-    if (echoChannel && (window as any).Echo) {
-      (window as any).Echo.leave(echoChannel.name || echoChannel.channel || '');
+    const pusher = getPusher();
+    if (echoChannelName && pusher) {
+      pusher.unsubscribe(echoChannelName);
     }
   } catch (_e) {}
 });

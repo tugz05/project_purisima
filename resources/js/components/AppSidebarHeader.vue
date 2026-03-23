@@ -6,6 +6,7 @@ import NotificationDropdown from '@/components/staff/NotificationDropdown.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { MessageSquare } from 'lucide-vue-next';
 import type { BreadcrumbItemType } from '@/types';
+import { getPusher } from '@/pusher';
 
 withDefaults(
     defineProps<{
@@ -21,14 +22,15 @@ const page = usePage() as any;
 const currentUser = page?.props?.auth?.user || null;
 const isStaff = currentUser && (currentUser.role === 'staff' || currentUser.role === 'admin');
 const headerUnread = ref<number>(page?.props?.unreadCount || 0);
-let headerChannel: any = null;
+let headerChannelName = '';
 
 onMounted(() => {
     try {
-        if (isStaff && (window as any).Echo && currentUser?.id) {
-            headerChannel = (window as any).Echo.private(`App.Models.User.${currentUser.id}`);
-            headerChannel.listen('.message.sent', (e: any) => {
-                // Ignore own messages
+        const pusher = getPusher();
+        if (isStaff && pusher && currentUser?.id) {
+            headerChannelName = `private-App.Models.User.${currentUser.id}`;
+            const channel = pusher.subscribe(headerChannelName);
+            channel.bind('message.sent', (e: any) => {
                 if (e?.message?.sender?.id === currentUser.id) return;
                 headerUnread.value = (headerUnread.value || 0) + 1;
             });
@@ -38,8 +40,9 @@ onMounted(() => {
 
 onUnmounted(() => {
     try {
-        if (headerChannel && (window as any).Echo) {
-            (window as any).Echo.leave(headerChannel.name || headerChannel.channel || '');
+        const pusher = getPusher();
+        if (headerChannelName && pusher) {
+            pusher.unsubscribe(headerChannelName);
         }
     } catch (_e) {}
 });

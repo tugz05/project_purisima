@@ -24,6 +24,7 @@ import {
     Phone,
     Video
 } from 'lucide-vue-next';
+import { getPusher } from '@/pusher';
 
 interface Conversation {
     id: number;
@@ -292,36 +293,24 @@ onMounted(() => {
 
 // Real-time messaging setup
 const setupRealTimeMessaging = () => {
-    console.log('Staff: Setting up real-time messaging...');
-    console.log('Staff: Selected conversation:', selectedConversation.value);
-    console.log('Staff: Echo object:', window.Echo);
+    const pusher = getPusher();
+    if (!pusher) return;
 
     // Clean up previous channel if exists
     if (currentChannel.value) {
-        console.log('Staff: Leaving previous channel:', currentChannel.value);
-        (window as any).Echo.leave(`conversation.${currentChannel.value}`);
+        pusher.unsubscribe(`private-conversation.${currentChannel.value}`);
         currentChannel.value = null;
     }
 
     if (selectedConversation.value) {
-        const channelName = `conversation.${selectedConversation.value.id}`;
-        console.log('Staff: Creating private channel:', channelName);
-
-        const channel = (window as any).Echo.private(channelName);
+        const channelName = `private-conversation.${selectedConversation.value.id}`;
+        const channel = pusher.subscribe(channelName);
         currentChannel.value = selectedConversation.value.id;
 
-        console.log('Staff: Channel created:', channel);
-
         // Listen for new messages
-        channel.listen('.message.sent', (e: any) => {
-            console.log('Staff: Received real-time message:', e);
-
-            // Only add message if it's not from current user (avoid duplicates)
+        channel.bind('message.sent', (e: any) => {
             if (e.message.sender.id !== props.currentUser?.id) {
                 messages.value.push(e.message);
-                console.log('Staff: Added message to conversation');
-
-                // Auto-scroll to bottom
                 setTimeout(() => {
                     const messagesContainer = document.querySelector('.overflow-y-auto');
                     if (messagesContainer) {
@@ -330,7 +319,6 @@ const setupRealTimeMessaging = () => {
                 }, 100);
             }
 
-            // Update conversation in sidebar
             const convIndex = props.conversations?.data?.findIndex(c => c.id === e.conversation.id);
             if (convIndex !== undefined && props.conversations?.data) {
                 props.conversations.data[convIndex].last_message = e.conversation.last_message;
@@ -340,13 +328,9 @@ const setupRealTimeMessaging = () => {
         });
 
         // Listen for typing indicators
-        channel.listen('.user.typing', (e: any) => {
-            console.log('Staff: Received typing event:', e);
-            // Handle typing indicators
+        channel.bind('user.typing', (e: any) => {
             if (e.user.id !== props.currentUser?.id) {
                 otherUserTyping.value = e.is_typing;
-
-                // Auto-hide typing indicator after 3 seconds
                 if (e.is_typing) {
                     setTimeout(() => {
                         otherUserTyping.value = false;
@@ -354,10 +338,6 @@ const setupRealTimeMessaging = () => {
                 }
             }
         });
-
-        console.log('Staff: Real-time messaging setup complete');
-    } else {
-        console.log('Staff: No conversation to set up real-time messaging');
     }
 };
 
@@ -369,12 +349,10 @@ watch(selectedConversation, () => {
 });
 
 onBeforeUnmount(() => {
-    // Clean up Echo channel
-    if (currentChannel.value) {
-        (window as any).Echo.leave(`conversation.${currentChannel.value}`);
+    const pusher = getPusher();
+    if (currentChannel.value && pusher) {
+        pusher.unsubscribe(`private-conversation.${currentChannel.value}`);
     }
-
-    // Clean up typing timeout
     if (typingTimeout.value) {
         clearTimeout(typingTimeout.value);
     }

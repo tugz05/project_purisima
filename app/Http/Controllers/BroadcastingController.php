@@ -38,7 +38,12 @@ class BroadcastingController extends Controller
                         'conversation_id' => $conversationId,
                         'user_id' => auth()->id()
                     ]);
-                    return Broadcast::auth($request);
+                    try {
+                        return Broadcast::auth($request);
+                    } catch (\Throwable $e) {
+                        \Log::warning('Broadcast auth failed', ['message' => $e->getMessage()]);
+                        return response()->json(['error' => 'Broadcast unavailable'], 503);
+                    }
                 } else {
                     \Log::warning('Conversation channel denied', [
                         'conversation_id' => $conversationId,
@@ -56,7 +61,12 @@ class BroadcastingController extends Controller
                     \Log::info('User channel authorized', [
                         'user_id' => auth()->id()
                     ]);
-                    return Broadcast::auth($request);
+                    try {
+                        return Broadcast::auth($request);
+                    } catch (\Throwable $e) {
+                        \Log::warning('Broadcast auth failed', ['message' => $e->getMessage()]);
+                        return response()->json(['error' => 'Broadcast unavailable'], 503);
+                    }
                 }
             }
         }

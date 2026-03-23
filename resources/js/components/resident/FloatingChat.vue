@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
-import { Head, router, usePage } from '@inertiajs/vue3';
+import { usePage } from '@inertiajs/vue3';
+import { getPusher, isPusherAvailable } from '@/pusher';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -103,12 +104,9 @@ const openChat = async () => {
 
     // Auto-create conversation with general staff if none exists
     if (conversations.value.length === 0) {
-        console.log('No existing conversations, creating new one...');
         await createGeneralConversation();
     } else {
-        // Use existing conversation
         currentConversation.value = conversations.value[0];
-        console.log('Using existing conversation:', currentConversation.value.id);
     }
 
     if (conversations.value.length > 0) {
@@ -131,18 +129,9 @@ const createGeneralConversation = async () => {
     isLoading.value = true;
 
     try {
-        // Get CSRF token from Laravel
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
                        || (document.querySelector('input[name="_token"]') as HTMLInputElement)?.value
                        || (window as any).Laravel?.csrfToken;
-
-        console.log('CSRF token found:', csrfToken ? 'Yes' : 'No');
-        console.log('CSRF token value:', csrfToken?.substring(0, 10) + '...' || 'None');
-
-        if (!csrfToken) {
-            // Try to make a request anyway and let the server tell us what's wrong
-            console.log('CSRF token not found, attempting request anyway...');
-        }
 
         const response = await fetch('/resident/messaging/conversations/create-general', {
             method: 'POST',
@@ -157,54 +146,32 @@ const createGeneralConversation = async () => {
             })
         });
 
-        console.log('Create conversation response status:', response.status);
-
         if (response.ok) {
             const data = await response.json();
-            console.log('Conversation created:', data);
             if (data.conversation) {
                 currentConversation.value = data.conversation;
                 conversations.value.unshift(data.conversation);
                 messageContent.value = '';
-
-                // Clear loading state immediately after successful creation
                 isLoading.value = false;
-                console.log('Conversation loaded, loading state cleared');
-
-                // Setup real-time messaging for the new conversation
                 setupRealTimeMessaging();
             } else {
-                console.error('No conversation data in response:', data);
                 isLoading.value = false;
             }
         } else {
             let errorMessage = `Server error (${response.status})`;
-            let errorData = null;
-
             try {
                 const responseText = await response.text();
-                console.log('Response text:', responseText);
-
-                // Try to parse as JSON
-                errorData = JSON.parse(responseText);
+                const errorData = responseText ? JSON.parse(responseText) : {};
                 errorMessage = errorData.error || errorData.message || errorMessage;
-            } catch (e) {
-                console.log('Response is not JSON, likely HTML error page');
-                console.log('Raw response:', response.text || 'No response text');
+            } catch {
+                // use default errorMessage
             }
-
-            console.error('Failed to create conversation:', {
-                status: response.status,
-                statusText: response.statusText,
-                errorData: errorData,
-                errorMessage: errorMessage
-            });
+            isLoading.value = false;
             alert(`Failed to create conversation (${response.status}): ${errorMessage}`);
         }
     } catch (error) {
-        console.error('Failed to create general conversation:', error);
-        alert('Failed to create conversation. Please check your connection.');
         isLoading.value = false;
+        alert('Failed to create conversation. Please check your connection.');
     }
 };
 
@@ -219,19 +186,15 @@ const sendMessage = async () => {
     try {
         // If no conversation exists, create one first
         if (!currentConversation.value) {
-            console.log('No current conversation, creating one...');
             await createGeneralConversation();
             if (!currentConversation.value) {
-                console.log('Failed to create conversation, stopping send');
                 isSending.value = false;
                 return;
             }
-            console.log('Conversation created successfully:', (currentConversation.value as Conversation).id);
         }
 
         // Double-check that conversation exists and has valid ID
         if (!currentConversation.value || !currentConversation.value.id) {
-            console.error('Invalid conversation state:', currentConversation.value);
             isSending.value = false;
             return;
         }
@@ -240,9 +203,6 @@ const sendMessage = async () => {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
                        || (document.querySelector('input[name="_token"]') as HTMLInputElement)?.value
                        || (window as any).Laravel?.csrfToken;
-
-        console.log('Send message - CSRF token:', csrfToken ? 'Found' : 'Not found');
-        console.log('FloatingChat: Sending message to conversation ID:', currentConversation.value.id);
 
         // Send message using fetch for better error handling
         const response = await fetch(`/resident/messaging/conversations/${currentConversation.value.id}/messages`, {
@@ -260,41 +220,32 @@ const sendMessage = async () => {
 
         if (response.ok) {
             const data = await response.json();
-            console.log('FloatingChat: Send message response:', data);
             messageContent.value = '';
 
             // Update conversation with new message
             if (currentConversation.value && data.message) {
                 currentConversation.value.messages.push(data.message);
-                console.log('FloatingChat: Added message locally');
             }
         } else {
             let errorMessage = `Server error (${response.status})`;
             try {
                 const errorData = await response.json();
                 errorMessage = errorData.error || errorData.message || errorMessage;
-                console.error('FloatingChat: Send message error:', errorData);
-            } catch (e) {
-                console.log('Response is not JSON, likely HTML error page');
+            } catch {
+                // Response is not JSON
             }
 
             // If conversation doesn't exist, try to recreate it
             if (response.status === 404 && errorMessage.includes('No query results')) {
-                console.log('Conversation not found, recreating...');
                 currentConversation.value = null;
                 await createGeneralConversation();
                 if (currentConversation.value) {
-                    console.log('Conversation recreated, retrying send...');
-                    // Retry sending the message
                     return sendMessage();
                 }
             }
-
-            console.error('Failed to send message:', errorMessage);
             alert('Failed to send message: ' + errorMessage);
         }
-    } catch (error) {
-        console.error('Failed to send message:', error);
+    } catch {
         alert('Failed to send message. Please check your connection.');
     } finally {
         isSending.value = false;
@@ -355,49 +306,31 @@ const stopTyping = () => {
     }
 };
 
-// Real-time messaging setup with polling fallback
+// Real-time messaging setup with Pusher; fallback to polling if unavailable
 const setupRealTimeMessaging = () => {
-    console.log('FloatingChat: Setting up real-time messaging...');
-    console.log('FloatingChat: Current conversation:', currentConversation.value);
-    console.log('FloatingChat: Echo object:', window.Echo);
+    const pusher = getPusher();
 
-    // Clean up previous channel if exists
-    if (currentChannel.value) {
-        console.log('FloatingChat: Leaving previous channel:', currentChannel.value);
-        if (window.Echo && window.Echo.leave) {
-            window.Echo.leave(`conversation.${currentChannel.value}`);
-        }
+    if (currentChannel.value && pusher) {
+        pusher.unsubscribe(`private-conversation.${currentChannel.value}`);
         currentChannel.value = null;
     }
 
     if (currentConversation.value) {
-        const channelName = `conversation.${currentConversation.value.id}`;
-        console.log('FloatingChat: Creating private channel:', channelName);
+        const channelName = `private-conversation.${currentConversation.value.id}`;
 
-        // Try WebSocket first
-        if (window.Echo && window.Echo.private) {
+        if (pusher && isPusherAvailable()) {
             try {
-                const channel = window.Echo.private(channelName);
+                const channel = pusher.subscribe(channelName);
                 currentChannel.value = currentConversation.value.id;
 
-                console.log('FloatingChat: Channel created:', channel);
-
-                // If polling was running earlier, stop it now to avoid duplicates
                 if (pollingInterval) {
                     clearInterval(pollingInterval);
                     pollingInterval = null;
                 }
 
-                // Listen for new messages
-                channel.listen('.message.sent', (e: any) => {
-                    console.log('FloatingChat: Received real-time message:', e);
-
-                    // Only add message if it's not from current user (avoid duplicates)
-                    if (e.message.sender.id !== currentUser.value?.id) {
+                channel.bind('message.sent', (e: any) => {
+                    if (e.message?.sender?.id !== currentUser.value?.id) {
                         addMessageIfNew(e.message);
-                        console.log('FloatingChat: Added message to conversation (Echo)');
-
-                        // If chat is closed or different conversation is selected, bump unread count
                         const targetConversationId = e.conversation?.id || currentConversation.value?.id;
                         if (!isOpen.value || (currentConversation.value && currentConversation.value.id !== targetConversationId)) {
                             const conv = conversations.value.find(c => c.id === targetConversationId);
@@ -408,34 +341,22 @@ const setupRealTimeMessaging = () => {
                     }
                 });
 
-                // Listen for typing indicators
-                channel.listen('.user.typing', (e: any) => {
-                    console.log('FloatingChat: Received typing event:', e);
-                    // Handle typing indicators
-                    if (e.user.id !== currentUser.value?.id) {
+                channel.bind('user.typing', (e: any) => {
+                    if (e.user?.id !== currentUser.value?.id) {
                         otherUserTyping.value = e.is_typing;
-
-                        // Auto-hide typing indicator after 3 seconds
                         if (e.is_typing) {
-                            setTimeout(() => {
-                                otherUserTyping.value = false;
-                            }, 3000);
+                            setTimeout(() => { otherUserTyping.value = false; }, 3000);
                         }
                     }
                 });
 
-                console.log('FloatingChat: Real-time messaging setup complete');
                 return;
-            } catch (error) {
-                console.error('FloatingChat: WebSocket setup failed:', error);
+            } catch {
+                // Pusher failed, fall through to polling
             }
         }
 
-        // Fallback to polling if WebSocket fails
-        console.log('FloatingChat: Using polling fallback for real-time updates');
         setupPollingUpdates();
-    } else {
-        console.log('FloatingChat: No conversation to set up real-time messaging');
     }
 };
 
@@ -465,7 +386,6 @@ const setupPollingUpdates = () => {
                         const deduped = fetchedMessages.filter(m => !existingIds.has(m.id));
                         if (deduped.length > 0) {
                             currentConversation.value.messages.push(...deduped);
-                            console.log('FloatingChat: Added', deduped.length, 'new messages via polling');
                             setTimeout(() => {
                                 const messagesContainer = document.querySelector('.overflow-y-auto');
                                 if (messagesContainer) {
@@ -475,37 +395,14 @@ const setupPollingUpdates = () => {
                         }
                     }
                 }
-            } catch (error) {
-                console.error('FloatingChat: Polling error:', error);
+            } catch {
+                // Polling error - retry on next interval
             }
         }
-    }, 2000); // Poll every 2 seconds
+    }, 5000); // Poll every 5 seconds when Pusher unavailable
 };
 
 onMounted(() => {
-    console.log('FloatingChat: Component mounted');
-    console.log('FloatingChat: Echo available:', !!window.Echo);
-    console.log('FloatingChat: Current user:', currentUser.value);
-
-    // Test Echo connection with better error handling
-    if (window.Echo) {
-        console.log('FloatingChat: Testing Echo connection...');
-        try {
-            // Wait a bit for Echo to be fully initialized
-            setTimeout(() => {
-                if (window.Echo && window.Echo.connector) {
-                    console.log('FloatingChat: Echo connector available');
-                } else {
-                    console.error('FloatingChat: Echo connector not available');
-                }
-            }, 1000);
-        } catch (error) {
-            console.error('FloatingChat: Error creating test channel:', error);
-        }
-    } else {
-        console.error('FloatingChat: Echo not available!');
-    }
-
     // Initialize conversations if any
     if (props.initialConversations && props.initialConversations.length > 0) {
         conversations.value = props.initialConversations;
@@ -525,14 +422,13 @@ watch(currentConversation, () => {
 });
 
 onBeforeUnmount(() => {
-    // Clean up listeners
     if (typingTimeout.value) {
         clearTimeout(typingTimeout.value);
     }
 
-    // Clean up Echo channel
-    if (currentChannel.value && window.Echo && window.Echo.leave) {
-        window.Echo.leave(`conversation.${currentChannel.value}`);
+    const pusher = getPusher();
+    if (currentChannel.value && pusher) {
+        pusher.unsubscribe(`private-conversation.${currentChannel.value}`);
     }
 
     // Clean up polling interval

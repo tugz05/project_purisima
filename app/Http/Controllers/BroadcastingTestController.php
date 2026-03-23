@@ -48,7 +48,7 @@ class BroadcastingTestController extends Controller
         $testMessage->sender = $user;
 
         // Broadcast the test message
-        broadcast(new MessageSent($testMessage, $conversation));
+        \App\Support\BroadcastHelper::safeBroadcast(new MessageSent($testMessage, $conversation));
 
         return response()->json([
             'success' => true,
@@ -72,11 +72,11 @@ class BroadcastingTestController extends Controller
         }
 
         // Broadcast typing event
-        broadcast(new UserTyping($user, $conversation, true));
+        \App\Support\BroadcastHelper::safeBroadcast(new UserTyping($user, $conversation, true));
 
         // Stop typing after 2 seconds
         sleep(2);
-        broadcast(new UserTyping($user, $conversation, false));
+        \App\Support\BroadcastHelper::safeBroadcast(new UserTyping($user, $conversation, false));
 
         return response()->json([
             'success' => true,

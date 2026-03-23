@@ -19,7 +19,7 @@ withDefaults(defineProps<Props>(), {
     breadcrumbs: () => [],
 });
 
-const { user, userInitials } = useAuth();
+const { user, userInitials, isAuthenticated } = useAuth();
 
 // Detect if we're on mobile based on screen size
 const isMobile = ref(false);
@@ -99,10 +99,10 @@ onUnmounted(() => {
     <!-- Toast Notifications -->
     <Toaster />
 
-    <!-- Floating Chat for Residents -->
+    <!-- Floating Chat for authenticated residents only -->
     <Teleport to="body">
         <FloatingChat
-            v-if="user?.role === 'resident'"
+            v-if="isAuthenticated && user?.role === 'resident'"
             :initial-conversations="[]"
         />
     </Teleport>

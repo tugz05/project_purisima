@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Events\NotificationCreated;
 use App\Models\Notification;
 use App\Models\User;
+use App\Support\BroadcastHelper;
 use Illuminate\Support\Facades\DB;
 
 class NotificationService
@@ -20,7 +22,7 @@ class NotificationService
         string $priority = 'normal',
         string $category = 'transaction'
     ): Notification {
-        return Notification::create([
+        $notification = Notification::create([
             'user_id' => $user->id,
             'type' => $type,
             'title' => $title,
@@ -29,6 +31,10 @@ class NotificationService
             'priority' => $priority,
             'category' => $category,
         ]);
+
+        BroadcastHelper::safeBroadcast(new NotificationCreated($notification));
+
+        return $notification;
     }
 
     /**

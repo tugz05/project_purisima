@@ -168,7 +168,7 @@ class MessagingController extends Controller
             );
 
             // Broadcast the message event for real-time updates
-            broadcast(new \App\Events\MessageSent($message, $conversation));
+            \App\Support\BroadcastHelper::safeBroadcast(new \App\Events\MessageSent($message, $conversation));
 
             // Reload conversation with messages
             $conversation->load(['resident', 'staff', 'messages' => function ($query) {
@@ -207,7 +207,7 @@ class MessagingController extends Controller
         $this->messagingService->startTyping($conversation, $user);
 
         // Broadcast typing event
-        broadcast(new \App\Events\UserTyping($user, $conversation, true));
+        \App\Support\BroadcastHelper::safeBroadcast(new \App\Events\UserTyping($user, $conversation, true));
 
         return response()->json(['success' => true]);
     }
@@ -227,7 +227,7 @@ class MessagingController extends Controller
         $this->messagingService->stopTyping($conversation, $user);
 
         // Broadcast typing event
-        broadcast(new \App\Events\UserTyping($user, $conversation, false));
+        \App\Support\BroadcastHelper::safeBroadcast(new \App\Events\UserTyping($user, $conversation, false));
 
         return response()->json(['success' => true]);
     }
