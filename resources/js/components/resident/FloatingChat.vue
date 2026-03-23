@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import { getPusher, isPusherAvailable } from '@/pusher';
+import { messagingJsonFetch } from '@/utils/messagingHttp';
+import { subscribeToConversationChannel, subscribeToUserMessagingChannel } from '@/composables/useMessagingPusher';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -55,7 +57,10 @@ const isLoading = ref(false);
 const typingTimeout = ref<number | null>(null);
 const isTyping = ref(false);
 const otherUserTyping = ref(false);
-const currentChannel = ref<any>(null);
+let unsubscribeConversation: (() => void) | null = null;
+let unsubscribeUser: (() => void) | null = null;
+/** Unread total when conversation list is empty but server has unread messages */
+const bootstrapUnread = ref(0);
 // Utilities to safely add messages without duplicates
 const addMessageIfNew = (incomingMessage: any) => {
     if (!currentConversation.value) return;
@@ -80,8 +85,10 @@ const currentUser = computed(() => {
     return page.props.auth?.user || { id: 1, name: 'Current User', role: 'resident' };
 });
 
-const unreadCount = computed(() =>
-    conversations.value.reduce((count, conv) => count + conv.unread_count, 0)
+const unreadCount = computed(
+    () =>
+        bootstrapUnread.value +
+        conversations.value.reduce((count, conv) => count + (conv.unread_count || 0), 0),
 );
 
 const getInitials = (name: string) => {
@@ -129,21 +136,14 @@ const createGeneralConversation = async () => {
     isLoading.value = true;
 
     try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
-                       || (document.querySelector('input[name="_token"]') as HTMLInputElement)?.value
-                       || (window as any).Laravel?.csrfToken;
-
-        const response = await fetch('/resident/messaging/conversations/create-general', {
+        const response = await messagingJsonFetch('/resident/messaging/conversations/create-general', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                ...(csrfToken && { 'X-CSRF-TOKEN': csrfToken })
             },
             body: JSON.stringify({
-                content: messageContent.value || 'Hello, I need assistance.'
-            })
+                content: messageContent.value || 'Hello, I need assistance.',
+            }),
         });
 
         if (response.ok) {
@@ -153,6 +153,7 @@ const createGeneralConversation = async () => {
                 conversations.value.unshift(data.conversation);
                 messageContent.value = '';
                 isLoading.value = false;
+                bootstrapUnread.value = 0;
                 setupRealTimeMessaging();
             } else {
                 isLoading.value = false;
@@ -199,24 +200,18 @@ const sendMessage = async () => {
             return;
         }
 
-        // Get CSRF token
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
-                       || (document.querySelector('input[name="_token"]') as HTMLInputElement)?.value
-                       || (window as any).Laravel?.csrfToken;
-
-        // Send message using fetch for better error handling
-        const response = await fetch(`/resident/messaging/conversations/${currentConversation.value.id}/messages`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                ...(csrfToken && { 'X-CSRF-TOKEN': csrfToken })
+        const response = await messagingJsonFetch(
+            `/resident/messaging/conversations/${currentConversation.value.id}/messages`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: messageContent.value,
+                }),
             },
-            body: JSON.stringify({
-                content: messageContent.value,
-            })
-        });
+        );
 
         if (response.ok) {
             const data = await response.json();
@@ -224,7 +219,7 @@ const sendMessage = async () => {
 
             // Update conversation with new message
             if (currentConversation.value && data.message) {
-                currentConversation.value.messages.push(data.message);
+                addMessageIfNew(data.message);
             }
         } else {
             let errorMessage = `Server error (${response.status})`;
@@ -265,13 +260,12 @@ const handleTyping = () => {
     isTyping.value = true;
 
     // Send typing start event
-    fetch(`/resident/messaging/conversations/${currentConversation.value.id}/typing/start`, {
+    messagingJsonFetch(`/resident/messaging/conversations/${currentConversation.value.id}/typing/start`, {
         method: 'POST',
         headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            'Accept': 'application/json',
             'Content-Type': 'application/json',
-        }
+        },
+        body: '{}',
     });
 
     // Clear existing timeout
@@ -291,13 +285,12 @@ const stopTyping = () => {
     isTyping.value = false;
 
     // Send typing stop event
-    fetch(`/resident/messaging/conversations/${currentConversation.value.id}/typing/stop`, {
+    messagingJsonFetch(`/resident/messaging/conversations/${currentConversation.value.id}/typing/stop`, {
         method: 'POST',
         headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            'Accept': 'application/json',
             'Content-Type': 'application/json',
-        }
+        },
+        body: '{}',
     });
 
     if (typingTimeout.value) {
@@ -306,58 +299,82 @@ const stopTyping = () => {
     }
 };
 
-// Real-time messaging setup with Pusher; fallback to polling if unavailable
 const setupRealTimeMessaging = () => {
-    const pusher = getPusher();
-
-    if (currentChannel.value && pusher) {
-        pusher.unsubscribe(`private-conversation.${currentChannel.value}`);
-        currentChannel.value = null;
+    if (unsubscribeConversation) {
+        unsubscribeConversation();
+        unsubscribeConversation = null;
     }
 
-    if (currentConversation.value) {
-        const channelName = `private-conversation.${currentConversation.value.id}`;
-
-        if (pusher && isPusherAvailable()) {
-            try {
-                const channel = pusher.subscribe(channelName);
-                currentChannel.value = currentConversation.value.id;
-
-                if (pollingInterval) {
-                    clearInterval(pollingInterval);
-                    pollingInterval = null;
-                }
-
-                channel.bind('message.sent', (e: any) => {
-                    if (e.message?.sender?.id !== currentUser.value?.id) {
-                        addMessageIfNew(e.message);
-                        const targetConversationId = e.conversation?.id || currentConversation.value?.id;
-                        if (!isOpen.value || (currentConversation.value && currentConversation.value.id !== targetConversationId)) {
-                            const conv = conversations.value.find(c => c.id === targetConversationId);
-                            if (conv) {
-                                conv.unread_count = (conv.unread_count || 0) + 1;
-                            }
-                        }
-                    }
-                });
-
-                channel.bind('user.typing', (e: any) => {
-                    if (e.user?.id !== currentUser.value?.id) {
-                        otherUserTyping.value = e.is_typing;
-                        if (e.is_typing) {
-                            setTimeout(() => { otherUserTyping.value = false; }, 3000);
-                        }
-                    }
-                });
-
-                return;
-            } catch {
-                // Pusher failed, fall through to polling
-            }
-        }
-
+    if (!currentConversation.value || !getPusher() || !isPusherAvailable()) {
         setupPollingUpdates();
+        return;
     }
+
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+
+    const convId = currentConversation.value.id;
+
+    unsubscribeConversation = subscribeToConversationChannel(convId, {
+        onMessageSent: (e) => {
+            if (e.message.sender.id === currentUser.value?.id) {
+                return;
+            }
+            addMessageIfNew(e.message);
+            const targetConversationId = e.conversation?.id ?? convId;
+            const row = conversations.value.find((c) => c.id === targetConversationId);
+            if (row && e.conversation?.last_message != null) {
+                (row as { last_message?: string }).last_message = e.conversation.last_message ?? undefined;
+            }
+        },
+        onUserTyping: (e) => {
+            if (e.user.id === currentUser.value?.id) {
+                return;
+            }
+            otherUserTyping.value = e.is_typing;
+            if (e.is_typing) {
+                setTimeout(() => {
+                    otherUserTyping.value = false;
+                }, 3000);
+            }
+        },
+    });
+};
+
+const setupUserMessagingChannel = () => {
+    if (unsubscribeUser) {
+        unsubscribeUser();
+        unsubscribeUser = null;
+    }
+    const uid = currentUser.value?.id;
+    if (!uid || !getPusher() || !isPusherAvailable()) {
+        return;
+    }
+
+    unsubscribeUser = subscribeToUserMessagingChannel(uid, {
+        onMessageSent: (e) => {
+            if (e.message.sender.id === uid) {
+                return;
+            }
+            const cid = e.conversation.id;
+            const activelyViewing =
+                isOpen.value && !isMinimized.value && currentConversation.value?.id === cid;
+            if (activelyViewing) {
+                return;
+            }
+            const conv = conversations.value.find((c) => c.id === cid);
+            if (conv) {
+                conv.unread_count = (conv.unread_count || 0) + 1;
+                if (e.conversation.last_message != null) {
+                    (conv as { last_message?: string }).last_message = e.conversation.last_message ?? undefined;
+                }
+            } else {
+                bootstrapUnread.value += 1;
+            }
+        },
+    });
 };
 
 // Polling-based real-time updates
@@ -371,12 +388,10 @@ const setupPollingUpdates = () => {
     pollingInterval = setInterval(async () => {
         if (currentConversation.value) {
             try {
-                const response = await fetch(`/resident/messaging/conversations/${currentConversation.value.id}/json`, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    }
-                });
+                const response = await messagingJsonFetch(
+                    `/resident/messaging/conversations/${currentConversation.value.id}/json`,
+                    { method: 'GET' },
+                );
 
                 if (response.ok) {
                     const data = await response.json();
@@ -399,14 +414,28 @@ const setupPollingUpdates = () => {
                 // Polling error - retry on next interval
             }
         }
-    }, 5000); // Poll every 5 seconds when Pusher unavailable
+    }, 8000);
 };
 
-onMounted(() => {
-    // Initialize conversations if any
+onMounted(async () => {
+    try {
+        const r = await messagingJsonFetch('/resident/messaging/unread-count', { method: 'GET' });
+        if (r.ok) {
+            const d = await r.json();
+            const n = Number(d.count);
+            if (!Number.isNaN(n) && n > 0) {
+                bootstrapUnread.value = n;
+            }
+        }
+    } catch {
+        // ignore
+    }
+
+    setupUserMessagingChannel();
+
     if (props.initialConversations && props.initialConversations.length > 0) {
         conversations.value = props.initialConversations;
-        // Auto-select first conversation if available
+        bootstrapUnread.value = 0;
         if (props.initialConversations[0]) {
             currentConversation.value = props.initialConversations[0];
             setupRealTimeMessaging();
@@ -414,10 +443,13 @@ onMounted(() => {
     }
 });
 
-// Watch for conversation changes to set up real-time listeners
 watch(currentConversation, () => {
     if (currentConversation.value) {
         setupRealTimeMessaging();
+    } else if (unsubscribeConversation) {
+        unsubscribeConversation();
+        unsubscribeConversation = null;
+        setupPollingUpdates();
     }
 });
 
@@ -426,12 +458,15 @@ onBeforeUnmount(() => {
         clearTimeout(typingTimeout.value);
     }
 
-    const pusher = getPusher();
-    if (currentChannel.value && pusher) {
-        pusher.unsubscribe(`private-conversation.${currentChannel.value}`);
+    if (unsubscribeConversation) {
+        unsubscribeConversation();
+        unsubscribeConversation = null;
+    }
+    if (unsubscribeUser) {
+        unsubscribeUser();
+        unsubscribeUser = null;
     }
 
-    // Clean up polling interval
     if (pollingInterval) {
         clearInterval(pollingInterval);
         pollingInterval = null;

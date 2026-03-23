@@ -1,0 +1,98 @@
+import { getPusher, isPusherAvailable } from '@/pusher';
+
+export type MessageSentPayload = {
+    message: {
+        id: number;
+        content: string;
+        type?: string;
+        attachments?: unknown;
+        is_read?: boolean;
+        is_edited?: boolean;
+        created_at: string;
+        display_time?: string;
+        sender: {
+            id: number;
+            name: string;
+            email?: string;
+            role?: string;
+        };
+    };
+    conversation: {
+        id: number;
+        last_message?: string | null;
+        last_message_at?: string | null;
+        resident_has_unread?: boolean;
+        staff_has_unread?: boolean;
+    };
+};
+
+export type UserTypingPayload = {
+    user: { id: number; name: string };
+    is_typing: boolean;
+    conversation_id: number;
+};
+
+/**
+ * Subscribe to a conversation private channel (realtime messages + typing).
+ */
+export function subscribeToConversationChannel(
+    conversationId: number,
+    handlers: {
+        onMessageSent: (payload: MessageSentPayload) => void;
+        onUserTyping: (payload: UserTypingPayload) => void;
+    },
+): () => void {
+    const pusher = getPusher();
+    if (!pusher || !isPusherAvailable()) {
+        return () => {};
+    }
+
+    const name = `private-conversation.${conversationId}`;
+    const channel = pusher.subscribe(name);
+
+    const onMessage = (e: MessageSentPayload) => handlers.onMessageSent(e);
+    const onTyping = (e: UserTypingPayload) => handlers.onUserTyping(e);
+
+    channel.bind('message.sent', onMessage);
+    channel.bind('user.typing', onTyping);
+
+    return () => {
+        try {
+            channel.unbind('message.sent', onMessage);
+            channel.unbind('user.typing', onTyping);
+            pusher.unsubscribe(name);
+        } catch {
+            // ignore
+        }
+    };
+}
+
+/**
+ * Subscribe to the Laravel user private channel (badge + sidebar when not in that conversation).
+ */
+export function subscribeToUserMessagingChannel(
+    userId: number,
+    handlers: {
+        onMessageSent: (payload: MessageSentPayload) => void;
+    },
+): () => void {
+    const pusher = getPusher();
+    if (!pusher || !isPusherAvailable()) {
+        return () => {};
+    }
+
+    const name = `private-App.Models.User.${userId}`;
+    const channel = pusher.subscribe(name);
+
+    const onMessage = (e: MessageSentPayload) => handlers.onMessageSent(e);
+    channel.bind('message.sent', onMessage);
+
+    return () => {
+        try {
+            channel.unbind('message.sent', onMessage);
+            pusher.unsubscribe(name);
+        } catch {
+            // ignore
+        }
+    };
+}

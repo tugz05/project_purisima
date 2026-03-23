@@ -2,11 +2,10 @@
 
 namespace App\Events;
 
-use App\Models\Message;
 use App\Models\Conversation;
+use App\Models\Message;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -17,6 +16,7 @@ class MessageSent implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public Message $message;
+
     public Conversation $conversation;
 
     /**
@@ -36,7 +36,7 @@ class MessageSent implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         $channels = [
-            new PrivateChannel('conversation.' . $this->conversation->id),
+            new PrivateChannel('conversation.'.$this->conversation->id),
         ];
 
         // Also notify the other participant via their user channel for global badges
@@ -50,7 +50,7 @@ class MessageSent implements ShouldBroadcastNow
 
         foreach ($recipientIds as $recipientId) {
             if ($recipientId) {
-                $channels[] = new PrivateChannel('App.Models.User.' . $recipientId);
+                $channels[] = new PrivateChannel('App.Models.User.'.$recipientId);
             }
         }
 
@@ -84,6 +84,7 @@ class MessageSent implements ShouldBroadcastNow
                     'id' => $this->message->sender->id,
                     'name' => $this->message->sender->name,
                     'email' => $this->message->sender->email,
+                    'role' => $this->message->sender->role,
                 ],
             ],
             'conversation' => [

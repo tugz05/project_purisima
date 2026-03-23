@@ -24,7 +24,9 @@ import {
     Phone,
     Video
 } from 'lucide-vue-next';
-import { getPusher } from '@/pusher';
+import { getPusher, isPusherAvailable } from '@/pusher';
+import { messagingJsonFetch } from '@/utils/messagingHttp';
+import { subscribeToConversationChannel, subscribeToUserMessagingChannel } from '@/composables/useMessagingPusher';
 
 interface Conversation {
     id: number;
@@ -72,27 +74,6 @@ interface Props {
 
 const props = defineProps<Props>();
 
-/** Ensures session cookies and CSRF are sent (fixes 419/500 on some hosts). */
-const staffMessagingFetch = (url: string, options: RequestInit = {}): Promise<Response> => {
-    const headers = new Headers(options.headers ?? {});
-    if (!headers.has('X-CSRF-TOKEN')) {
-        headers.set(
-            'X-CSRF-TOKEN',
-            document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
-        );
-    }
-    if (!headers.has('Accept')) {
-        headers.set('Accept', 'application/json');
-    }
-    headers.set('X-Requested-With', 'XMLHttpRequest');
-
-    return fetch(url, {
-        credentials: 'same-origin',
-        ...options,
-        headers,
-    });
-};
-
 const { createBreadcrumbs } = useBreadcrumbs();
 const breadcrumbs = createBreadcrumbs([
     { title: 'Dashboard', href: '/staff/dashboard' },
@@ -111,10 +92,29 @@ const sendingMessage = ref(false);
 const typingTimeout = ref<number | null>(null);
 const isTyping = ref(false);
 const otherUserTyping = ref(false);
-const currentChannel = ref<any>(null);
+let unsubscribeConversation: (() => void) | null = null;
+let unsubscribeUser: (() => void) | null = null;
+
+const sidebarUnreadCount = ref(props.unreadCount ?? 0);
+
+watch(
+    () => props.unreadCount,
+    (c) => {
+        if (typeof c === 'number') {
+            sidebarUnreadCount.value = c;
+        }
+    },
+);
+
+const appendMessageIfNew = (msg: { id: number }) => {
+    if (messages.value.some((m) => m.id === msg.id)) {
+        return;
+    }
+    messages.value.push(msg);
+};
 
 // Computed properties
-const hasUnreadMessages = computed(() => props.unreadCount > 0);
+const hasUnreadMessages = computed(() => sidebarUnreadCount.value > 0);
 
 const formatLastMessageTime = (dateString: string | null) => {
     if (!dateString) return 'No messages';
@@ -179,7 +179,7 @@ const selectConversation = async (conversation: Conversation) => {
 
     try {
         // Fetch messages for this conversation
-        const response = await staffMessagingFetch(`/staff/messaging/conversations/${conversation.id}/json`, {
+        const response = await messagingJsonFetch(`/staff/messaging/conversations/${conversation.id}/json`, {
             method: 'GET',
         });
 
@@ -188,7 +188,7 @@ const selectConversation = async (conversation: Conversation) => {
             messages.value = data.conversation.messages || [];
 
             // Mark messages as read
-            await staffMessagingFetch(`/staff/messaging/conversations/${conversation.id}/mark-read`, {
+            await messagingJsonFetch(`/staff/messaging/conversations/${conversation.id}/mark-read`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -212,7 +212,7 @@ const sendMessage = async () => {
     stopTyping();
 
     try {
-        const response = await staffMessagingFetch(`/staff/messaging/conversations/${selectedConversation.value.id}/messages`, {
+        const response = await messagingJsonFetch(`/staff/messaging/conversations/${selectedConversation.value.id}/messages`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -224,11 +224,8 @@ const sendMessage = async () => {
 
         if (response.ok) {
             const data = await response.json();
-            console.log('Staff: Send message response:', data);
-            // Add the new message to the existing messages
             if (data.message) {
-                messages.value.push(data.message);
-                console.log('Staff: Added message locally');
+                appendMessageIfNew(data.message);
             }
             newMessage.value = '';
 
@@ -259,7 +256,7 @@ const handleTyping = () => {
     isTyping.value = true;
 
     // Send typing start event
-    staffMessagingFetch(`/staff/messaging/conversations/${selectedConversation.value.id}/typing/start`, {
+    messagingJsonFetch(`/staff/messaging/conversations/${selectedConversation.value.id}/typing/start`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -284,7 +281,7 @@ const stopTyping = () => {
     isTyping.value = false;
 
     // Send typing stop event
-    staffMessagingFetch(`/staff/messaging/conversations/${selectedConversation.value.id}/typing/stop`, {
+    messagingJsonFetch(`/staff/messaging/conversations/${selectedConversation.value.id}/typing/stop`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -298,72 +295,104 @@ const stopTyping = () => {
     }
 };
 
-onMounted(() => {
-    // Set up real-time updates for unread count
-    // This would be implemented with Laravel Echo
-});
-
-// Real-time messaging setup
 const setupRealTimeMessaging = () => {
-    const pusher = getPusher();
-    if (!pusher) return;
-
-    // Clean up previous channel if exists
-    if (currentChannel.value) {
-        pusher.unsubscribe(`private-conversation.${currentChannel.value}`);
-        currentChannel.value = null;
+    if (unsubscribeConversation) {
+        unsubscribeConversation();
+        unsubscribeConversation = null;
     }
 
-    if (selectedConversation.value) {
-        const channelName = `private-conversation.${selectedConversation.value.id}`;
-        const channel = pusher.subscribe(channelName);
-        currentChannel.value = selectedConversation.value.id;
+    if (!selectedConversation.value || !getPusher() || !isPusherAvailable()) {
+        return;
+    }
 
-        // Listen for new messages
-        channel.bind('message.sent', (e: any) => {
-            if (e.message.sender.id !== props.currentUser?.id) {
-                messages.value.push(e.message);
-                setTimeout(() => {
-                    const messagesContainer = document.querySelector('.overflow-y-auto');
-                    if (messagesContainer) {
-                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    }
-                }, 100);
+    const convId = selectedConversation.value.id;
+
+    unsubscribeConversation = subscribeToConversationChannel(convId, {
+        onMessageSent: (e) => {
+            if (e.message.sender.id === props.currentUser?.id) {
+                return;
             }
-
-            const convIndex = props.conversations?.data?.findIndex(c => c.id === e.conversation.id);
-            if (convIndex !== undefined && props.conversations?.data) {
-                props.conversations.data[convIndex].last_message = e.conversation.last_message;
-                props.conversations.data[convIndex].last_message_at = e.conversation.last_message_at;
-                props.conversations.data[convIndex].staff_has_unread = e.conversation.staff_has_unread;
-            }
-        });
-
-        // Listen for typing indicators
-        channel.bind('user.typing', (e: any) => {
-            if (e.user.id !== props.currentUser?.id) {
-                otherUserTyping.value = e.is_typing;
-                if (e.is_typing) {
-                    setTimeout(() => {
-                        otherUserTyping.value = false;
-                    }, 3000);
+            appendMessageIfNew(e.message);
+            setTimeout(() => {
+                const el = document.querySelector('.overflow-y-auto');
+                if (el) {
+                    (el as HTMLElement).scrollTop = (el as HTMLElement).scrollHeight;
                 }
+            }, 50);
+
+            const convIndex = props.conversations?.data?.findIndex((c) => c.id === e.conversation.id);
+            if (convIndex !== undefined && convIndex >= 0 && props.conversations?.data) {
+                const row = props.conversations.data[convIndex];
+                row.last_message = e.conversation.last_message ?? row.last_message;
+                row.last_message_at = e.conversation.last_message_at ?? row.last_message_at;
+                row.staff_has_unread = e.conversation.staff_has_unread ?? row.staff_has_unread;
             }
-        });
-    }
+        },
+        onUserTyping: (e) => {
+            if (e.user.id === props.currentUser?.id) {
+                return;
+            }
+            otherUserTyping.value = e.is_typing;
+            if (e.is_typing) {
+                setTimeout(() => {
+                    otherUserTyping.value = false;
+                }, 3000);
+            }
+        },
+    });
 };
 
-// Watch for conversation changes to set up real-time listeners
+const setupUserChannel = () => {
+    if (unsubscribeUser) {
+        unsubscribeUser();
+        unsubscribeUser = null;
+    }
+    if (!props.currentUser?.id || !getPusher() || !isPusherAvailable()) {
+        return;
+    }
+
+    unsubscribeUser = subscribeToUserMessagingChannel(props.currentUser.id, {
+        onMessageSent: (e) => {
+            if (e.message.sender.id === props.currentUser.id) {
+                return;
+            }
+            const convId = e.conversation.id;
+            const row = props.conversations?.data?.find((c) => c.id === convId);
+            if (row) {
+                row.last_message = e.conversation.last_message ?? row.last_message;
+                row.last_message_at = e.conversation.last_message_at ?? row.last_message_at;
+                if (!selectedConversation.value || selectedConversation.value.id !== convId) {
+                    row.staff_has_unread = true;
+                    sidebarUnreadCount.value += 1;
+                }
+            } else if (!selectedConversation.value || selectedConversation.value.id !== convId) {
+                sidebarUnreadCount.value += 1;
+            }
+        },
+    });
+};
+
+onMounted(() => {
+    setupUserChannel();
+});
+
 watch(selectedConversation, () => {
     if (selectedConversation.value) {
         setupRealTimeMessaging();
+    } else if (unsubscribeConversation) {
+        unsubscribeConversation();
+        unsubscribeConversation = null;
     }
 });
 
 onBeforeUnmount(() => {
-    const pusher = getPusher();
-    if (currentChannel.value && pusher) {
-        pusher.unsubscribe(`private-conversation.${currentChannel.value}`);
+    if (unsubscribeConversation) {
+        unsubscribeConversation();
+        unsubscribeConversation = null;
+    }
+    if (unsubscribeUser) {
+        unsubscribeUser();
+        unsubscribeUser = null;
     }
     if (typingTimeout.value) {
         clearTimeout(typingTimeout.value);
@@ -384,7 +413,7 @@ onBeforeUnmount(() => {
                         <h1 class="text-lg font-semibold text-gray-900">Messages</h1>
                         <div v-if="hasUnreadMessages" class="relative">
                             <Badge variant="destructive" class="text-xs px-2 py-1">
-                                {{ unreadCount }}
+                                {{ sidebarUnreadCount }}
                             </Badge>
                         </div>
                     </div>

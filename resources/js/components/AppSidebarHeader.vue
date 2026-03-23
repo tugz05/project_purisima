@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import NotificationDropdown from '@/components/staff/NotificationDropdown.vue';
@@ -23,6 +23,15 @@ const currentUser = page?.props?.auth?.user || null;
 const isStaff = currentUser && (currentUser.role === 'staff' || currentUser.role === 'admin');
 const headerUnread = ref<number>(page?.props?.unreadCount || 0);
 let headerChannelName = '';
+
+watch(
+    () => page?.props?.unreadCount,
+    (n) => {
+        if (typeof n === 'number') {
+            headerUnread.value = n;
+        }
+    },
+);
 
 onMounted(() => {
     try {

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
+import { getPusher, isPusherAvailable } from '@/pusher';
+import { messagingJsonFetch } from '@/utils/messagingHttp';
+import { subscribeToConversationChannel } from '@/composables/useMessagingPusher';
 import StaffLayout from '@/layouts/staff/Layout.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,6 +41,7 @@ interface Message {
         id: number;
         name: string;
         email: string;
+        role?: string;
     };
 }
 
@@ -68,6 +72,9 @@ interface Props {
 
 const props = defineProps<Props>();
 
+const page = usePage();
+const authUserId = computed(() => (page.props.auth as { user?: { id: number } })?.user?.id ?? 0);
+
 const { createBreadcrumbs } = useBreadcrumbs();
 const breadcrumbs = createBreadcrumbs([
     { title: 'Dashboard', href: '/staff/dashboard' },
@@ -78,13 +85,15 @@ const breadcrumbs = createBreadcrumbs([
 // Reactive data
 const messageContent = ref('');
 const isTyping = ref(false);
-const typingUsers = ref<any[]>([]);
+const otherUserTyping = ref(false);
+const messages = ref<Message[]>([...props.conversation.messages]);
 const messagesContainer = ref<HTMLElement>();
 const isSending = ref(false);
 const typingTimeout = ref<number | null>(null);
 
+let unsubscribeConversation: (() => void) | null = null;
+
 // Computed properties
-const currentUser = computed(() => props.conversation.staff);
 const otherUser = computed(() => props.conversation.resident);
 
 const getInitials = (name: string) => {
@@ -102,7 +111,14 @@ const formatMessageTime = (dateString: string) => {
 };
 
 const isCurrentUser = (senderId: number) => {
-    return senderId === currentUser.value.id;
+    return senderId === authUserId.value;
+};
+
+const appendMessageIfNew = (msg: Message) => {
+    if (messages.value.some((m) => m.id === msg.id)) {
+        return;
+    }
+    messages.value.push(msg);
 };
 
 const scrollToBottom = () => {
@@ -119,21 +135,26 @@ const sendMessage = async () => {
     isSending.value = true;
 
     try {
-        await router.post(`/staff/messaging/conversations/${props.conversation.id}/messages`, {
-            content: messageContent.value,
-        }, {
-            preserveState: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                messageContent.value = '';
-                scrollToBottom();
+        const response = await messagingJsonFetch(
+            `/staff/messaging/conversations/${props.conversation.id}/messages`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: messageContent.value.trim() }),
             },
-            onFinish: () => {
-                isSending.value = false;
+        );
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.message) {
+                appendMessageIfNew(data.message);
             }
-        });
-    } catch (error) {
-        console.error('Failed to send message:', error);
+            messageContent.value = '';
+            scrollToBottom();
+        }
+    } catch {
+        // ignore
+    } finally {
         isSending.value = false;
     }
 };
@@ -141,24 +162,24 @@ const sendMessage = async () => {
 const handleTyping = () => {
     if (!isTyping.value) {
         isTyping.value = true;
-        router.post(`/staff/messaging/conversations/${props.conversation.id}/typing/start`, {}, {
-            preserveState: true,
-            preserveScroll: true,
+        messagingJsonFetch(`/staff/messaging/conversations/${props.conversation.id}/typing/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
         });
     }
 
-    // Clear existing timeout
     if (typingTimeout.value) {
         clearTimeout(typingTimeout.value);
     }
 
-    // Set new timeout to stop typing
     typingTimeout.value = setTimeout(() => {
         if (isTyping.value) {
             isTyping.value = false;
-            router.post(`/staff/messaging/conversations/${props.conversation.id}/typing/stop`, {}, {
-                preserveState: true,
-                preserveScroll: true,
+            messagingJsonFetch(`/staff/messaging/conversations/${props.conversation.id}/typing/stop`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}',
             });
         }
     }, 1000);
@@ -179,18 +200,40 @@ const downloadAttachment = (attachment: any) => {
     link.click();
 };
 
+const bindRealtime = () => {
+    if (unsubscribeConversation) {
+        unsubscribeConversation();
+        unsubscribeConversation = null;
+    }
+    if (!getPusher() || !isPusherAvailable()) {
+        return;
+    }
+
+    unsubscribeConversation = subscribeToConversationChannel(props.conversation.id, {
+        onMessageSent: (e) => {
+            if (e.message.sender.id === authUserId.value) {
+                return;
+            }
+            appendMessageIfNew(e.message as Message);
+            scrollToBottom();
+        },
+        onUserTyping: (e) => {
+            if (e.user.id === authUserId.value) {
+                return;
+            }
+            otherUserTyping.value = e.is_typing;
+            if (e.is_typing) {
+                setTimeout(() => {
+                    otherUserTyping.value = false;
+                }, 3000);
+            }
+        },
+    });
+};
+
 onMounted(() => {
     scrollToBottom();
-
-    // Set up real-time listeners
-    // This would be implemented with Laravel Echo
-    // Echo.private(`conversation.${props.conversation.id}`)
-    //     .listen('message.sent', (e) => {
-    //         // Handle new message
-    //     })
-    //     .listen('user.typing', (e) => {
-    //         // Handle typing indicators
-    //     });
+    bindRealtime();
 });
 
 onBeforeUnmount(() => {
@@ -198,10 +241,16 @@ onBeforeUnmount(() => {
         clearTimeout(typingTimeout.value);
     }
 
+    if (unsubscribeConversation) {
+        unsubscribeConversation();
+        unsubscribeConversation = null;
+    }
+
     if (isTyping.value) {
-        router.post(`/staff/messaging/conversations/${props.conversation.id}/typing/stop`, {}, {
-            preserveState: true,
-            preserveScroll: true,
+        messagingJsonFetch(`/staff/messaging/conversations/${props.conversation.id}/typing/stop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
         });
     }
 });
@@ -300,7 +349,7 @@ onBeforeUnmount(() => {
                     ref="messagesContainer"
                     class="flex-1 overflow-y-auto p-6 space-y-4"
                 >
-                    <div v-if="conversation.messages.length === 0" class="flex items-center justify-center h-full">
+                    <div v-if="messages.length === 0" class="flex items-center justify-center h-full">
                         <div class="text-center">
                             <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <MessageSquare class="h-8 w-8 text-gray-400" />
@@ -311,7 +360,7 @@ onBeforeUnmount(() => {
                     </div>
 
                     <div
-                        v-for="message in conversation.messages"
+                        v-for="message in messages"
                         :key="message.id"
                         class="flex"
                         :class="isCurrentUser(message.sender.id) ? 'justify-end' : 'justify-start'"
@@ -372,11 +421,11 @@ onBeforeUnmount(() => {
                     </div>
 
                     <!-- Typing Indicator -->
-                    <div v-if="typingUsers.length > 0" class="flex justify-start">
+                    <div v-if="otherUserTyping" class="flex justify-start">
                         <div class="flex items-start gap-2">
                             <Avatar class="h-8 w-8 ring-2 ring-gray-100 shadow-sm">
-                                <AvatarImage :src="`https://ui-avatars.com/api/?name=${typingUsers[0].name}&background=10b981&color=fff&bold=true`" />
-                                <AvatarFallback class="text-xs font-semibold">{{ getInitials(typingUsers[0].name) }}</AvatarFallback>
+                                <AvatarImage :src="`https://ui-avatars.com/api/?name=${otherUser.name}&background=10b981&color=fff&bold=true`" />
+                                <AvatarFallback class="text-xs font-semibold">{{ getInitials(otherUser.name) }}</AvatarFallback>
                             </Avatar>
                             <div class="bg-gray-100 rounded-2xl px-4 py-3 shadow-sm">
                                 <div class="flex items-center gap-1">
