@@ -127,8 +127,17 @@ class MessagingController extends Controller
 
         try {
             $this->messagingService->markMessagesAsRead($conversation, $user);
+            $conversation->refresh();
 
-            return response()->json(['success' => true]);
+            return response()->json([
+                'success' => true,
+                'unread_total' => $this->messagingService->getUnreadCount($user),
+                'conversation' => [
+                    'id' => $conversation->id,
+                    'staff_has_unread' => $conversation->staff_has_unread,
+                    'resident_has_unread' => $conversation->resident_has_unread,
+                ],
+            ]);
         } catch (\Throwable $e) {
             report($e);
 

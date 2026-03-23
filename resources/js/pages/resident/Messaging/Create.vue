@@ -287,12 +287,12 @@ const createConversation = async () => {
                         </div>
                         <div>
                             <h4 class="font-semibold text-blue-900 mb-2">Need help choosing a staff member?</h4>
-                            <div class="text-blue-800 text-sm space-y-1">
-                                <p>• <strong>General inquiries:</strong> Any available staff member can help</p>
-                                <p>• <strong>Transaction questions:</strong> Staff can process documents and payments</p>
-                                <p>• <strong>Services:</strong> Staff can assist with requests</p>
-                                <p>• All staff members are trained to help with a variety of barangay concerns</p>
-                            </div>
+                            <ul class="list-disc space-y-1 pl-5 text-sm text-blue-800">
+                                <li><strong>General inquiries:</strong> Any available staff member can help</li>
+                                <li><strong>Transaction questions:</strong> Staff can process documents and payments</li>
+                                <li><strong>Services:</strong> Staff can assist with requests</li>
+                                <li>All staff members are trained to help with a variety of barangay concerns</li>
+                            </ul>
                         </div>
                     </div>
                 </CardContent>

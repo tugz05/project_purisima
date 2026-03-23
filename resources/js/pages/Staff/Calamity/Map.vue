@@ -4,7 +4,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, MapPin, RefreshCw, ArrowLeft, Users, Heart, Navigation, Loader2 } from 'lucide-vue-next';
+import { AlertTriangle, MapPin, RefreshCw, ArrowLeft, ArrowRight, Users, Heart, Navigation, Loader2 } from 'lucide-vue-next';
 import StaffLayout from '@/layouts/staff/Layout.vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -95,16 +95,19 @@ const getSeverityColor = (severity: string): string => {
     }
 };
 
-const getStatusIcon = (status: string): string => {
+/** Inline SVG (Lucide-style paths) for Leaflet divIcon — avoids emoji markers. */
+const getStatusIconSvg = (status: string): string => {
+    const a =
+        'xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
     switch (status) {
         case 'pending':
-            return '⏳';
+            return `<svg ${a}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
         case 'acknowledged':
-            return '👁️';
+            return `<svg ${a}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
         case 'in_progress':
-            return '🔄';
+            return `<svg ${a}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>`;
         default:
-            return '📍';
+            return `<svg ${a}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`;
     }
 };
 
@@ -136,7 +139,7 @@ const createMarker = (report: ActiveReport): L.Marker => {
                     color: white;
                     font-size: 16px;
                     font-weight: bold;
-                ">${getStatusIcon(report.status)}</span>
+                ">${getStatusIconSvg(report.status)}</span>
             </div>
         `,
         iconSize: [32, 32],
@@ -590,8 +593,9 @@ watch(() => [props.activeReports, props.residentLocations, props.staffLocations,
                                             </Badge>
                                         </div>
                                         <Link :href="`/staff/calamity/${report.id}`" class="mt-2 inline-block">
-                                            <Button variant="ghost" size="sm" class="h-6 text-xs">
-                                                View Details →
+                                            <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-xs">
+                                                View Details
+                                                <ArrowRight class="h-3 w-3 shrink-0" />
                                             </Button>
                                         </Link>
                                     </div>

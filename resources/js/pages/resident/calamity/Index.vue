@@ -498,8 +498,8 @@ onUnmounted(() => {
                                         <p class="text-xs font-semibold text-amber-900 mb-1">Location Permission Required</p>
                                         <p class="text-xs text-amber-800 mb-2">To submit an emergency report, please enable location access:</p>
                                         <ul class="text-xs text-amber-800 space-y-1 list-disc list-inside">
-                                            <li><strong>Mobile:</strong> Go to Settings → Site Settings → Location → Allow</li>
-                                            <li><strong>Desktop:</strong> Click the lock icon in the address bar → Site Settings → Location → Allow</li>
+                                            <li><strong>Mobile:</strong> Go to Settings, then Site Settings, then Location, then Allow.</li>
+                                            <li><strong>Desktop:</strong> Click the lock icon in the address bar, then Site Settings, then Location, then Allow.</li>
                                         </ul>
                                         <button
                                             type="button"

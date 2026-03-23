@@ -10,7 +10,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Search, Eye, Edit, Trash2, FileText, DollarSign, Clock, CheckCircle, X, FileType, Tag, FileCode } from 'lucide-vue-next';
+import {
+    Plus,
+    Search,
+    Eye,
+    Edit,
+    Trash2,
+    FileText,
+    DollarSign,
+    Clock,
+    CheckCircle,
+    X,
+    FileType,
+    Tag,
+    FileCode,
+    Lightbulb,
+} from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import StaffLayout from '@/layouts/staff/Layout.vue';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
@@ -1057,8 +1072,9 @@ const categoryOptions = [
                                         Add
                                     </Button>
                                 </div>
-                                <p class="text-xs text-gray-500">
-                                    💡 Tip: Separate multiple documents with commas or new lines (e.g., "Valid ID, Proof of Residency, Utility Bill")
+                                <p class="flex items-start gap-2 text-xs text-gray-500">
+                                    <Lightbulb class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                                    <span>Tip: Separate multiple documents with commas or new lines (e.g., "Valid ID, Proof of Residency, Utility Bill")</span>
                                 </p>
                             </div>
 
@@ -1110,8 +1126,9 @@ const categoryOptions = [
                                         Add
                                     </Button>
                                 </div>
-                                <p class="text-xs text-gray-500">
-                                    💡 Tip: Examples: "Purpose", "Business Name", "Contact Number", etc.
+                                <p class="flex items-start gap-2 text-xs text-gray-500">
+                                    <Lightbulb class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                                    <span>Tip: Examples: "Purpose", "Business Name", "Contact Number", etc.</span>
                                 </p>
                             </div>
 
@@ -1359,8 +1376,9 @@ const categoryOptions = [
                                         Add
                                     </Button>
                                 </div>
-                                <p class="text-xs text-gray-500">
-                                    💡 Tip: Separate multiple documents with commas or new lines (e.g., "Valid ID, Proof of Residency, Utility Bill")
+                                <p class="flex items-start gap-2 text-xs text-gray-500">
+                                    <Lightbulb class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                                    <span>Tip: Separate multiple documents with commas or new lines (e.g., "Valid ID, Proof of Residency, Utility Bill")</span>
                                 </p>
                             </div>
 
@@ -1415,8 +1433,9 @@ const categoryOptions = [
                                         Add
                                     </Button>
                                 </div>
-                                <p class="text-xs text-gray-500">
-                                    💡 Tip: Examples: "Purpose", "Business Name", "Contact Number", etc.
+                                <p class="flex items-start gap-2 text-xs text-gray-500">
+                                    <Lightbulb class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                                    <span>Tip: Examples: "Purpose", "Business Name", "Contact Number", etc.</span>
                                 </p>
                             </div>
 

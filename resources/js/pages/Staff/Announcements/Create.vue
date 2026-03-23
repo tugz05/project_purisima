@@ -133,10 +133,30 @@
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="general">📢 General</SelectItem>
-                        <SelectItem value="urgent">🚨 Urgent</SelectItem>
-                        <SelectItem value="event">📅 Event</SelectItem>
-                        <SelectItem value="notice">📋 Notice</SelectItem>
+                        <SelectItem value="general">
+                          <span class="flex items-center gap-2">
+                            <Megaphone class="h-4 w-4 shrink-0 text-slate-600" />
+                            General
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="urgent">
+                          <span class="flex items-center gap-2">
+                            <Siren class="h-4 w-4 shrink-0 text-red-600" />
+                            Urgent
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="event">
+                          <span class="flex items-center gap-2">
+                            <CalendarDays class="h-4 w-4 shrink-0 text-slate-600" />
+                            Event
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="notice">
+                          <span class="flex items-center gap-2">
+                            <ClipboardList class="h-4 w-4 shrink-0 text-slate-600" />
+                            Notice
+                          </span>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <p v-if="form.errors.type" class="text-red-500 text-sm mt-1">
@@ -154,10 +174,30 @@
                         <SelectValue placeholder="Select priority" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="low">🟢 Low Priority</SelectItem>
-                        <SelectItem value="normal">🟡 Normal Priority</SelectItem>
-                        <SelectItem value="high">🟠 High Priority</SelectItem>
-                        <SelectItem value="urgent">🔴 Urgent Priority</SelectItem>
+                        <SelectItem value="low">
+                          <span class="flex items-center gap-2">
+                            <Circle class="h-3 w-3 shrink-0 fill-green-500 text-green-600" />
+                            Low Priority
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="normal">
+                          <span class="flex items-center gap-2">
+                            <Circle class="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-500" />
+                            Normal Priority
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="high">
+                          <span class="flex items-center gap-2">
+                            <Circle class="h-3 w-3 shrink-0 fill-orange-500 text-orange-600" />
+                            High Priority
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="urgent">
+                          <span class="flex items-center gap-2">
+                            <Circle class="h-3 w-3 shrink-0 fill-red-500 text-red-600" />
+                            Urgent Priority
+                          </span>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <p v-if="form.errors.priority" class="text-red-500 text-sm mt-1">
@@ -288,6 +328,11 @@ import {
   Settings,
   Star,
   X,
+  Megaphone,
+  Siren,
+  CalendarDays,
+  ClipboardList,
+  Circle,
 } from 'lucide-vue-next';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import StaffLayout from '@/layouts/staff/Layout.vue';

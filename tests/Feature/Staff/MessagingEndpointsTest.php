@@ -34,7 +34,13 @@ test('staff can mark conversation as read', function () {
 
     $response = $this->postJson("/staff/messaging/conversations/{$conversation->id}/mark-read");
 
-    $response->assertSuccessful()->assertJson(['success' => true]);
+    $response->assertSuccessful()
+        ->assertJson([
+            'success' => true,
+            'unread_total' => 0,
+        ])
+        ->assertJsonPath('conversation.id', $conversation->id)
+        ->assertJsonPath('conversation.staff_has_unread', false);
 });
 
 test('staff can start and stop typing', function () {

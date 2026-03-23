@@ -381,10 +381,30 @@
                     <SelectValue placeholder="Select announcement type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="general">📢 General</SelectItem>
-                    <SelectItem value="urgent">🚨 Urgent</SelectItem>
-                    <SelectItem value="event">📅 Event</SelectItem>
-                    <SelectItem value="notice">📋 Notice</SelectItem>
+                    <SelectItem value="general">
+                      <span class="flex items-center gap-2">
+                        <Megaphone class="h-4 w-4 shrink-0 text-slate-600" />
+                        General
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="urgent">
+                      <span class="flex items-center gap-2">
+                        <Siren class="h-4 w-4 shrink-0 text-red-600" />
+                        Urgent
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="event">
+                      <span class="flex items-center gap-2">
+                        <CalendarDays class="h-4 w-4 shrink-0 text-slate-600" />
+                        Event
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="notice">
+                      <span class="flex items-center gap-2">
+                        <ClipboardList class="h-4 w-4 shrink-0 text-slate-600" />
+                        Notice
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <p v-if="createForm.errors.type" class="text-red-500 text-sm mt-2 flex items-center gap-1">
@@ -403,10 +423,30 @@
                     <SelectValue placeholder="Select priority level" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="low">🟢 Low Priority</SelectItem>
-                    <SelectItem value="normal">🟡 Normal Priority</SelectItem>
-                    <SelectItem value="high">🟠 High Priority</SelectItem>
-                    <SelectItem value="urgent">🔴 Urgent Priority</SelectItem>
+                    <SelectItem value="low">
+                      <span class="flex items-center gap-2">
+                        <Circle class="h-3 w-3 shrink-0 fill-green-500 text-green-600" />
+                        Low Priority
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="normal">
+                      <span class="flex items-center gap-2">
+                        <Circle class="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-500" />
+                        Normal Priority
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="high">
+                      <span class="flex items-center gap-2">
+                        <Circle class="h-3 w-3 shrink-0 fill-orange-500 text-orange-600" />
+                        High Priority
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="urgent">
+                      <span class="flex items-center gap-2">
+                        <Circle class="h-3 w-3 shrink-0 fill-red-500 text-red-600" />
+                        Urgent Priority
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <p v-if="createForm.errors.priority" class="text-red-500 text-sm mt-2 flex items-center gap-1">
@@ -523,7 +563,10 @@
                   @change="handleImageUpload"
                   class="bg-white border-gray-200 hover:border-indigo-300 focus:border-indigo-500 transition-all duration-200"
                 />
-                <p class="text-gray-500 text-sm mt-1">📷 Max 2MB. Supported: JPEG, PNG, JPG, GIF, WebP</p>
+                <p class="mt-1 flex items-center gap-2 text-sm text-gray-500">
+                  <Camera class="h-4 w-4 shrink-0 text-gray-500" />
+                  <span>Max 2MB. Supported: JPEG, PNG, JPG, GIF, WebP</span>
+                </p>
               </div>
 
               <div>
@@ -537,7 +580,10 @@
                   @change="handleAttachmentsUpload"
                   class="bg-white border-gray-200 hover:border-indigo-300 focus:border-indigo-500 transition-all duration-200"
                 />
-                <p class="text-gray-500 text-sm mt-1">📎 Max 10MB each. PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT</p>
+                <p class="mt-1 flex items-center gap-2 text-sm text-gray-500">
+                  <Paperclip class="h-4 w-4 shrink-0 text-gray-500" />
+                  <span>Max 10MB each. PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT</span>
+                </p>
               </div>
             </div>
           </div>
@@ -1118,6 +1164,13 @@ import {
   Clock,
   Info,
   AlertTriangle,
+  Megaphone,
+  Siren,
+  CalendarDays,
+  ClipboardList,
+  Circle,
+  Camera,
+  Paperclip,
 } from 'lucide-vue-next';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import StaffLayout from '@/layouts/staff/Layout.vue';
@@ -1213,13 +1266,13 @@ const submitCreate = () => {
     forceFormData: true,
     onSuccess: () => {
       createSheetOpen.value = false;
-      toast.success('🎉 Announcement created successfully!', {
+      toast.success('Announcement created successfully!', {
         description: 'Your announcement has been published and is now visible to the community.',
         duration: 5000,
       });
     },
     onError: (errors: any) => {
-      toast.error('❌ Failed to create announcement', {
+      toast.error('Failed to create announcement', {
         description: 'Please check the form for errors and try again.',
         duration: 5000,
       });
@@ -1232,13 +1285,13 @@ const submitEdit = () => {
     forceFormData: true,
     onSuccess: () => {
       editSheetOpen.value = false;
-      toast.success('✅ Announcement updated successfully!', {
+      toast.success('Announcement updated successfully!', {
         description: 'Your changes have been saved and are now live.',
         duration: 5000,
       });
     },
     onError: (errors: any) => {
-      toast.error('❌ Failed to update announcement', {
+      toast.error('Failed to update announcement', {
         description: 'Please check the form for errors and try again.',
         duration: 5000,
       });
@@ -1250,13 +1303,13 @@ const submitDelete = () => {
   deleteForm.delete(route('staff.announcements.destroy', selectedAnnouncement.value.id), {
     onSuccess: () => {
       deleteDialogOpen.value = false;
-      toast.success('🗑️ Announcement deleted successfully!', {
+      toast.success('Announcement deleted successfully!', {
         description: 'The announcement has been permanently removed from the system.',
         duration: 5000,
       });
     },
     onError: (errors: any) => {
-      toast.error('❌ Failed to delete announcement', {
+      toast.error('Failed to delete announcement', {
         description: 'Please try again or contact support if the issue persists.',
         duration: 5000,
       });

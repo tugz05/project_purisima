@@ -9,7 +9,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, FileText, Clock, Eye, Edit, ArrowLeft, CheckCircle, XCircle, AlertCircle, User, Calendar, DollarSign, Upload, X, Camera, RotateCcw } from 'lucide-vue-next';
+import {
+    Plus,
+    FileText,
+    Clock,
+    Eye,
+    ArrowLeft,
+    CheckCircle,
+    XCircle,
+    AlertCircle,
+    User,
+    Calendar,
+    DollarSign,
+    Upload,
+    X,
+    Camera,
+    RotateCcw,
+    ClipboardList,
+    PartyPopper,
+    Loader2,
+    Rocket,
+    Save,
+    Search,
+    RefreshCw,
+    Pencil,
+    NotebookPen,
+    Ban,
+} from 'lucide-vue-next';
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { useTransactions } from '@/composables/useTransactions';
@@ -548,8 +574,9 @@ watch(sheetOpen, (newValue) => {
                                                 <p class="text-sm text-green-600">This document type doesn't require any specific documents to be uploaded.</p>
                                             </div>
 
-                                            <p class="text-sm text-blue-700 font-medium bg-blue-100 px-4 py-2 rounded-lg">
-                                                📋 Please upload all required documents before submitting your request.
+                                            <p class="flex items-center gap-2 text-sm text-blue-700 font-medium bg-blue-100 px-4 py-2 rounded-lg">
+                                                <ClipboardList class="h-4 w-4 shrink-0 text-blue-700" />
+                                                <span>Please upload all required documents before submitting your request.</span>
                                             </p>
                                         </div>
 
@@ -579,7 +606,10 @@ watch(sheetOpen, (newValue) => {
 
                                         <div v-if="selectedType && transactionTypes && transactionTypes[selectedType] && transactionTypes[selectedType].fee > 0" class="space-y-4">
                                             <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-6">
-                                                <h4 class="font-bold text-blue-900 mb-3 text-lg">💰 Fee Information</h4>
+                                                <h4 class="flex items-center gap-2 font-bold text-blue-900 mb-3 text-lg">
+                                                    <DollarSign class="h-6 w-6 shrink-0 text-blue-700" />
+                                                    Fee Information
+                                                </h4>
                                                 <p class="text-blue-700 text-xl mb-2">
                                                     Processing fee: <span class="font-black text-2xl">₱{{ Number(transactionTypes[selectedType].fee).toFixed(2) }}</span>
                                                 </p>
@@ -591,7 +621,10 @@ watch(sheetOpen, (newValue) => {
 
                                         <div v-if="selectedType && transactionTypes && transactionTypes[selectedType] && Number(transactionTypes[selectedType].fee) === 0" class="space-y-4">
                                             <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-6">
-                                                <h4 class="font-bold text-green-900 mb-3 text-lg">🎉 No Fee Required</h4>
+                                                <h4 class="flex items-center gap-2 font-bold text-green-900 mb-3 text-lg">
+                                                    <PartyPopper class="h-6 w-6 shrink-0 text-green-700" />
+                                                    No Fee Required
+                                                </h4>
                                                 <p class="text-green-700 text-lg font-medium">
                                                     This document type is free of charge.
                                                 </p>
@@ -603,8 +636,16 @@ watch(sheetOpen, (newValue) => {
                                 <!-- Fixed Footer with Buttons -->
                                 <div class="flex-shrink-0 p-6 sm:p-8 border-t border-gray-200 bg-white">
                                     <div class="flex flex-row gap-3 sm:gap-4">
-                                        <Button type="button" :disabled="createForm.processing" @click="submitCreate" size="lg" class="flex-1 h-12 sm:h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300">
-                                            {{ createForm.processing ? '⏳ Submitting...' : '🚀 Submit Request' }}
+                                        <Button
+                                            type="button"
+                                            :disabled="createForm.processing"
+                                            @click="submitCreate"
+                                            size="lg"
+                                            class="flex flex-1 h-12 sm:h-14 items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300"
+                                        >
+                                            <Loader2 v-if="createForm.processing" class="h-5 w-5 shrink-0 animate-spin" />
+                                            <Rocket v-else class="h-5 w-5 shrink-0" />
+                                            {{ createForm.processing ? 'Submitting...' : 'Submit Request' }}
                                         </Button>
                                         <Button type="button" variant="outline" size="lg" @click="sheetOpen = false" class="flex-1 h-12 sm:h-14 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-bold text-base sm:text-lg rounded-xl transition-all duration-300">
                                             Cancel
@@ -641,7 +682,10 @@ watch(sheetOpen, (newValue) => {
 
                                             <!-- Transaction Info -->
                                             <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-6">
-                                                <h3 class="text-xl font-bold text-blue-900 mb-4">📋 Request Information</h3>
+                                                <h3 class="mb-4 flex items-center gap-2 text-xl font-bold text-blue-900">
+                                                    <ClipboardList class="h-6 w-6 shrink-0 text-blue-700" />
+                                                    Request Information
+                                                </h3>
                                                 <div class="space-y-3">
                                                     <div class="flex items-center gap-3">
                                                         <FileText class="h-5 w-5 text-blue-600" />
@@ -665,7 +709,10 @@ watch(sheetOpen, (newValue) => {
 
                                             <!-- Progressive Timeline -->
                                             <div class="bg-gradient-to-r from-gray-50 to-slate-50 border-2 border-gray-200 rounded-2xl p-6">
-                                                <h3 class="text-xl font-bold text-gray-900 mb-6">⏰ Transaction Progress</h3>
+                                                <h3 class="mb-6 flex items-center gap-2 text-xl font-bold text-gray-900">
+                                                    <Clock class="h-6 w-6 shrink-0 text-gray-700" />
+                                                    Transaction Progress
+                                                </h3>
 
                                                 <!-- Progress Steps -->
                                                 <div class="relative">
@@ -777,7 +824,10 @@ watch(sheetOpen, (newValue) => {
 
                                             <!-- Fee Information -->
                                             <div v-if="Number(selectedTransaction.fee_amount) > 0" class="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-2xl p-6">
-                                                <h3 class="text-xl font-bold text-yellow-900 mb-4">💰 Fee Information</h3>
+                                                <h3 class="mb-4 flex items-center gap-2 text-xl font-bold text-yellow-900">
+                                                    <DollarSign class="h-6 w-6 shrink-0 text-yellow-700" />
+                                                    Fee Information
+                                                </h3>
                                                 <div class="space-y-3">
                                                     <div class="flex items-center gap-3">
                                                         <DollarSign class="h-5 w-5 text-yellow-600" />
@@ -786,11 +836,13 @@ watch(sheetOpen, (newValue) => {
                                                     </div>
                                                     <div class="flex items-center gap-3">
                                                         <span class="font-semibold text-yellow-800">Status:</span>
-                                                        <Badge v-if="selectedTransaction.fee_paid" class="bg-green-100 text-green-800 border-green-200">
-                                                            ✅ Paid
+                                                        <Badge v-if="selectedTransaction.fee_paid" class="inline-flex items-center gap-1 bg-green-100 text-green-800 border-green-200">
+                                                            <CheckCircle class="h-3.5 w-3.5 shrink-0" />
+                                                            Paid
                                                         </Badge>
-                                                        <Badge v-else class="bg-yellow-100 text-yellow-800 border-yellow-200">
-                                                            ⏳ Pending Payment
+                                                        <Badge v-else class="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 border-yellow-200">
+                                                            <Clock class="h-3.5 w-3.5 shrink-0" />
+                                                            Pending Payment
                                                         </Badge>
                                                     </div>
                                                 </div>
@@ -798,7 +850,10 @@ watch(sheetOpen, (newValue) => {
 
                                             <!-- Staff Information -->
                                             <div v-if="selectedTransaction.staff" class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-6">
-                                                <h3 class="text-xl font-bold text-green-900 mb-4">👤 Assigned Staff</h3>
+                                                <h3 class="mb-4 flex items-center gap-2 text-xl font-bold text-green-900">
+                                                    <User class="h-6 w-6 shrink-0 text-green-700" />
+                                                    Assigned Staff
+                                                </h3>
                                                 <div class="flex items-center gap-3">
                                                     <User class="h-5 w-5 text-green-600" />
                                                     <span class="font-semibold text-green-800">Name:</span>
@@ -808,13 +863,19 @@ watch(sheetOpen, (newValue) => {
 
                                             <!-- Staff Notes -->
                                             <div v-if="selectedTransaction.staff_notes && selectedTransaction.staff_notes.trim()" class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-2xl p-6">
-                                                <h3 class="text-xl font-bold text-purple-900 mb-4">📝 Staff Notes</h3>
+                                                <h3 class="mb-4 flex items-center gap-2 text-xl font-bold text-purple-900">
+                                                    <NotebookPen class="h-6 w-6 shrink-0 text-purple-700" />
+                                                    Staff Notes
+                                                </h3>
                                                 <p class="text-purple-700">{{ selectedTransaction.staff_notes }}</p>
                                             </div>
 
                                             <!-- Rejection Reason -->
                                             <div v-if="selectedTransaction.rejection_reason && selectedTransaction.rejection_reason.trim()" class="bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl p-6">
-                                                <h3 class="text-xl font-bold text-red-900 mb-4">❌ Rejection Reason</h3>
+                                                <h3 class="mb-4 flex items-center gap-2 text-xl font-bold text-red-900">
+                                                    <Ban class="h-6 w-6 shrink-0 text-red-700" />
+                                                    Rejection Reason
+                                                </h3>
                                                 <p class="text-red-700">{{ selectedTransaction.rejection_reason }}</p>
                                             </div>
                                         </div>
@@ -827,9 +888,10 @@ watch(sheetOpen, (newValue) => {
                                                 v-if="selectedTransaction?.status === 'pending'"
                                                 @click="openEditSheet(selectedTransaction); viewSheetOpen = false"
                                                 size="lg"
-                                                class="flex-1 h-12 sm:h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300"
+                                                class="flex flex-1 h-12 sm:h-14 items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300"
                                             >
-                                                ✏️ Edit Request
+                                                <Pencil class="h-5 w-5 shrink-0" />
+                                                Edit Request
                                             </Button>
                                             <Button
                                                 variant="outline"
@@ -906,9 +968,11 @@ watch(sheetOpen, (newValue) => {
                                                 :disabled="editForm?.processing"
                                                 @click="submitEdit"
                                                 size="lg"
-                                                class="flex-1 h-12 sm:h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300"
+                                                class="flex flex-1 h-12 sm:h-14 items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300"
                                             >
-                                                {{ editForm?.processing ? '⏳ Updating...' : '💾 Update Request' }}
+                                                <Loader2 v-if="editForm?.processing" class="h-5 w-5 shrink-0 animate-spin" />
+                                                <Save v-else class="h-5 w-5 shrink-0" />
+                                                {{ editForm?.processing ? 'Updating...' : 'Update Request' }}
                                             </Button>
                                             <Button
                                                 type="button"
@@ -930,7 +994,10 @@ watch(sheetOpen, (newValue) => {
                 <!-- Filters Section -->
                 <Card class="mb-10 shadow-xl border-0 bg-white/80 backdrop-blur-sm rounded-2xl">
                     <CardHeader class="pb-6">
-                        <CardTitle class="text-2xl font-bold text-gray-900">🔍 Filter Transactions</CardTitle>
+                        <CardTitle class="flex items-center gap-2 text-2xl font-bold text-gray-900">
+                            <Search class="h-7 w-7 shrink-0 text-gray-700" />
+                            Filter Transactions
+                        </CardTitle>
                     </CardHeader>
                     <CardContent class="pt-0">
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -942,11 +1009,36 @@ watch(sheetOpen, (newValue) => {
                                     </SelectTrigger>
                                     <SelectContent class="rounded-xl border-2 border-gray-200 shadow-xl">
                                         <SelectItem value="all" class="py-3">All Status</SelectItem>
-                                        <SelectItem value="pending" class="py-3">⏳ Pending</SelectItem>
-                                        <SelectItem value="in_progress" class="py-3">🔄 In Progress</SelectItem>
-                                        <SelectItem value="approved" class="py-3">✅ Approved</SelectItem>
-                                        <SelectItem value="rejected" class="py-3">❌ Rejected</SelectItem>
-                                        <SelectItem value="completed" class="py-3">🎉 Completed</SelectItem>
+                                        <SelectItem value="pending" class="py-3">
+                                            <span class="flex items-center gap-2">
+                                                <Clock class="h-4 w-4 shrink-0 text-amber-600" />
+                                                Pending
+                                            </span>
+                                        </SelectItem>
+                                        <SelectItem value="in_progress" class="py-3">
+                                            <span class="flex items-center gap-2">
+                                                <RefreshCw class="h-4 w-4 shrink-0 text-blue-600" />
+                                                In Progress
+                                            </span>
+                                        </SelectItem>
+                                        <SelectItem value="approved" class="py-3">
+                                            <span class="flex items-center gap-2">
+                                                <CheckCircle class="h-4 w-4 shrink-0 text-green-600" />
+                                                Approved
+                                            </span>
+                                        </SelectItem>
+                                        <SelectItem value="rejected" class="py-3">
+                                            <span class="flex items-center gap-2">
+                                                <XCircle class="h-4 w-4 shrink-0 text-red-600" />
+                                                Rejected
+                                            </span>
+                                        </SelectItem>
+                                        <SelectItem value="completed" class="py-3">
+                                            <span class="flex items-center gap-2">
+                                                <PartyPopper class="h-4 w-4 shrink-0 text-emerald-600" />
+                                                Completed
+                                            </span>
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -984,7 +1076,11 @@ watch(sheetOpen, (newValue) => {
 
                                     <div class="space-y-3">
                                         <p class="text-lg font-semibold text-gray-700">
-                                            {{ getTypeName(transaction.type, props.transactionTypes) }} • ID: {{ transaction.transaction_id }}
+                                            <span class="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                                <span>{{ getTypeName(transaction.type, props.transactionTypes) }}</span>
+                                                <span class="text-gray-400" aria-hidden="true">·</span>
+                                                <span>ID: {{ transaction.transaction_id }}</span>
+                                            </span>
                                         </p>
                                         <div class="flex flex-col sm:flex-row sm:items-center gap-4 text-base text-gray-600">
                                             <span class="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full">
@@ -1001,11 +1097,13 @@ watch(sheetOpen, (newValue) => {
                                         <span class="text-lg font-bold text-gray-800 bg-gray-100 px-4 py-2 rounded-full">
                                             Fee: ₱{{ formatFeeAmount(transaction.fee_amount) }}
                                         </span>
-                                        <Badge v-if="transaction.fee_paid" class="bg-green-100 text-green-800 border-green-200 px-4 py-2 rounded-full font-semibold">
-                                            ✅ Paid
+                                        <Badge v-if="transaction.fee_paid" class="inline-flex items-center gap-1.5 bg-green-100 text-green-800 border-green-200 px-4 py-2 rounded-full font-semibold">
+                                            <CheckCircle class="h-4 w-4 shrink-0" />
+                                            Paid
                                         </Badge>
-                                        <Badge v-else class="bg-yellow-100 text-yellow-800 border-yellow-200 px-4 py-2 rounded-full font-semibold">
-                                            ⏳ Pending Payment
+                                        <Badge v-else class="inline-flex items-center gap-1.5 bg-yellow-100 text-yellow-800 border-yellow-200 px-4 py-2 rounded-full font-semibold">
+                                            <Clock class="h-4 w-4 shrink-0" />
+                                            Pending Payment
                                         </Badge>
                                     </div>
                                 </div>
@@ -1015,18 +1113,20 @@ watch(sheetOpen, (newValue) => {
                                         @click="openViewSheet(transaction)"
                                         variant="outline"
                                         size="lg"
-                                        class="w-full h-12 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-2 border-blue-200 text-blue-700 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                                        class="flex w-full h-12 items-center justify-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-2 border-blue-200 text-blue-700 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                                     >
-                                        👁️ View Details
+                                        <Eye class="h-5 w-5 shrink-0" />
+                                        View Details
                                     </Button>
                                     <Button
                                         v-if="transaction.status === 'pending'"
                                         @click="openEditSheet(transaction)"
                                         variant="outline"
                                         size="lg"
-                                        class="w-full h-12 bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100 border-2 border-gray-200 text-gray-700 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                                        class="flex w-full h-12 items-center justify-center gap-2 bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100 border-2 border-gray-200 text-gray-700 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                                     >
-                                        ✏️ Edit
+                                        <Pencil class="h-5 w-5 shrink-0" />
+                                        Edit
                                     </Button>
                                 </div>
                             </div>
@@ -1040,7 +1140,6 @@ watch(sheetOpen, (newValue) => {
                             </div>
                             <h3 class="text-3xl font-bold text-gray-900 mb-4">No transactions found</h3>
                             <p class="text-xl text-gray-600 mb-8 max-w-md mx-auto leading-relaxed">Get started by creating your first document request using the "New Request" button above.</p>
-                            <div class="text-6xl">📋</div>
                         </div>
                     </div>
                 </div>

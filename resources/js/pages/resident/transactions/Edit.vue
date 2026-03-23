@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, FileText, Save } from 'lucide-vue-next';
+import { ArrowLeft, Check, FileText, Save } from 'lucide-vue-next';
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { Link } from '@inertiajs/vue3';
 import { type BreadcrumbItem } from '@/types';
@@ -229,7 +229,7 @@ const formatFeeAmount = (amount: number | string) => {
                                 <div class="p-4 bg-green-50 rounded-xl border border-green-200">
                                     <div class="flex items-center gap-3">
                                         <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                                            <span class="text-green-600 font-bold">✓</span>
+                                            <Check class="h-5 w-5 text-green-600" stroke-width="2.5" />
                                         </div>
                                         <div>
                                             <h3 class="text-sm font-semibold text-green-900">Free Service</h3>

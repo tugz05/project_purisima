@@ -16,7 +16,8 @@ import {
     CheckCircle,
     CheckCircle2,
     Archive,
-    MoreVertical
+    MoreVertical,
+    X,
 } from 'lucide-vue-next';
 
 interface Conversation {
@@ -165,9 +166,10 @@ onMounted(() => {
                             variant="ghost"
                             size="sm"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 rounded-full"
+                            aria-label="Clear search"
                             @click="clearSearch"
                         >
-                            ×
+                            <X class="h-4 w-4" />
                         </Button>
                     </div>
                 </div>

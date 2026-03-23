@@ -378,7 +378,11 @@ const closeAnnouncementView = () => {
     <div class="hidden bg-[#0EA5E9] text-white lg:block" aria-label="utility bar">
       <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-2 text-[12px]">
         <div class="flex flex-wrap items-center gap-4 opacity-95">
-          <span class="inline-flex items-center gap-1"><Phone class="h-3.5 w-3.5" /> Emergency: 117 • +63 900 000 0000</span>
+          <span class="inline-flex items-center gap-1">
+            <Phone class="h-3.5 w-3.5" /> Emergency: 117
+            <span class="mx-1 text-white/70" aria-hidden="true">·</span>
+            +63 900 000 0000
+          </span>
           <span class="hidden md:inline-flex items-center gap-1"><Mail class="h-3.5 w-3.5" /> purisima@example.com</span>
           <span class="inline-flex items-center gap-1"><MapPin class="h-3.5 w-3.5" /> Barangay Purisima, PH</span>
         </div>
@@ -1301,7 +1305,11 @@ const closeAnnouncementView = () => {
         <div class="border-t border-[#E0F2FE] bg-white">
           <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-6 py-4 text-center text-[12px] text-[#0f172a] sm:flex-row">
             <span>© {{ new Date().getFullYear() }} Uni Respond. All rights reserved.</span>
-            <span>Built for public service • v1.0</span>
+            <span class="inline-flex items-center gap-1.5">
+              Built for public service
+              <span class="text-[#94a3b8]" aria-hidden="true">·</span>
+              v1.0
+            </span>
           </div>
         </div>
       </footer>

@@ -91,6 +91,15 @@ const unreadCount = computed(
         conversations.value.reduce((count, conv) => count + (conv.unread_count || 0), 0),
 );
 
+/** Compact label for small FAB badge (mobile-friendly). */
+const unreadBadgeLabel = computed(() => {
+    const n = unreadCount.value;
+    if (n <= 0) {
+        return '';
+    }
+    return n > 9 ? '9+' : String(n);
+});
+
 const getInitials = (name: string) => {
     return name
         .split(' ')
@@ -475,33 +484,30 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <!-- Floating Action Button -->
+    <!-- Floating Action Button: safe-area + clearance above mobile bottom nav -->
     <div
         v-if="!isOpen"
-        class="fixed right-6 bottom-20 md:bottom-6 md:top-auto"
-        style="z-index: 9998 !important; position: fixed !important;"
+        class="fixed z-[9998] right-4 max-[767px]:right-[max(1rem,env(safe-area-inset-right,0px))] bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] md:right-6 md:bottom-6 md:top-auto"
         :class="unreadCount > 0 ? 'md:right-24' : ''"
     >
-    <Button
-        @click="openChat"
-        class="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 bg-blue-600 hover:bg-blue-700 md:h-16 md:w-16 transform hover:scale-110 active:scale-105 animate-pulse-glow"
-    >
-            <div class="relative">
-                <MessageCircle class="h-7 w-7 md:h-8 md:w-8" />
+        <Button
+            @click="openChat"
+            :class="[
+                'h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 bg-blue-600 hover:bg-blue-700 md:h-16 md:w-16 transform hover:scale-110 active:scale-105',
+                unreadCount > 0 ? '' : 'animate-pulse-glow',
+            ]"
+        >
+            <div class="relative flex items-center justify-center">
+                <MessageCircle class="h-7 w-7 md:h-8 md:w-8 shrink-0" />
                 <Badge
                     v-if="unreadCount > 0"
                     variant="destructive"
-                    class="absolute -top-1 -right-1 h-6 w-6 rounded-full flex items-center justify-center text-xs md:-top-2 md:-right-2 md:h-6 md:w-6"
+                    class="absolute -top-0.5 -right-0.5 min-h-[1.125rem] min-w-[1.125rem] max-w-[2rem] px-1 rounded-full flex items-center justify-center text-[10px] font-semibold leading-none tabular-nums md:-top-2 md:-right-2 md:min-h-6 md:min-w-6 md:text-xs"
                 >
-                    {{ unreadCount }}
+                    {{ unreadBadgeLabel }}
                 </Badge>
             </div>
         </Button>
-
-        <!-- Unread messages indicator -->
-        <div v-if="unreadCount > 0" class="absolute -top-1 -right-1 animate-pulse md:top-0 md:right-0">
-            <div class="w-3 h-3 bg-red-500 rounded-full md:w-3 md:h-3"></div>
-        </div>
     </div>
 
     <!-- Chat Window -->
@@ -538,7 +544,11 @@ onBeforeUnmount(() => {
                 </div>
                 <div>
                     <h3 class="font-semibold text-white text-sm leading-4">Barangay Support</h3>
-                    <p class="text-slate-300 text-xs leading-3">Online • Staff Team</p>
+                    <p class="flex items-center gap-1.5 text-xs leading-3 text-slate-300">
+                        <span>Online</span>
+                        <span class="text-slate-500" aria-hidden="true">|</span>
+                        <span>Staff Team</span>
+                    </p>
                 </div>
             </div>
             <div v-else class="flex-1 ml-3">

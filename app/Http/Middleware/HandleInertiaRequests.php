@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\MessagingService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -38,14 +39,21 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
+        $user = $request->user();
+        $messagingUnreadCount = null;
+        if ($user && in_array($user->role, ['staff', 'admin'], true)) {
+            $messagingUnreadCount = app(MessagingService::class)->getUnreadCount($user);
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'messagingUnreadCount' => $messagingUnreadCount,
         ];
     }
 }

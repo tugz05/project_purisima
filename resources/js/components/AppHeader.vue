@@ -15,6 +15,7 @@ import type { BreadcrumbItem, NavItem } from '@/types';
 import { InertiaLinkProps, Link, usePage } from '@inertiajs/vue3';
 import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-vue-next';
 import { computed } from 'vue';
+import PwaInstallButton from '@/components/PwaInstallButton.vue';
 
 interface Props {
     breadcrumbs?: BreadcrumbItem[];
@@ -59,6 +60,9 @@ const rightNavItems: NavItem[] = [
 <template>
     <div>
         <div class="border-b border-sidebar-border/80">
+            <div class="mx-auto md:max-w-7xl">
+                <PwaInstallButton />
+            </div>
             <div class="mx-auto flex h-16 items-center px-4 md:max-w-7xl">
                 <!-- Mobile Menu -->
                 <div class="lg:hidden">

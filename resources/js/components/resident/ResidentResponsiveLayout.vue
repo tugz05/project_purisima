@@ -9,6 +9,7 @@ import AppSidebarHeader from '@/components/AppSidebarHeader.vue';
 import { Toaster } from 'vue-sonner';
 import { useAuth } from '@/composables/useAuth';
 import FloatingChat from './FloatingChat.vue';
+import PwaInstallButton from '@/components/PwaInstallButton.vue';
 import type { BreadcrumbItemType } from '@/types';
 
 interface Props {
@@ -57,8 +58,9 @@ onUnmounted(() => {
     <!-- Mobile Layout with Bottom Navigation -->
     <div v-else class="flex flex-col min-h-screen bg-gray-50 md:hidden">
         <!-- Mobile Header -->
-        <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
-            <div class="flex items-center justify-between">
+        <header class="sticky top-0 z-40 divide-y divide-gray-200 border-b border-gray-200 bg-white">
+            <PwaInstallButton />
+            <div class="flex items-center justify-between px-4 py-3">
                 <div class="flex items-center gap-3">
                     <img 
                         src="/images/logo/unirespond.jpg" 

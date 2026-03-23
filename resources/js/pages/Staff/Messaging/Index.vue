@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { dispatchStaffMessagingUnreadCount } from '@/staffMessagingEvents';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import StaffLayout from '@/layouts/staff/Layout.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +23,8 @@ import {
     Paperclip,
     Smile,
     Phone,
-    Video
+    Video,
+    X,
 } from 'lucide-vue-next';
 import { getPusher, isPusherAvailable } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
@@ -74,6 +76,8 @@ interface Props {
 
 const props = defineProps<Props>();
 
+const page = usePage();
+
 const { createBreadcrumbs } = useBreadcrumbs();
 const breadcrumbs = createBreadcrumbs([
     { title: 'Dashboard', href: '/staff/dashboard' },
@@ -95,10 +99,29 @@ const otherUserTyping = ref(false);
 let unsubscribeConversation: (() => void) | null = null;
 let unsubscribeUser: (() => void) | null = null;
 
-const sidebarUnreadCount = ref(props.unreadCount ?? 0);
+const sidebarUnreadCount = ref(
+    (typeof page.props.messagingUnreadCount === 'number' ? page.props.messagingUnreadCount : null) ??
+        props.unreadCount ??
+        0,
+);
+
+const syncSidebarUnreadFromRows = () => {
+    const n = props.conversations?.data?.filter((c) => c.staff_has_unread).length ?? 0;
+    sidebarUnreadCount.value = n;
+    dispatchStaffMessagingUnreadCount(n);
+};
 
 watch(
     () => props.unreadCount,
+    (c) => {
+        if (typeof c === 'number') {
+            sidebarUnreadCount.value = c;
+        }
+    },
+);
+
+watch(
+    () => page.props.messagingUnreadCount,
     (c) => {
         if (typeof c === 'number') {
             sidebarUnreadCount.value = c;
@@ -187,14 +210,32 @@ const selectConversation = async (conversation: Conversation) => {
             const data = await response.json();
             messages.value = data.conversation.messages || [];
 
-            // Mark messages as read
-            await messagingJsonFetch(`/staff/messaging/conversations/${conversation.id}/mark-read`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
+            const readResponse = await messagingJsonFetch(
+                `/staff/messaging/conversations/${conversation.id}/mark-read`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: '{}',
                 },
-                body: '{}',
-            });
+            );
+
+            if (readResponse.ok) {
+                const readData = await readResponse.json();
+                const row = props.conversations?.data?.find((c) => c.id === conversation.id);
+                if (row && readData.conversation) {
+                    row.staff_has_unread = readData.conversation.staff_has_unread;
+                } else if (row) {
+                    row.staff_has_unread = false;
+                }
+                if (typeof readData.unread_total === 'number') {
+                    sidebarUnreadCount.value = readData.unread_total;
+                    dispatchStaffMessagingUnreadCount(readData.unread_total);
+                } else {
+                    syncSidebarUnreadFromRows();
+                }
+            }
         }
     } catch (error) {
         console.error('Error loading conversation:', error);
@@ -327,6 +368,7 @@ const setupRealTimeMessaging = () => {
                 row.last_message_at = e.conversation.last_message_at ?? row.last_message_at;
                 row.staff_has_unread = e.conversation.staff_has_unread ?? row.staff_has_unread;
             }
+            syncSidebarUnreadFromRows();
         },
         onUserTyping: (e) => {
             if (e.user.id === props.currentUser?.id) {
@@ -352,7 +394,7 @@ const setupUserChannel = () => {
     }
 
     unsubscribeUser = subscribeToUserMessagingChannel(props.currentUser.id, {
-        onMessageSent: (e) => {
+        onMessageSent: async (e) => {
             if (e.message.sender.id === props.currentUser.id) {
                 return;
             }
@@ -363,10 +405,24 @@ const setupUserChannel = () => {
                 row.last_message_at = e.conversation.last_message_at ?? row.last_message_at;
                 if (!selectedConversation.value || selectedConversation.value.id !== convId) {
                     row.staff_has_unread = true;
-                    sidebarUnreadCount.value += 1;
+                } else {
+                    row.staff_has_unread = e.conversation.staff_has_unread ?? row.staff_has_unread;
                 }
-            } else if (!selectedConversation.value || selectedConversation.value.id !== convId) {
-                sidebarUnreadCount.value += 1;
+                syncSidebarUnreadFromRows();
+            } else {
+                try {
+                    const r = await messagingJsonFetch('/staff/messaging/unread-count', { method: 'GET' });
+                    if (r.ok) {
+                        const d = await r.json();
+                        const n = Number(d.count);
+                        if (!Number.isNaN(n)) {
+                            sidebarUnreadCount.value = n;
+                            dispatchStaffMessagingUnreadCount(n);
+                        }
+                    }
+                } catch {
+                    // ignore
+                }
             }
         },
     });
@@ -432,9 +488,10 @@ onBeforeUnmount(() => {
                             variant="ghost"
                             size="sm"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 h-5 w-5 p-0 rounded-full"
+                            aria-label="Clear search"
                             @click="clearSearch"
                         >
-                            ×
+                            <X class="h-3.5 w-3.5" />
                         </Button>
                     </div>
                 </div>

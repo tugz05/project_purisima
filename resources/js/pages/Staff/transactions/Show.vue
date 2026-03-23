@@ -8,7 +8,36 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, User, FileText, Calendar, DollarSign, Download, File, Eye, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Save, Sparkles, FileCheck, Printer } from 'lucide-vue-next';
+import {
+    ArrowLeft,
+    Clock,
+    CheckCircle,
+    XCircle,
+    AlertCircle,
+    User,
+    FileText,
+    Calendar,
+    DollarSign,
+    Download,
+    File,
+    Eye,
+    X,
+    ZoomIn,
+    ZoomOut,
+    RotateCcw,
+    Maximize2,
+    Minimize2,
+    Save,
+    Sparkles,
+    FileCheck,
+    Printer,
+    Image,
+    FileSpreadsheet,
+    Folder,
+    Move,
+    AlertTriangle,
+    type LucideIcon,
+} from 'lucide-vue-next';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import RichTextEditor from '@/components/RichTextEditor.vue';
 import StaffLayout from '@/layouts/staff/Layout.vue';
@@ -293,12 +322,17 @@ const isPdfFile = (mimeType: string): boolean => {
     return mimeType === 'application/pdf';
 };
 
-const getFileIcon = (mimeType: string) => {
-    if (isImageFile(mimeType)) return '🖼️';
-    if (isPdfFile(mimeType)) return '📄';
-    if (mimeType.includes('word')) return '📝';
-    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return '📊';
-    return '📁';
+const getFileIconComponent = (mimeType: string): LucideIcon => {
+    if (isImageFile(mimeType)) {
+        return Image;
+    }
+    if (isPdfFile(mimeType) || mimeType.includes('word')) {
+        return FileText;
+    }
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) {
+        return FileSpreadsheet;
+    }
+    return Folder;
 };
 
 // Zoom and pan functions
@@ -882,7 +916,10 @@ onUnmounted(() => {
                 <DialogHeader>
                     <DialogTitle class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            <span class="text-2xl">{{ currentFile ? getFileIcon(currentFile.mime_type) : '📁' }}</span>
+                            <component
+                                :is="currentFile ? getFileIconComponent(currentFile.mime_type) : Folder"
+                                class="h-7 w-7 shrink-0 text-slate-600"
+                            />
                             <span>{{ currentFile?.name }}</span>
                         </div>
 
@@ -933,7 +970,7 @@ onUnmounted(() => {
                         <!-- Zoom Instructions -->
                         <div v-if="zoomLevel > 100" class="absolute top-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm">
                             <div class="flex items-center gap-2">
-                                <span>🖱️</span>
+                                <Move class="h-4 w-4 shrink-0" />
                                 <span>Drag to pan</span>
                             </div>
                         </div>
@@ -950,9 +987,16 @@ onUnmounted(() => {
 
                     <!-- Unsupported File Type -->
                     <div v-else class="flex flex-col items-center justify-center h-[70vh] text-center">
-                        <div class="text-6xl mb-4">{{ getFileIcon(currentFile.mime_type) }}</div>
+                        <component
+                            :is="getFileIconComponent(currentFile.mime_type)"
+                            class="h-16 w-16 mb-4 shrink-0 text-slate-400"
+                        />
                         <h3 class="text-xl font-semibold text-gray-900 mb-2">{{ currentFile.name }}</h3>
-                        <p class="text-gray-600 mb-4">{{ formatFileSize(currentFile.size) }} • {{ currentFile.mime_type }}</p>
+                        <p class="mb-4 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-gray-600">
+                            <span>{{ formatFileSize(currentFile.size) }}</span>
+                            <span class="text-gray-400" aria-hidden="true">·</span>
+                            <span>{{ currentFile.mime_type }}</span>
+                        </p>
                         <p class="text-gray-500 mb-6">This file type cannot be previewed in the browser.</p>
                         <Button @click="downloadFile(currentFile)" class="bg-blue-600 hover:bg-blue-700">
                             <Download class="h-4 w-4 mr-2" />
@@ -1194,8 +1238,11 @@ onUnmounted(() => {
                                                     placeholder="e.g., CHARLITA G. MONTENEGRO, RSW"
                                                     class="w-full border-2 border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-400 text-sm font-medium bg-white shadow-sm h-9 rounded-md px-3 py-1 outline-none transition-[color,box-shadow]"
                                                 />
-                                                <p class="text-xs text-amber-700 mt-2 font-medium">
-                                                    ⚠️ <strong>Important:</strong> This name will appear on the printed certificate as "Officer of the Day" if provided. Leave empty if Punong Barangay will sign.
+                                                <p class="flex items-start gap-2 text-xs text-amber-700 mt-2 font-medium">
+                                                    <AlertTriangle class="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                                                    <span>
+                                                        <strong>Important:</strong> This name will appear on the printed certificate as "Officer of the Day" if provided. Leave empty if Punong Barangay will sign.
+                                                    </span>
                                                 </p>
                                             </div>
                                             <div class="pt-3 border-t-2 border-amber-200">

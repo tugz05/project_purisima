@@ -11,7 +11,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Search, Eye, Edit, Trash2, Users, Calendar, Phone, Mail, Upload, X, User, FileText, MapPin } from 'lucide-vue-next';
+import {
+    Plus,
+    Search,
+    Eye,
+    Edit,
+    Trash2,
+    Users,
+    Calendar,
+    Phone,
+    Mail,
+    Upload,
+    X,
+    User,
+    FileText,
+    MapPin,
+    Lightbulb,
+} from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import StaffLayout from '@/layouts/staff/Layout.vue';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
@@ -516,12 +532,15 @@ const civilStatusOptions = [
 
                         <!-- Helpful Tips -->
                         <div v-if="!searchQuery" class="mt-8 p-4 bg-blue-50 rounded-lg text-left">
-                            <h4 class="text-sm font-semibold text-blue-900 mb-2">💡 Getting Started Tips:</h4>
-                            <ul class="text-sm text-blue-800 space-y-1">
-                                <li>• Start with the Barangay Captain</li>
-                                <li>• Add councilors and key officials</li>
-                                <li>• Include contact information for easy access</li>
-                                <li>• Upload photos for better identification</li>
+                            <h4 class="mb-2 flex items-center gap-2 text-sm font-semibold text-blue-900">
+                                <Lightbulb class="h-4 w-4 shrink-0 text-amber-500" />
+                                Getting Started Tips:
+                            </h4>
+                            <ul class="list-disc space-y-1 pl-5 text-sm text-blue-800">
+                                <li>Start with the Barangay Captain</li>
+                                <li>Add councilors and key officials</li>
+                                <li>Include contact information for easy access</li>
+                                <li>Upload photos for better identification</li>
                             </ul>
                         </div>
                     </div>

@@ -13,10 +13,11 @@
       <button
         type="button"
         @click="handleAttachmentUpload"
-        class="attachment-button"
+        class="attachment-button inline-flex items-center gap-2"
         title="Insert Attachment"
       >
-        📎 Insert Attachment
+        <Paperclip class="h-4 w-4 shrink-0" />
+        Insert Attachment
       </button>
     </div>
   </div>
@@ -26,6 +27,24 @@
 import { ref, watch } from 'vue';
 import { QuillEditor } from '@vueup/vue-quill';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
+import { Paperclip } from 'lucide-vue-next';
+
+/** Inline SVG markers for attachment chips (replaces emoji). */
+const fileTypeIconSvg = (fileName: string): string => {
+    const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+    const base =
+        'xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+    if (['xls', 'xlsx', 'csv'].includes(ext)) {
+        return `<svg ${base}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h2"/></svg>`;
+    }
+    if (['zip', 'rar', '7z'].includes(ext)) {
+        return `<svg ${base}><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`;
+    }
+    if (['pdf', 'doc', 'docx', 'txt', 'ppt', 'pptx'].includes(ext)) {
+        return `<svg ${base}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/></svg>`;
+    }
+    return `<svg ${base}><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`;
+};
 
 // Props
 const props = defineProps<{
@@ -237,27 +256,9 @@ const insertAttachmentToEditor = (file: File) => {
       attachmentDiv.style.boxShadow = 'none';
     });
 
-    // File icon based on type
-    const getFileIcon = (fileName: string) => {
-      const extension = fileName.split('.').pop()?.toLowerCase();
-      switch (extension) {
-        case 'pdf': return '📄';
-        case 'doc':
-        case 'docx': return '📝';
-        case 'xls':
-        case 'xlsx': return '📊';
-        case 'ppt':
-        case 'pptx': return '📋';
-        case 'zip':
-        case 'rar': return '📦';
-        case 'txt': return '📃';
-        default: return '📎';
-      }
-    };
-
     // Create attachment content
     attachmentDiv.innerHTML = `
-      <span style="font-size: 20px;">${getFileIcon(file.name)}</span>
+      <span style="display:inline-flex;align-items:center;flex-shrink:0;">${fileTypeIconSvg(file.name)}</span>
       <div style="flex: 1; min-width: 0;">
         <div style="font-weight: 600; color: #1e293b; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           ${file.name}
