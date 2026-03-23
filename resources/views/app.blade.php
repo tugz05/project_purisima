@@ -42,7 +42,8 @@
         {{-- PWA: Web App Manifest --}}
         <link rel="manifest" href="/manifest.json">
 
-        {{-- PWA: iOS meta tags for Add to Home Screen --}}
+        {{-- PWA: iOS + standards (mobile-web-app-capable is the non-deprecated name) --}}
+        <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
         <meta name="apple-mobile-web-app-title" content="{{ config('app.name', 'Purisima') }}">

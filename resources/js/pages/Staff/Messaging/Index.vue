@@ -72,6 +72,27 @@ interface Props {
 
 const props = defineProps<Props>();
 
+/** Ensures session cookies and CSRF are sent (fixes 419/500 on some hosts). */
+const staffMessagingFetch = (url: string, options: RequestInit = {}): Promise<Response> => {
+    const headers = new Headers(options.headers ?? {});
+    if (!headers.has('X-CSRF-TOKEN')) {
+        headers.set(
+            'X-CSRF-TOKEN',
+            document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
+        );
+    }
+    if (!headers.has('Accept')) {
+        headers.set('Accept', 'application/json');
+    }
+    headers.set('X-Requested-With', 'XMLHttpRequest');
+
+    return fetch(url, {
+        credentials: 'same-origin',
+        ...options,
+        headers,
+    });
+};
+
 const { createBreadcrumbs } = useBreadcrumbs();
 const breadcrumbs = createBreadcrumbs([
     { title: 'Dashboard', href: '/staff/dashboard' },
@@ -158,12 +179,8 @@ const selectConversation = async (conversation: Conversation) => {
 
     try {
         // Fetch messages for this conversation
-        const response = await fetch(`/staff/messaging/conversations/${conversation.id}/json`, {
+        const response = await staffMessagingFetch(`/staff/messaging/conversations/${conversation.id}/json`, {
             method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            }
         });
 
         if (response.ok) {
@@ -171,13 +188,12 @@ const selectConversation = async (conversation: Conversation) => {
             messages.value = data.conversation.messages || [];
 
             // Mark messages as read
-            await fetch(`/staff/messaging/conversations/${conversation.id}/mark-read`, {
+            await staffMessagingFetch(`/staff/messaging/conversations/${conversation.id}/mark-read`, {
                 method: 'POST',
                 headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    'Accept': 'application/json',
                     'Content-Type': 'application/json',
-                }
+                },
+                body: '{}',
             });
         }
     } catch (error) {
@@ -196,16 +212,14 @@ const sendMessage = async () => {
     stopTyping();
 
     try {
-        const response = await fetch(`/staff/messaging/conversations/${selectedConversation.value.id}/messages`, {
+        const response = await staffMessagingFetch(`/staff/messaging/conversations/${selectedConversation.value.id}/messages`, {
             method: 'POST',
             headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                'Accept': 'application/json',
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                content: newMessage.value.trim()
-            })
+                content: newMessage.value.trim(),
+            }),
         });
 
         if (response.ok) {
@@ -245,13 +259,12 @@ const handleTyping = () => {
     isTyping.value = true;
 
     // Send typing start event
-    fetch(`/staff/messaging/conversations/${selectedConversation.value.id}/typing/start`, {
+    staffMessagingFetch(`/staff/messaging/conversations/${selectedConversation.value.id}/typing/start`, {
         method: 'POST',
         headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            'Accept': 'application/json',
             'Content-Type': 'application/json',
-        }
+        },
+        body: '{}',
     });
 
     // Clear existing timeout
@@ -271,13 +284,12 @@ const stopTyping = () => {
     isTyping.value = false;
 
     // Send typing stop event
-    fetch(`/staff/messaging/conversations/${selectedConversation.value.id}/typing/stop`, {
+    staffMessagingFetch(`/staff/messaging/conversations/${selectedConversation.value.id}/typing/stop`, {
         method: 'POST',
         headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            'Accept': 'application/json',
             'Content-Type': 'application/json',
-        }
+        },
+        body: '{}',
     });
 
     if (typingTimeout.value) {

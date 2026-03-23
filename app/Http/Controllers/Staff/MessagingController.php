@@ -8,12 +8,12 @@ use App\Models\Message;
 use App\Models\User;
 use App\Services\MessagingService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
-use Inertia\Inertia;
-use Inertia\Response;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class MessagingController extends Controller
 {
@@ -60,7 +60,7 @@ class MessagingController extends Controller
         $user = Auth::user();
 
         // Ensure user is a participant
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to view this conversation.');
         }
 
@@ -89,7 +89,7 @@ class MessagingController extends Controller
         $user = Auth::user();
 
         // Ensure user is a participant
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -108,7 +108,7 @@ class MessagingController extends Controller
                 'resident_has_unread' => $conversation->resident_has_unread,
                 'staff_has_unread' => $conversation->staff_has_unread,
                 'last_message_at' => $conversation->last_message_at,
-            ]
+            ],
         ]);
     }
 
@@ -121,15 +121,18 @@ class MessagingController extends Controller
         $user = Auth::user();
 
         // Ensure user is a participant
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         try {
             $this->messagingService->markMessagesAsRead($conversation, $user);
+
             return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['error' => 'Unable to mark messages as read.'], 500);
         }
     }
 
@@ -142,7 +145,7 @@ class MessagingController extends Controller
         $user = Auth::user();
 
         // Ensure user is a participant
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to send messages in this conversation.');
         }
 
@@ -167,9 +170,6 @@ class MessagingController extends Controller
                 $attachments
             );
 
-            // Broadcast the message event for real-time updates
-            \App\Support\BroadcastHelper::safeBroadcast(new \App\Events\MessageSent($message, $conversation));
-
             // Reload conversation with messages
             $conversation->load(['resident', 'staff', 'messages' => function ($query) {
                 $query->with('sender')->orderBy('created_at', 'asc')->limit(50);
@@ -183,11 +183,12 @@ class MessagingController extends Controller
                     'messages' => $conversation->messages,
                     'last_message' => $conversation->last_message,
                     'last_message_at' => $conversation->last_message_at,
-                ]
+                ],
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            report($e);
             throw ValidationException::withMessages([
-                'message' => 'Failed to send message: ' . $e->getMessage(),
+                'message' => 'Failed to send message: '.$e->getMessage(),
             ]);
         }
     }
@@ -200,14 +201,11 @@ class MessagingController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to access this conversation.');
         }
 
         $this->messagingService->startTyping($conversation, $user);
-
-        // Broadcast typing event
-        \App\Support\BroadcastHelper::safeBroadcast(new \App\Events\UserTyping($user, $conversation, true));
 
         return response()->json(['success' => true]);
     }
@@ -220,14 +218,11 @@ class MessagingController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to access this conversation.');
         }
 
         $this->messagingService->stopTyping($conversation, $user);
-
-        // Broadcast typing event
-        \App\Support\BroadcastHelper::safeBroadcast(new \App\Events\UserTyping($user, $conversation, false));
 
         return response()->json(['success' => true]);
     }
@@ -240,7 +235,7 @@ class MessagingController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to access this conversation.');
         }
 
@@ -259,7 +254,7 @@ class MessagingController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to archive this conversation.');
         }
 
@@ -277,7 +272,7 @@ class MessagingController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to restore this conversation.');
         }
 

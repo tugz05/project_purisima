@@ -8,12 +8,12 @@ use App\Models\Message;
 use App\Models\User;
 use App\Services\MessagingService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
-use Inertia\Inertia;
-use Inertia\Response;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class MessagingController extends Controller
 {
@@ -59,7 +59,7 @@ class MessagingController extends Controller
                         'sender' => [
                             'id' => $message->sender->id,
                             'name' => $message->sender->name,
-                        ]
+                        ],
                     ];
                 }),
                 'unread_count' => $conversation->resident_has_unread ? 1 : 0,
@@ -89,7 +89,7 @@ class MessagingController extends Controller
         $staff = User::findOrFail($validated['staff_id']);
 
         // Ensure staff member has staff or admin role
-        if (!in_array($staff->role, ['staff', 'admin'])) {
+        if (! in_array($staff->role, ['staff', 'admin'])) {
             throw ValidationException::withMessages([
                 'staff_id' => 'Selected user is not a staff member.',
             ]);
@@ -115,11 +115,11 @@ class MessagingController extends Controller
                 'conversation' => $conversation->load(['staff', 'messages' => function ($q) {
                     $q->oldest()->with('sender');
                 }]),
-                'message' => $message
+                'message' => $message,
             ]);
         } catch (\Exception $e) {
             throw ValidationException::withMessages([
-                'conversation' => 'Failed to create conversation: ' . $e->getMessage(),
+                'conversation' => 'Failed to create conversation: '.$e->getMessage(),
             ]);
         }
     }
@@ -136,7 +136,7 @@ class MessagingController extends Controller
         \Illuminate\Support\Facades\Log::info('createGeneralConversation called', [
             'user_id' => $user->id,
             'user_role' => $user->role,
-            'user_email' => $user->email
+            'user_email' => $user->email,
         ]);
 
         // Get any available staff member (simple approach)
@@ -145,13 +145,14 @@ class MessagingController extends Controller
         \Illuminate\Support\Facades\Log::info('Staff lookup result', [
             'staff_found' => $staff ? true : false,
             'staff_id' => $staff?->id,
-            'staff_role' => $staff?->role
+            'staff_role' => $staff?->role,
         ]);
 
-        if (!$staff) {
+        if (! $staff) {
             \Illuminate\Support\Facades\Log::warning('No staff members available');
+
             return response()->json([
-                'error' => 'No staff members are available at the moment'
+                'error' => 'No staff members are available at the moment',
             ], 503);
         }
 
@@ -173,7 +174,7 @@ class MessagingController extends Controller
                 'conversation_id' => $conversation->id,
                 'conversation_exists' => $conversation->exists,
                 'resident_id' => $conversation->resident_id,
-                'staff_id' => $conversation->staff_id
+                'staff_id' => $conversation->staff_id,
             ]);
 
             // Send initial message if provided
@@ -204,7 +205,7 @@ class MessagingController extends Controller
                         'sender' => [
                             'id' => $message->sender->id,
                             'name' => $message->sender->name,
-                        ]
+                        ],
                     ];
                 }),
                 'unread_count' => 0,
@@ -214,16 +215,16 @@ class MessagingController extends Controller
             return response()->json([
                 'success' => true,
                 'conversation' => $formattedConversation,
-                'message' => $message
+                'message' => $message,
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to create conversation', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
-                'error' => 'Failed to create conversation: ' . $e->getMessage()
+                'error' => 'Failed to create conversation: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -237,7 +238,7 @@ class MessagingController extends Controller
         $user = Auth::user();
 
         // Ensure user is a participant
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to view this conversation.');
         }
 
@@ -265,7 +266,7 @@ class MessagingController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to view this conversation.');
         }
 
@@ -330,7 +331,7 @@ class MessagingController extends Controller
         $staff = User::findOrFail($validated['staff_id']);
 
         // Ensure staff member has staff or admin role
-        if (!in_array($staff->role, ['staff', 'admin'])) {
+        if (! in_array($staff->role, ['staff', 'admin'])) {
             throw ValidationException::withMessages([
                 'staff_id' => 'Selected user is not a staff member.',
             ]);
@@ -353,7 +354,7 @@ class MessagingController extends Controller
                 ->with('success', 'Message sent successfully.');
         } catch (\Exception $e) {
             throw ValidationException::withMessages([
-                'message' => 'Failed to send message: ' . $e->getMessage(),
+                'message' => 'Failed to send message: '.$e->getMessage(),
             ]);
         }
     }
@@ -370,11 +371,11 @@ class MessagingController extends Controller
         \Illuminate\Support\Facades\Log::info('Resident sendMessage called', [
             'conversation_id' => $conversation->id,
             'user_id' => $user->id,
-            'conversation_exists' => $conversation->exists
+            'conversation_exists' => $conversation->exists,
         ]);
 
         // Ensure user is a participant
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to send messages in this conversation.');
         }
 
@@ -399,16 +400,14 @@ class MessagingController extends Controller
                 $attachments
             );
 
-            // Broadcast the message event for real-time updates
-            \App\Support\BroadcastHelper::safeBroadcast(new \App\Events\MessageSent($message, $conversation));
-
             return response()->json([
                 'success' => true,
                 'message' => $message,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            report($e);
             throw ValidationException::withMessages([
-                'message' => 'Failed to send message: ' . $e->getMessage(),
+                'message' => 'Failed to send message: '.$e->getMessage(),
             ]);
         }
     }
@@ -421,14 +420,11 @@ class MessagingController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to access this conversation.');
         }
 
         $this->messagingService->startTyping($conversation, $user);
-
-        // Broadcast typing event
-        \App\Support\BroadcastHelper::safeBroadcast(new \App\Events\UserTyping($user, $conversation, true));
 
         return response()->json(['success' => true]);
     }
@@ -441,14 +437,11 @@ class MessagingController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to access this conversation.');
         }
 
         $this->messagingService->stopTyping($conversation, $user);
-
-        // Broadcast typing event
-        \App\Support\BroadcastHelper::safeBroadcast(new \App\Events\UserTyping($user, $conversation, false));
 
         return response()->json(['success' => true]);
     }
@@ -461,7 +454,7 @@ class MessagingController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to access this conversation.');
         }
 
@@ -480,7 +473,7 @@ class MessagingController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$conversation->isParticipant($user)) {
+        if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to archive this conversation.');
         }
 
