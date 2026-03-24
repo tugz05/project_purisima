@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Transaction;
 use App\Services\MessagingService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
@@ -45,6 +46,11 @@ class HandleInertiaRequests extends Middleware
             $messagingUnreadCount = app(MessagingService::class)->getUnreadCount($user);
         }
 
+        $staffPendingTransactionsCount = null;
+        if ($user && $user->role === 'staff') {
+            $staffPendingTransactionsCount = Transaction::query()->where('status', 'pending')->count();
+        }
+
         return [
             ...parent::share($request),
             'csrf_token' => csrf_token(),
@@ -55,6 +61,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'messagingUnreadCount' => $messagingUnreadCount,
+            'staffPendingTransactionsCount' => $staffPendingTransactionsCount,
         ];
     }
 }
