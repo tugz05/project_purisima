@@ -2,10 +2,11 @@
 import { Head } from '@inertiajs/vue3';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Users, FileCheck, TrendingUp } from 'lucide-vue-next';
+import { FileText, Users, FileCheck, CreditCard } from 'lucide-vue-next';
 import StaffLayout from '@/layouts/staff/Layout.vue';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { Link } from '@inertiajs/vue3';
+import staff from '@/routes/staff';
 
 // Composables
 const { staffDashboardBreadcrumbs } = useBreadcrumbs();
@@ -68,37 +69,41 @@ const breadcrumbs = staffDashboardBreadcrumbs.value;
                         </Card>
                     </Link>
 
-                    <Card class="shadow-lg border-gray-200 hover:shadow-xl transition-all duration-300 cursor-pointer group hover:border-purple-300">
-                        <CardHeader class="pb-3">
-                            <CardTitle class="flex items-center gap-3 text-lg">
-                                <div class="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
-                                    <Users class="h-6 w-6 text-purple-600" />
-                                </div>
-                                Residents
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <CardDescription class="text-gray-600">
-                                Manage resident profiles and accounts
-                            </CardDescription>
-                        </CardContent>
-                    </Card>
+                    <Link href="/staff/residents">
+                        <Card class="shadow-lg border-gray-200 hover:shadow-xl transition-all duration-300 cursor-pointer group hover:border-purple-300">
+                            <CardHeader class="pb-3">
+                                <CardTitle class="flex items-center gap-3 text-lg">
+                                    <div class="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                                        <Users class="h-6 w-6 text-purple-600" />
+                                    </div>
+                                    Residents
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <CardDescription class="text-gray-600">
+                                    Manage resident profiles and accounts
+                                </CardDescription>
+                            </CardContent>
+                        </Card>
+                    </Link>
 
-                    <Card class="shadow-lg border-gray-200 hover:shadow-xl transition-all duration-300 cursor-pointer group hover:border-orange-300">
-                        <CardHeader class="pb-3">
-                            <CardTitle class="flex items-center gap-3 text-lg">
-                                <div class="p-2 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors">
-                                    <TrendingUp class="h-6 w-6 text-orange-600" />
-                                </div>
-                                Reports
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <CardDescription class="text-gray-600">
-                                View system reports and analytics
-                            </CardDescription>
-                        </CardContent>
-                    </Card>
+                    <Link :href="staff.payments.history.url()">
+                        <Card class="shadow-lg border-gray-200 hover:shadow-xl transition-all duration-300 cursor-pointer group hover:border-emerald-300">
+                            <CardHeader class="pb-3">
+                                <CardTitle class="flex items-center gap-3 text-lg">
+                                    <div class="p-2 bg-emerald-100 rounded-lg group-hover:bg-emerald-200 transition-colors">
+                                        <CreditCard class="h-6 w-6 text-emerald-600" />
+                                    </div>
+                                    Payment history
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <CardDescription class="text-gray-600">
+                                    Trace receipts, methods, and verification across fee-bearing requests
+                                </CardDescription>
+                            </CardContent>
+                        </Card>
+                    </Link>
                 </div>
 
                 <!-- Recent Activity -->

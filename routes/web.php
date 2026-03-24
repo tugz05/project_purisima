@@ -1,10 +1,10 @@
 <?php
 
+use App\Http\Controllers\Resident\AccountController;
+use App\Http\Controllers\Resident\OnboardingController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Auth;
-use App\Http\Controllers\Resident\OnboardingController;
-use App\Http\Controllers\Resident\AccountController;
 
 // Load broadcasting channels
 require __DIR__.'/channels.php';
@@ -19,12 +19,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/test-typing', [\App\Http\Controllers\BroadcastingTestController::class, 'testTyping'])->name('test-typing');
     Route::get('/test-reverb', function () {
         $conversation = \App\Models\Conversation::first();
-        if (!$conversation) {
+        if (! $conversation) {
             return response()->json(['error' => 'No conversations found']);
         }
 
         $user = auth()->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['error' => 'User not authenticated']);
         }
 
@@ -49,7 +49,7 @@ Route::middleware('auth')->group(function () {
             'success' => true,
             'message' => 'Test message broadcasted via Reverb',
             'conversation_id' => $conversation->id,
-            'channel' => 'conversation.' . $conversation->id
+            'channel' => 'conversation.'.$conversation->id,
         ]);
     })->name('test-reverb');
 });
@@ -81,7 +81,7 @@ Route::get('/create-users', function () {
     return response()->json([
         'staff' => $staff,
         'resident' => $resident,
-        'message' => 'Test users created! Use resident@test.com / password to test'
+        'message' => 'Test users created! Use resident@test.com / password to test',
     ]);
 });
 
@@ -91,10 +91,10 @@ Route::get('/debug-users', function () {
 
     return response()->json([
         'staff_count' => $staff->count(),
-        'staff_users' => $staff->map(fn($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email]),
+        'staff_users' => $staff->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email]),
         'resident_count' => $residents->count(),
-        'resident_users' => $residents->map(fn($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email]),
-        'total_users' => \App\Models\User::count()
+        'resident_users' => $residents->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email]),
+        'total_users' => \App\Models\User::count(),
     ]);
 });
 
@@ -102,11 +102,11 @@ Route::get('/test-conversation', function () {
     $staff = \App\Models\User::whereIn('role', ['staff', 'admin'])->first();
     $resident = \App\Models\User::where('role', 'resident')->first();
 
-    if (!$staff) {
+    if (! $staff) {
         return response()->json(['error' => 'No staff members found'], 404);
     }
 
-    if (!$resident) {
+    if (! $resident) {
         return response()->json(['error' => 'No residents found'], 404);
     }
 
@@ -118,7 +118,7 @@ Route::get('/test-conversation', function () {
             'success' => true,
             'conversation_id' => $conversation->id,
             'staff' => $staff->name,
-            'resident' => $resident->name
+            'resident' => $resident->name,
         ]);
     } catch (\Exception $e) {
         return response()->json(['error' => $e->getMessage()], 500);
@@ -171,24 +171,22 @@ Route::get('/api/announcements', function () {
 Route::post('/api/upload-image', function (\Illuminate\Http\Request $request) {
     try {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048'
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
 
         $image = $request->file('image');
-        $filename = time() . '_' . $image->getClientOriginalName();
+        $filename = time().'_'.$image->getClientOriginalName();
         $path = $image->storeAs('announcements/images', $filename, 'public');
 
         return response()->json([
             'success' => true,
-            'image_url' => '/storage/' . $path,
-            'filename' => $filename
+            'image_url' => '/storage/'.$path,
+            'filename' => $filename,
         ]);
     } catch (\Exception $e) {
         return response()->json(['error' => $e->getMessage()], 500);
     }
 })->name('api.upload-image');
-
-
 
 Route::get('dashboard', function () {
     $user = Auth::user();
@@ -227,6 +225,7 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
     Route::get('transactions/{transaction}/print-certificate', [\App\Http\Controllers\Staff\TransactionController::class, 'printCertificate'])->name('transactions.print-certificate');
 
     // Payment processing routes
+    Route::get('payments/history', [\App\Http\Controllers\Staff\PaymentController::class, 'history'])->name('payments.history');
     Route::get('transactions/{transaction}/payment', [\App\Http\Controllers\Staff\PaymentController::class, 'show'])->name('payments.show');
     Route::post('transactions/{transaction}/payment', [\App\Http\Controllers\Staff\PaymentController::class, 'process'])->name('payments.process');
     Route::post('transactions/{transaction}/payment/failed', [\App\Http\Controllers\Staff\PaymentController::class, 'markFailed'])->name('payments.mark-failed');
@@ -236,7 +235,7 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
 
     // Document Type management routes
     Route::resource('document-types', \App\Http\Controllers\Staff\DocumentTypeController::class);
-    
+
     // Certificate Template management routes (nested under document-types)
     Route::prefix('document-types/{documentType}')->name('document-types.')->group(function () {
         Route::get('certificate-templates', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'index'])->name('certificate-templates.index');
@@ -265,18 +264,18 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
 
     // Resident management routes
     Route::get('residents', [\App\Http\Controllers\Staff\ResidentController::class, 'index'])->name('residents.index');
-    
+
     // Calamity Report management routes
     Route::get('calamity', [\App\Http\Controllers\Staff\CalamityReportController::class, 'index'])->name('calamity.index');
     Route::get('calamity/map', [\App\Http\Controllers\Staff\CalamityReportController::class, 'map'])->name('calamity.map');
     Route::get('calamity/active-reports', [\App\Http\Controllers\Staff\CalamityReportController::class, 'getActiveReports'])->name('calamity.active-reports');
-    
+
     // Location tracking routes
     Route::post('location/update', [\App\Http\Controllers\Staff\LocationController::class, 'update'])->name('location.update');
     Route::get('location/residents', [\App\Http\Controllers\Staff\LocationController::class, 'getResidentLocations'])->name('location.residents');
     Route::get('calamity/{calamityReport}', [\App\Http\Controllers\Staff\CalamityReportController::class, 'show'])->name('calamity.show');
     Route::put('calamity/{calamityReport}', [\App\Http\Controllers\Staff\CalamityReportController::class, 'update'])->name('calamity.update');
-    
+
     Route::post('announcements/reorder', [\App\Http\Controllers\Staff\AnnouncementController::class, 'reorder'])->name('announcements.reorder');
 
     // Notification routes
@@ -292,20 +291,20 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
         Route::delete('/delete-all', [\App\Http\Controllers\Staff\NotificationController::class, 'deleteAll'])->name('delete-all');
     });
 
-        // Messaging routes
-        Route::prefix('messaging')->name('messaging.')->group(function () {
-            Route::get('/', [\App\Http\Controllers\Staff\MessagingController::class, 'index'])->name('index');
-            Route::get('/conversations/{conversation}', [\App\Http\Controllers\Staff\MessagingController::class, 'show'])->name('show');
-            Route::get('/conversations/{conversation}/json', [\App\Http\Controllers\Staff\MessagingController::class, 'showAsJson'])->name('show-json');
-            Route::post('/conversations/{conversation}/messages', [\App\Http\Controllers\Staff\MessagingController::class, 'sendMessage'])->name('send-message');
-            Route::post('/conversations/{conversation}/mark-read', [\App\Http\Controllers\Staff\MessagingController::class, 'markAsRead'])->name('mark-read');
-            Route::post('/conversations/{conversation}/typing/start', [\App\Http\Controllers\Staff\MessagingController::class, 'startTyping'])->name('start-typing');
-            Route::post('/conversations/{conversation}/typing/stop', [\App\Http\Controllers\Staff\MessagingController::class, 'stopTyping'])->name('stop-typing');
-            Route::get('/conversations/{conversation}/typing', [\App\Http\Controllers\Staff\MessagingController::class, 'getTypingIndicators'])->name('typing-indicators');
-            Route::post('/conversations/{conversation}/archive', [\App\Http\Controllers\Staff\MessagingController::class, 'archive'])->name('archive');
-            Route::post('/conversations/{conversation}/restore', [\App\Http\Controllers\Staff\MessagingController::class, 'restore'])->name('restore');
-            Route::get('/unread-count', [\App\Http\Controllers\Staff\MessagingController::class, 'getUnreadCount'])->name('unread-count');
-        });
+    // Messaging routes
+    Route::prefix('messaging')->name('messaging.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Staff\MessagingController::class, 'index'])->name('index');
+        Route::get('/conversations/{conversation}', [\App\Http\Controllers\Staff\MessagingController::class, 'show'])->name('show');
+        Route::get('/conversations/{conversation}/json', [\App\Http\Controllers\Staff\MessagingController::class, 'showAsJson'])->name('show-json');
+        Route::post('/conversations/{conversation}/messages', [\App\Http\Controllers\Staff\MessagingController::class, 'sendMessage'])->name('send-message');
+        Route::post('/conversations/{conversation}/mark-read', [\App\Http\Controllers\Staff\MessagingController::class, 'markAsRead'])->name('mark-read');
+        Route::post('/conversations/{conversation}/typing/start', [\App\Http\Controllers\Staff\MessagingController::class, 'startTyping'])->name('start-typing');
+        Route::post('/conversations/{conversation}/typing/stop', [\App\Http\Controllers\Staff\MessagingController::class, 'stopTyping'])->name('stop-typing');
+        Route::get('/conversations/{conversation}/typing', [\App\Http\Controllers\Staff\MessagingController::class, 'getTypingIndicators'])->name('typing-indicators');
+        Route::post('/conversations/{conversation}/archive', [\App\Http\Controllers\Staff\MessagingController::class, 'archive'])->name('archive');
+        Route::post('/conversations/{conversation}/restore', [\App\Http\Controllers\Staff\MessagingController::class, 'restore'])->name('restore');
+        Route::get('/unread-count', [\App\Http\Controllers\Staff\MessagingController::class, 'getUnreadCount'])->name('unread-count');
+    });
 });
 
 Route::middleware(['auth', 'role:enforcer'])->prefix('enforcer')->name('enforcer.')->group(function () {
@@ -318,7 +317,7 @@ Route::middleware(['auth', 'role:enforcer'])->prefix('enforcer')->name('enforcer
 Route::middleware(['auth', 'role:resident'])->prefix('resident')->name('resident.')->group(function () {
     Route::get('onboarding', [OnboardingController::class, 'show'])->name('onboarding.show');
     Route::post('onboarding', [OnboardingController::class, 'store'])->name('onboarding.store');
-    
+
     Route::get('account', [AccountController::class, 'edit'])->name('account.edit');
     Route::post('account', [AccountController::class, 'update'])->name('account.update');
 });
@@ -340,25 +339,25 @@ Route::middleware(['auth', 'role:resident', 'profile.completed'])->prefix('resid
     Route::get('calamity/map', [\App\Http\Controllers\Resident\LocationController::class, 'map'])->name('calamity.map');
     Route::resource('calamity', \App\Http\Controllers\Resident\CalamityReportController::class)->except(['create', 'edit', 'destroy']);
     Route::post('calamity/{calamityReport}/update-location', [\App\Http\Controllers\Resident\CalamityReportController::class, 'updateLocation'])->name('calamity.update-location');
-    
+
     // Location tracking routes
     Route::post('location/update', [\App\Http\Controllers\Resident\LocationController::class, 'update'])->name('location.update');
 
-        // Messaging routes
-        Route::prefix('messaging')->name('messaging.')->group(function () {
-            Route::get('/', [\App\Http\Controllers\Resident\MessagingController::class, 'index'])->name('index');
-            Route::post('/conversations/create', [\App\Http\Controllers\Resident\MessagingController::class, 'createConversation'])->name('conversations.create');
-            Route::post('/conversations/create-general', [\App\Http\Controllers\Resident\MessagingController::class, 'createGeneralConversation'])->name('conversations.create-general');
-            Route::post('/', [\App\Http\Controllers\Resident\MessagingController::class, 'store'])->name('store');
-            Route::get('/conversations/{conversation}', [\App\Http\Controllers\Resident\MessagingController::class, 'show'])->name('show');
-            Route::get('/conversations/{conversation}/json', [\App\Http\Controllers\Resident\MessagingController::class, 'showAsJson'])->name('show-json');
-            Route::post('/conversations/{conversation}/messages', [\App\Http\Controllers\Resident\MessagingController::class, 'sendMessage'])->name('send-message');
-            Route::post('/conversations/{conversation}/typing/start', [\App\Http\Controllers\Resident\MessagingController::class, 'startTyping'])->name('start-typing');
-            Route::post('/conversations/{conversation}/typing/stop', [\App\Http\Controllers\Resident\MessagingController::class, 'stopTyping'])->name('stop-typing');
-            Route::get('/conversations/{conversation}/typing', [\App\Http\Controllers\Resident\MessagingController::class, 'getTypingIndicators'])->name('typing-indicators');
-            Route::post('/conversations/{conversation}/archive', [\App\Http\Controllers\Resident\MessagingController::class, 'archive'])->name('archive');
-            Route::get('/unread-count', [\App\Http\Controllers\Resident\MessagingController::class, 'getUnreadCount'])->name('unread-count');
-        });
+    // Messaging routes
+    Route::prefix('messaging')->name('messaging.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Resident\MessagingController::class, 'index'])->name('index');
+        Route::post('/conversations/create', [\App\Http\Controllers\Resident\MessagingController::class, 'createConversation'])->name('conversations.create');
+        Route::post('/conversations/create-general', [\App\Http\Controllers\Resident\MessagingController::class, 'createGeneralConversation'])->name('conversations.create-general');
+        Route::post('/', [\App\Http\Controllers\Resident\MessagingController::class, 'store'])->name('store');
+        Route::get('/conversations/{conversation}', [\App\Http\Controllers\Resident\MessagingController::class, 'show'])->name('show');
+        Route::get('/conversations/{conversation}/json', [\App\Http\Controllers\Resident\MessagingController::class, 'showAsJson'])->name('show-json');
+        Route::post('/conversations/{conversation}/messages', [\App\Http\Controllers\Resident\MessagingController::class, 'sendMessage'])->name('send-message');
+        Route::post('/conversations/{conversation}/typing/start', [\App\Http\Controllers\Resident\MessagingController::class, 'startTyping'])->name('start-typing');
+        Route::post('/conversations/{conversation}/typing/stop', [\App\Http\Controllers\Resident\MessagingController::class, 'stopTyping'])->name('stop-typing');
+        Route::get('/conversations/{conversation}/typing', [\App\Http\Controllers\Resident\MessagingController::class, 'getTypingIndicators'])->name('typing-indicators');
+        Route::post('/conversations/{conversation}/archive', [\App\Http\Controllers\Resident\MessagingController::class, 'archive'])->name('archive');
+        Route::get('/unread-count', [\App\Http\Controllers\Resident\MessagingController::class, 'getUnreadCount'])->name('unread-count');
+    });
 });
 
 require __DIR__.'/settings.php';

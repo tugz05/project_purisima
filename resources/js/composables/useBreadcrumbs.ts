@@ -61,6 +61,20 @@ export function useBreadcrumbs() {
         ])
     );
 
+    const staffPaymentHistoryBreadcrumbs = computed(() =>
+        createBreadcrumbs([
+            { title: 'Dashboard', href: DASHBOARD_URL },
+            { title: 'Payment History', href: staff.payments.history.url() },
+        ])
+    );
+
+    const staffPaymentStatisticsBreadcrumbs = computed(() =>
+        createBreadcrumbs([
+            { title: 'Dashboard', href: DASHBOARD_URL },
+            { title: 'Payment Statistics', href: staff.payments.statistics.url() },
+        ])
+    );
+
     // Resident breadcrumbs
     const residentDashboardBreadcrumbs = computed(() => []);
 
@@ -158,6 +172,8 @@ export function useBreadcrumbs() {
         staffDocumentTypesBreadcrumbs,
         staffBarangayOfficialsBreadcrumbs,
         staffAnnouncementsBreadcrumbs,
+        staffPaymentHistoryBreadcrumbs,
+        staffPaymentStatisticsBreadcrumbs,
 
         // Resident
         residentDashboardBreadcrumbs,

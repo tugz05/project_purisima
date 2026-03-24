@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     ArrowLeft,
     Clock,
@@ -36,6 +37,7 @@ import {
     Folder,
     Move,
     AlertTriangle,
+    HelpCircle,
     type LucideIcon,
 } from 'lucide-vue-next';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -909,127 +911,164 @@ onUnmounted(() => {
 
         <!-- File Viewer Modal -->
         <Dialog :open="viewerOpen" @update:open="closeFileViewer">
-            <DialogContent
-                :class="isFullscreen ? 'max-w-full max-h-full w-screen h-screen' : 'max-w-4xl max-h-[90vh]'"
-                class="overflow-hidden"
-            >
-                <DialogHeader>
-                    <DialogTitle class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <component
-                                :is="currentFile ? getFileIconComponent(currentFile.mime_type) : Folder"
-                                class="h-7 w-7 shrink-0 text-slate-600"
+            <TooltipProvider :delay-duration="200">
+                <DialogContent
+                    :class="[
+                        '!flex !max-h-[min(90vh,100dvh)] !w-[min(calc(100vw-1.5rem),56rem)] !flex-col !gap-0 !p-0 !sm:max-w-4xl overflow-hidden shadow-xl',
+                        isFullscreen ? '!fixed !inset-2 !h-[calc(100dvh-1rem)] !w-[calc(100vw-1rem)] !max-h-none !max-w-none !translate-x-0 !translate-y-0 sm:!inset-4' : '',
+                    ]"
+                >
+                    <DialogHeader class="shrink-0 space-y-0 border-b border-border bg-background px-4 py-3 pr-12 text-left sm:px-5">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                            <DialogTitle class="flex min-w-0 items-center gap-2 text-base font-semibold leading-snug sm:text-lg">
+                                <component
+                                    :is="currentFile ? getFileIconComponent(currentFile.mime_type) : Folder"
+                                    class="h-6 w-6 shrink-0 text-muted-foreground sm:h-7 sm:w-7"
+                                />
+                                <span class="truncate" :title="currentFile?.name">{{ currentFile?.name }}</span>
+                            </DialogTitle>
+
+                            <div
+                                v-if="currentFile && isImageFile(currentFile.mime_type)"
+                                class="flex flex-wrap items-center gap-1.5 sm:shrink-0"
+                            >
+                                <Button type="button" @click="zoomOut" size="sm" variant="outline" :disabled="zoomLevel <= 25" aria-label="Zoom out">
+                                    <ZoomOut class="h-4 w-4" />
+                                </Button>
+                                <span class="min-w-[2.75rem] text-center text-sm font-medium tabular-nums">{{ zoomLevel }}%</span>
+                                <Button type="button" @click="zoomIn" size="sm" variant="outline" :disabled="zoomLevel >= 500" aria-label="Zoom in">
+                                    <ZoomIn class="h-4 w-4" />
+                                </Button>
+                                <Button type="button" @click="resetZoom" size="sm" variant="outline" aria-label="Reset zoom">
+                                    <RotateCcw class="h-4 w-4" />
+                                </Button>
+                                <Button type="button" @click="toggleFullscreen" size="sm" variant="outline" aria-label="Toggle fullscreen">
+                                    <Maximize2 v-if="!isFullscreen" class="h-4 w-4" />
+                                    <Minimize2 v-else class="h-4 w-4" />
+                                </Button>
+                                <Tooltip>
+                                    <TooltipTrigger as-child>
+                                        <Button type="button" size="sm" variant="ghost" class="h-8 w-8 p-0" aria-label="Keyboard shortcuts">
+                                            <HelpCircle class="h-4 w-4 text-muted-foreground" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" align="end" class="max-w-xs text-left">
+                                        <p class="text-xs leading-relaxed">
+                                            <span class="font-medium">Shortcuts:</span>
+                                            + / − zoom · 0 reset · F fullscreen · Esc close · wheel zoom when over image
+                                        </p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    <div v-if="currentFile" class="flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/20 px-3 py-3 sm:px-4">
+                        <!-- Image Viewer with Zoom -->
+                        <div
+                            v-if="isImageFile(currentFile.mime_type)"
+                            class="relative min-h-[min(50vh,24rem)] flex-1 overflow-hidden rounded-lg border border-border/80 bg-muted"
+                            @wheel="handleWheel"
+                            @mousedown="handleMouseDown"
+                            @mousemove="handleMouseMove"
+                            @mouseup="handleMouseUp"
+                            @mouseleave="handleMouseUp"
+                        >
+                            <img
+                                ref="imageRef"
+                                :src="`/storage/${currentFile.path}`"
+                                :alt="currentFile.name"
+                                :style="{
+                                    transform: `scale(${zoomLevel / 100}) translate(${imagePosition.x}px, ${imagePosition.y}px)`,
+                                    transformOrigin: 'center center',
+                                    transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+                                    cursor: zoomLevel > 100 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                                }"
+                                class="absolute top-1/2 left-1/2 max-h-none max-w-none -translate-x-1/2 -translate-y-1/2 object-contain"
                             />
-                            <span>{{ currentFile?.name }}</span>
+
+                            <div
+                                v-if="zoomLevel > 100"
+                                class="pointer-events-none absolute left-3 top-3 rounded-md bg-black/75 px-2.5 py-1.5 text-xs text-white shadow-md sm:text-sm"
+                            >
+                                <div class="flex items-center gap-2">
+                                    <Move class="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                                    <span>Drag to pan</span>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Zoom Controls -->
-                        <div v-if="currentFile && isImageFile(currentFile.mime_type)" class="flex items-center gap-2">
-                            <Button @click="zoomOut" size="sm" variant="outline" :disabled="zoomLevel <= 25">
-                                <ZoomOut class="h-4 w-4" />
-                            </Button>
-                            <span class="text-sm font-medium min-w-[3rem] text-center">{{ zoomLevel }}%</span>
-                            <Button @click="zoomIn" size="sm" variant="outline" :disabled="zoomLevel >= 500">
-                                <ZoomIn class="h-4 w-4" />
-                            </Button>
-                            <Button @click="resetZoom" size="sm" variant="outline">
-                                <RotateCcw class="h-4 w-4" />
-                            </Button>
-                            <Button @click="toggleFullscreen" size="sm" variant="outline">
-                                <Maximize2 v-if="!isFullscreen" class="h-4 w-4" />
-                                <Minimize2 v-else class="h-4 w-4" />
+                        <!-- PDF Viewer -->
+                        <div v-else-if="isPdfFile(currentFile.mime_type)" class="min-h-[min(60vh,32rem)] flex-1 overflow-hidden rounded-lg border border-border/80 bg-background">
+                            <iframe
+                                :src="`/storage/${currentFile.path}`"
+                                class="h-full min-h-[min(50vh,24rem)] w-full border-0"
+                                title="PDF Viewer"
+                            ></iframe>
+                        </div>
+
+                        <!-- Unsupported File Type -->
+                        <div v-else class="flex min-h-[min(50vh,20rem)] flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-background px-4 text-center">
+                            <component
+                                :is="getFileIconComponent(currentFile.mime_type)"
+                                class="mb-4 h-16 w-16 shrink-0 text-muted-foreground"
+                            />
+                            <h3 class="mb-2 text-lg font-semibold text-foreground sm:text-xl">{{ currentFile.name }}</h3>
+                            <p class="mb-4 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-sm text-muted-foreground">
+                                <span>{{ formatFileSize(currentFile.size) }}</span>
+                                <span class="text-border" aria-hidden="true">·</span>
+                                <span>{{ currentFile.mime_type }}</span>
+                            </p>
+                            <p class="mb-6 max-w-sm text-sm text-muted-foreground">This file type cannot be previewed in the browser.</p>
+                            <Button type="button" @click="downloadFile(currentFile)" class="bg-blue-600 hover:bg-blue-700">
+                                <Download class="mr-2 h-4 w-4" />
+                                Download to View
                             </Button>
                         </div>
-                    </DialogTitle>
-                </DialogHeader>
+                    </div>
 
-                <div v-if="currentFile" class="flex-1 overflow-hidden relative">
-                    <!-- Image Viewer with Zoom -->
+                    <!-- File info + download: stable footer, no overlap -->
                     <div
-                        v-if="isImageFile(currentFile.mime_type)"
-                        class="relative w-full h-[70vh] overflow-hidden bg-gray-100 rounded-lg"
-                        @wheel="handleWheel"
-                        @mousedown="handleMouseDown"
-                        @mousemove="handleMouseMove"
-                        @mouseup="handleMouseUp"
-                        @mouseleave="handleMouseUp"
+                        v-if="currentFile"
+                        class="shrink-0 border-t border-border bg-background px-4 py-4 sm:px-5"
                     >
-                        <img
-                            ref="imageRef"
-                            :src="`/storage/${currentFile.path}`"
-                            :alt="currentFile.name"
-                            :style="{
-                                transform: `scale(${zoomLevel / 100}) translate(${imagePosition.x}px, ${imagePosition.y}px)`,
-                                transformOrigin: 'center center',
-                                transition: isDragging ? 'none' : 'transform 0.2s ease-out',
-                                cursor: zoomLevel > 100 ? (isDragging ? 'grabbing' : 'grab') : 'default'
-                            }"
-                            class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-w-none max-h-none object-contain"
-                        />
-
-                        <!-- Zoom Instructions -->
-                        <div v-if="zoomLevel > 100" class="absolute top-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm">
-                            <div class="flex items-center gap-2">
-                                <Move class="h-4 w-4 shrink-0" />
-                                <span>Drag to pan</span>
+                        <div class="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:justify-between sm:gap-6">
+                            <dl class="grid min-w-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
+                                <div class="min-w-0">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Type</dt>
+                                    <dd class="mt-1 truncate text-sm font-medium text-foreground" :title="currentFile.document_type.replace('_', ' ').toUpperCase()">
+                                        {{ currentFile.document_type.replace('_', ' ').toUpperCase() }}
+                                    </dd>
+                                </div>
+                                <div class="min-w-0">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Size</dt>
+                                    <dd class="mt-1 text-sm font-medium text-foreground">
+                                        {{ formatFileSize(currentFile.size) }}
+                                    </dd>
+                                </div>
+                                <div class="min-w-0 sm:col-span-1">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Format</dt>
+                                    <dd class="mt-1 truncate font-mono text-sm text-foreground" :title="currentFile.mime_type">
+                                        {{ currentFile.mime_type }}
+                                    </dd>
+                                </div>
+                            </dl>
+                            <div class="flex shrink-0 sm:items-end">
+                                <Button
+                                    type="button"
+                                    @click="downloadFile(currentFile)"
+                                    variant="outline"
+                                    size="default"
+                                    class="h-10 w-full min-w-[9rem] sm:w-auto sm:self-center"
+                                >
+                                    <Download class="mr-2 h-4 w-4" />
+                                    Download
+                                </Button>
                             </div>
                         </div>
                     </div>
-
-                    <!-- PDF Viewer -->
-                    <div v-else-if="isPdfFile(currentFile.mime_type)" class="w-full h-[70vh]">
-                        <iframe
-                            :src="`/storage/${currentFile.path}`"
-                            class="w-full h-full border-0 rounded-lg"
-                            title="PDF Viewer"
-                        ></iframe>
-                    </div>
-
-                    <!-- Unsupported File Type -->
-                    <div v-else class="flex flex-col items-center justify-center h-[70vh] text-center">
-                        <component
-                            :is="getFileIconComponent(currentFile.mime_type)"
-                            class="h-16 w-16 mb-4 shrink-0 text-slate-400"
-                        />
-                        <h3 class="text-xl font-semibold text-gray-900 mb-2">{{ currentFile.name }}</h3>
-                        <p class="mb-4 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-gray-600">
-                            <span>{{ formatFileSize(currentFile.size) }}</span>
-                            <span class="text-gray-400" aria-hidden="true">·</span>
-                            <span>{{ currentFile.mime_type }}</span>
-                        </p>
-                        <p class="text-gray-500 mb-6">This file type cannot be previewed in the browser.</p>
-                        <Button @click="downloadFile(currentFile)" class="bg-blue-600 hover:bg-blue-700">
-                            <Download class="h-4 w-4 mr-2" />
-                            Download to View
-                        </Button>
-                    </div>
-                </div>
-
-                <!-- File Info Footer -->
-                <div v-if="currentFile" class="border-t pt-4 mt-4">
-                    <div class="flex items-center justify-between text-sm text-gray-600">
-                        <div class="flex items-center gap-4">
-                            <span><strong>Type:</strong> {{ currentFile.document_type.replace('_', ' ').toUpperCase() }}</span>
-                            <span><strong>Size:</strong> {{ formatFileSize(currentFile.size) }}</span>
-                            <span><strong>Format:</strong> {{ currentFile.mime_type }}</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <!-- Keyboard Shortcuts Help -->
-                            <div v-if="isImageFile(currentFile.mime_type)" class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                <span class="font-medium">Shortcuts:</span>
-                                <span class="mx-1">+/-</span> zoom,
-                                <span class="mx-1">0</span> reset,
-                                <span class="mx-1">F</span> fullscreen,
-                                <span class="mx-1">Esc</span> close
-                            </div>
-                            <Button @click="downloadFile(currentFile)" variant="outline" size="sm">
-                                <Download class="h-3 w-3 mr-1" />
-                                Download
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </DialogContent>
+                </DialogContent>
+            </TooltipProvider>
         </Dialog>
 
         <!-- Certificate Generation Sheet -->

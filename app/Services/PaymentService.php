@@ -4,9 +4,10 @@ namespace App\Services;
 
 use App\Models\Transaction;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class PaymentService
 {
@@ -110,7 +111,7 @@ class PaymentService
         Transaction $transaction,
         User $staffMember
     ): Transaction {
-        return DB::transaction(function () use ($transaction, $staffMember) {
+        return DB::transaction(function () use ($transaction) {
             $transaction->update([
                 'payment_status' => 'pending',
                 'payment_method' => null,
@@ -139,7 +140,7 @@ class PaymentService
         $month = date('m');
 
         // Get the last receipt number for this month
-        $lastReceipt = Transaction::where('receipt_number', 'like', $prefix . $year . $month . '%')
+        $lastReceipt = Transaction::where('receipt_number', 'like', $prefix.$year.$month.'%')
             ->orderBy('receipt_number', 'desc')
             ->first();
 
@@ -150,7 +151,7 @@ class PaymentService
             $newNumber = 1;
         }
 
-        return $prefix . $year . $month . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+        return $prefix.$year.$month.str_pad($newNumber, 4, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -194,9 +195,166 @@ class PaymentService
                         'count' => $item->count,
                         'total_amount' => $item->total_amount,
                         'percentage' => 0, // Will be calculated in the frontend
-                    ]
+                    ],
                 ];
             })
             ->toArray();
+    }
+
+    /**
+     * Paginated payment-related transactions (fee > 0) for staff audit trail.
+     *
+     * @param  array{
+     *     search: string,
+     *     payment_status: string,
+     *     payment_method: string,
+     *     date_from: ?string,
+     *     date_to: ?string,
+     *     sort: string,
+     *     direction: string,
+     *     per_page: int
+     * }  $filters
+     */
+    public function paginatePaymentHistory(array $filters): LengthAwarePaginator
+    {
+        $query = $this->paymentHistoryBaseQuery();
+        $this->applyPaymentHistoryFilters($query, $filters);
+        $this->applyPaymentHistorySort($query, $filters);
+
+        return $query->paginate($filters['per_page'])->withQueryString();
+    }
+
+    /**
+     * Summary counts and totals for the same filter set as the history table.
+     *
+     * @param  array{
+     *     search: string,
+     *     payment_status: string,
+     *     payment_method: string,
+     *     date_from: ?string,
+     *     date_to: ?string,
+     *     sort: string,
+     *     direction: string,
+     *     per_page: int
+     * }  $filters
+     * @return array{
+     *     matching_count: int,
+     *     paid_count: int,
+     *     pending_count: int,
+     *     failed_count: int,
+     *     refunded_count: int,
+     *     collected_total: float|int|string,
+     *     outstanding_fees_total: float|int|string
+     * }
+     */
+    public function getPaymentHistorySummary(array $filters): array
+    {
+        $query = $this->paymentHistoryBaseQuery();
+        $this->applyPaymentHistoryFilters($query, $filters);
+
+        $matchingCount = (clone $query)->count();
+
+        $paidCount = (clone $query)->where('payment_status', 'paid')->count();
+        $pendingCount = (clone $query)->where('payment_status', 'pending')->count();
+        $failedCount = (clone $query)->where('payment_status', 'failed')->count();
+        $refundedCount = (clone $query)->where('payment_status', 'refunded')->count();
+
+        $collectedTotal = (clone $query)->where('payment_status', 'paid')->sum('amount_paid');
+
+        $outstandingFeesTotal = (clone $query)
+            ->whereIn('payment_status', ['pending', 'failed'])
+            ->sum('fee_amount');
+
+        return [
+            'matching_count' => $matchingCount,
+            'paid_count' => $paidCount,
+            'pending_count' => $pendingCount,
+            'failed_count' => $failedCount,
+            'refunded_count' => $refundedCount,
+            'collected_total' => $collectedTotal,
+            'outstanding_fees_total' => $outstandingFeesTotal,
+        ];
+    }
+
+    /**
+     * @return Builder<Transaction>
+     */
+    private function paymentHistoryBaseQuery(): Builder
+    {
+        return Transaction::query()
+            ->with([
+                'resident:id,name,email',
+                'documentType:id,name,code',
+                'paymentVerifier:id,name',
+            ])
+            ->where('fee_amount', '>', 0);
+    }
+
+    /**
+     * @param  array{
+     *     search: string,
+     *     payment_status: string,
+     *     payment_method: string,
+     *     date_from: ?string,
+     *     date_to: ?string,
+     *     sort: string,
+     *     direction: string,
+     *     per_page: int
+     * }  $filters
+     */
+    private function applyPaymentHistoryFilters(Builder $query, array $filters): void
+    {
+        if ($filters['search'] !== '') {
+            $search = $filters['search'];
+            $query->where(function (Builder $q) use ($search) {
+                $q->where('transaction_id', 'like', '%'.$search.'%')
+                    ->orWhere('receipt_number', 'like', '%'.$search.'%')
+                    ->orWhere('payment_reference', 'like', '%'.$search.'%')
+                    ->orWhereHas('resident', function (Builder $rq) use ($search) {
+                        $rq->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('email', 'like', '%'.$search.'%');
+                    });
+            });
+        }
+
+        if ($filters['payment_status'] !== 'all') {
+            $query->where('payment_status', $filters['payment_status']);
+        }
+
+        if ($filters['payment_method'] !== 'all') {
+            $query->where('payment_method', $filters['payment_method']);
+        }
+
+        if ($filters['date_from'] !== null) {
+            $query->whereRaw('COALESCE(payment_date, transactions.created_at) >= ?', [$filters['date_from'].' 00:00:00']);
+        }
+
+        if ($filters['date_to'] !== null) {
+            $query->whereRaw('COALESCE(payment_date, transactions.created_at) <= ?', [$filters['date_to'].' 23:59:59']);
+        }
+    }
+
+    /**
+     * @param  array{
+     *     search: string,
+     *     payment_status: string,
+     *     payment_method: string,
+     *     date_from: ?string,
+     *     date_to: ?string,
+     *     sort: string,
+     *     direction: string,
+     *     per_page: int
+     * }  $filters
+     */
+    private function applyPaymentHistorySort(Builder $query, array $filters): void
+    {
+        $direction = strtolower($filters['direction']) === 'asc' ? 'asc' : 'desc';
+
+        match ($filters['sort']) {
+            'amount_paid' => $query->orderByRaw('amount_paid IS NULL')->orderBy('amount_paid', $direction)->orderByDesc('transactions.id'),
+            'fee_amount' => $query->orderBy('fee_amount', $direction)->orderByDesc('transactions.id'),
+            'receipt_number' => $query->orderByRaw('receipt_number IS NULL')->orderBy('receipt_number', $direction)->orderByDesc('transactions.id'),
+            default => $query->orderByRaw('COALESCE(payment_date, transactions.created_at) '.$direction)->orderByDesc('transactions.id'),
+        };
     }
 }

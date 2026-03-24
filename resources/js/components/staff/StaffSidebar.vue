@@ -5,7 +5,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { LayoutGrid, FileText, Users, Settings, FileType, UserCheck, Megaphone, Bell, MessageSquare, ClipboardList, CreditCard, AlertTriangle } from 'lucide-vue-next';
+import { LayoutGrid, FileText, Users, Settings, FileType, UserCheck, Megaphone, CreditCard, AlertTriangle } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
 import staff from '@/routes/staff';
 
@@ -35,6 +35,21 @@ const mainNavItems: NavItem[] = [
             {
                 title: 'Completed',
                 href: '/staff/transactions?status=completed',
+            },
+        ],
+    },
+    {
+        title: 'Payments',
+        href: staff.payments.history.url(),
+        icon: CreditCard,
+        children: [
+            {
+                title: 'Payment History',
+                href: staff.payments.history.url(),
+            },
+            {
+                title: 'Statistics',
+                href: staff.payments.statistics.url(),
             },
         ],
     },

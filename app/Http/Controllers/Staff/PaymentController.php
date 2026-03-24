@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Staff\StaffPaymentHistoryRequest;
 use App\Models\Transaction;
-use App\Services\PaymentService;
 use App\Services\NotificationService;
+use App\Services\PaymentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -47,7 +48,7 @@ class PaymentController extends Controller
     {
         $request->validate([
             'payment_method' => ['required', Rule::in(['cash', 'gcash', 'paymaya', 'bank_transfer', 'check'])],
-            'amount_paid' => ['required', 'numeric', 'min:' . $transaction->fee_amount],
+            'amount_paid' => ['required', 'numeric', 'min:'.$transaction->fee_amount],
             'payment_reference' => ['nullable', 'string', 'max:255'],
             'payment_notes' => ['nullable', 'string', 'max:1000'],
             'payment_proof' => ['nullable', 'array'],
@@ -65,7 +66,7 @@ class PaymentController extends Controller
             $this->createPaymentNotification($transaction, 'payment_completed');
 
             return redirect()->route('staff.transactions.show', $transaction)
-                ->with('success', 'Payment processed successfully. Receipt number: ' . $transaction->fresh()->receipt_number);
+                ->with('success', 'Payment processed successfully. Receipt number: '.$transaction->fresh()->receipt_number);
         } catch (\Exception $e) {
             return redirect()->back()
                 ->withErrors(['error' => $e->getMessage()])
@@ -147,6 +148,30 @@ class PaymentController extends Controller
     }
 
     /**
+     * Staff payment history (traceable ledger of fee-bearing transactions).
+     */
+    public function history(StaffPaymentHistoryRequest $request): Response
+    {
+        $filters = $request->filters();
+        $payments = $this->paymentService->paginatePaymentHistory($filters);
+        $summary = $this->paymentService->getPaymentHistorySummary($filters);
+
+        return Inertia::render('Staff/payments/History', [
+            'payments' => [
+                'data' => $payments->items(),
+                'current_page' => $payments->currentPage(),
+                'last_page' => $payments->lastPage(),
+                'per_page' => $payments->perPage(),
+                'total' => $payments->total(),
+                'from' => $payments->firstItem(),
+                'to' => $payments->lastItem(),
+            ],
+            'summary' => $summary,
+            'filters' => $filters,
+        ]);
+    }
+
+    /**
      * Show payment statistics
      */
     public function statistics(): Response
@@ -172,21 +197,21 @@ class PaymentController extends Controller
             'amount' => $transaction->amount_paid ?? $transaction->fee_amount,
         ];
 
-        $notificationType = match($type) {
+        $notificationType = match ($type) {
             'payment_completed' => 'payment_completed',
             'payment_failed' => 'payment_failed',
             'payment_refunded' => 'payment_refunded',
             default => 'payment_updated',
         };
 
-        $title = match($type) {
+        $title = match ($type) {
             'payment_completed' => 'Payment Completed',
             'payment_failed' => 'Payment Failed',
             'payment_refunded' => 'Payment Refunded',
             default => 'Payment Updated',
         };
 
-        $message = match($type) {
+        $message = match ($type) {
             'payment_completed' => "Payment of ₱{$transaction->amount_paid} for {$transaction->resident->name} has been completed.",
             'payment_failed' => "Payment for {$transaction->resident->name} has been marked as failed.",
             'payment_refunded' => "Refund has been processed for {$transaction->resident->name}.",
