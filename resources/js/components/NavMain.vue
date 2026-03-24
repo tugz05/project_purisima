@@ -16,10 +16,12 @@ import resident from '@/routes/resident';
 interface Props {
     items: NavItem[];
     disabled?: boolean;
+    groupLabel?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     disabled: false,
+    groupLabel: 'Platform',
 });
 
 const page = usePage();
@@ -39,7 +41,7 @@ const handleClick = (href: string, e: Event) => {
 
 <template>
     <SidebarGroup class="px-2 py-0">
-        <SidebarGroupLabel>Platform</SidebarGroupLabel>
+        <SidebarGroupLabel>{{ groupLabel }}</SidebarGroupLabel>
         <SidebarMenu>
             <SidebarMenuItem v-for="item in items" :key="item.title">
                 <SidebarMenuButton 

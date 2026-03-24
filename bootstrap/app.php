@@ -33,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'profile.completed' => \App\Http\Middleware\EnsureProfileCompleted::class,
+            'superadmin' => \App\Http\Middleware\EnsureSuperadmin::class,
         ]);
 
         // Trust ngrok and other proxies so HTTPS is correctly detected behind them

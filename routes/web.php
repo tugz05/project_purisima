@@ -195,6 +195,7 @@ Route::get('dashboard', function () {
     }
 
     return match ($user->role) {
+        'superadmin' => redirect()->route('superadmin.dashboard'),
         'admin' => redirect()->route('admin.dashboard'),
         'staff' => redirect()->route('staff.dashboard'),
         'enforcer' => redirect()->route('enforcer.dashboard'),
@@ -209,6 +210,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 // Role-based portals
+Route::middleware(['auth', 'verified', 'superadmin'])->prefix('superadmin')->name('superadmin.')->group(function () {
+    Route::get('dashboard', function () {
+        return Inertia::render('superadmin/Dashboard');
+    })->name('dashboard');
+
+    Route::get('users', [\App\Http\Controllers\Superadmin\UserManagementController::class, 'index'])->name('users.index');
+    Route::get('users/{user}/edit', [\App\Http\Controllers\Superadmin\UserManagementController::class, 'edit'])->name('users.edit');
+    Route::put('users/{user}', [\App\Http\Controllers\Superadmin\UserManagementController::class, 'update'])->name('users.update');
+});
+
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('admin/Dashboard');
