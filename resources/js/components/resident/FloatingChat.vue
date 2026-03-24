@@ -785,8 +785,8 @@ onBeforeUnmount(() => {
                     </button>
                 </span>
             </div>
-            <div class="flex w-full min-w-0 items-stretch gap-2">
-                <DropdownMenu>
+            <div class="relative z-10 flex w-full min-w-0 items-stretch gap-2">
+                <DropdownMenu :modal="false">
                     <DropdownMenuTrigger as-child>
                         <Button
                             type="button"
@@ -799,7 +799,14 @@ onBeforeUnmount(() => {
                             <Upload class="h-4 w-4 text-slate-700" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" class="w-52">
+                    <DropdownMenuContent
+                        portal-disabled
+                        align="start"
+                        side="top"
+                        :side-offset="6"
+                        position-strategy="fixed"
+                        class="z-[10050] w-52"
+                    >
                         <DropdownMenuItem
                             class="cursor-pointer gap-2"
                             @click.prevent="documentAttachmentInputRef?.click()"

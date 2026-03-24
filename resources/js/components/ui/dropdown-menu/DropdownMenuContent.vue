@@ -10,15 +10,18 @@ import {
 import { computed, type HTMLAttributes } from 'vue'
 
 const props = withDefaults(
-  defineProps<DropdownMenuContentProps & { class?: HTMLAttributes['class'] }>(),
+  defineProps<
+    DropdownMenuContentProps & { class?: HTMLAttributes['class']; portalDisabled?: boolean }
+  >(),
   {
     sideOffset: 4,
+    portalDisabled: false,
   },
 )
 const emits = defineEmits<DropdownMenuContentEmits>()
 
 const delegatedProps = computed(() => {
-  const { class: _, ...delegated } = props
+  const { class: _, portalDisabled: __, ...delegated } = props
 
   return delegated
 })
@@ -27,7 +30,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
-  <DropdownMenuPortal>
+  <DropdownMenuPortal :disabled="portalDisabled">
     <DropdownMenuContent
       data-slot="dropdown-menu-content"
       v-bind="forwarded"
