@@ -241,20 +241,6 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
     // Document Type management routes
     Route::resource('document-types', \App\Http\Controllers\Staff\DocumentTypeController::class);
 
-    // Certificate Template management routes (nested under document-types)
-    Route::prefix('document-types/{documentType}')->name('document-types.')->group(function () {
-        Route::get('certificate-templates', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'index'])->name('certificate-templates.index');
-        Route::get('certificate-templates/create', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'create'])->name('certificate-templates.create');
-        Route::post('certificate-templates', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'store'])->name('certificate-templates.store');
-        Route::get('certificate-templates/{certificateTemplate}', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'show'])->name('certificate-templates.show');
-        Route::get('certificate-templates/{certificateTemplate}/edit', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'edit'])->name('certificate-templates.edit');
-        Route::put('certificate-templates/{certificateTemplate}', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'update'])->name('certificate-templates.update');
-        Route::delete('certificate-templates/{certificateTemplate}', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'destroy'])->name('certificate-templates.destroy');
-        Route::post('certificate-templates/{certificateTemplate}/set-default', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'setDefault'])->name('certificate-templates.set-default');
-        Route::post('certificate-templates/{certificateTemplate}/preview', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'preview'])->name('certificate-templates.preview');
-        Route::get('certificate-templates/{certificateTemplate}/fields', [\App\Http\Controllers\Staff\CertificateTemplateController::class, 'getFields'])->name('certificate-templates.fields');
-    });
-
     // Document Request processing routes (individual requests from residents)
     Route::resource('document-requests', \App\Http\Controllers\Staff\DocumentRequestController::class);
 

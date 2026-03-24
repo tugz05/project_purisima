@@ -23,7 +23,6 @@ import {
     X,
     FileType,
     Tag,
-    FileCode,
     Lightbulb,
 } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
@@ -33,6 +32,7 @@ import { useUtils } from '@/composables/useUtils';
 
 type DynamicFieldType = 'text' | 'textarea' | 'number' | 'date' | 'email' | 'select';
 
+/** `key` is kept for saving existing document types (not shown in UI; new fields get a key from the label on submit). */
 interface DynamicInputFieldForm {
     key: string;
     label: string;
@@ -134,6 +134,15 @@ const newProcessingStep = ref('');
 
 const dynamicFieldTypes: DynamicFieldType[] = ['text', 'textarea', 'number', 'date', 'email', 'select'];
 
+const fieldTypeLabels: Record<DynamicFieldType, string> = {
+    text: 'Single line of text',
+    textarea: 'Paragraph (several lines)',
+    number: 'Number',
+    date: 'Date',
+    email: 'Email address',
+    select: 'Dropdown — pick one option',
+};
+
 const emptyDynamicField = (): DynamicInputFieldForm => ({
     key: '',
     label: '',
@@ -205,7 +214,7 @@ const finalizeRequiredFieldsForSubmit = (rows: DynamicInputFieldForm[]): Array<{
     return rows
         .filter((r) => r.label.trim() !== '')
         .map((r, i) => {
-            let key = r.key.trim() || slugKeyFromLabel(r.label, i);
+            let key = (r.key && r.key.trim()) || slugKeyFromLabel(r.label, i);
             while (used.has(key)) {
                 key = `${key}_${used.size + 1}`;
             }
@@ -698,17 +707,6 @@ const getStatusColor = (isActive: boolean) => {
     return isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
 };
 
-const getCategoryColor = (category?: string) => {
-    const categoryColors: Record<string, string> = {
-        'certificates': 'bg-blue-100 text-blue-800',
-        'permits': 'bg-purple-100 text-purple-800',
-        'taxes': 'bg-green-100 text-green-800',
-        'other': 'bg-gray-100 text-gray-800',
-    };
-
-    return categoryColors[category || 'other'] || 'bg-gray-100 text-gray-800';
-};
-
 // Category options
 const categoryOptions = [
     'certificates',
@@ -772,26 +770,17 @@ const categoryOptions = [
                     </div>
                 </div>
 
-                <!-- Action Bar -->
-                <div class="flex flex-col sm:flex-row gap-4 items-center justify-between mb-6">
-                            <!-- Search -->
-                            <div class="flex-1 max-w-md">
-                                <div class="relative">
-                                    <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                    <Input
-                                        v-model="searchQuery"
-                                        placeholder="Search document types..."
-                                        class="pl-10 h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                                    />
-                                </div>
-                            </div>
-
-                            <!-- Add Button -->
-                            <Button @click="openCreateSheet" class="bg-blue-600 hover:bg-blue-700 text-white font-medium h-10 px-6 shadow-lg">
-                                <Plus class="h-4 w-4 mr-2" />
-                                Add New Document Type
-                            </Button>
-                        </div>
+                <!-- Search -->
+                <div class="mb-6 max-w-md">
+                    <div class="relative">
+                        <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                            v-model="searchQuery"
+                            placeholder="Search document types..."
+                            class="pl-10 h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                        />
+                    </div>
+                </div>
 
                 <!-- Document Types List -->
                 <div v-if="filteredDocumentTypes.length > 0" class="space-y-4">
@@ -820,9 +809,6 @@ const categoryOptions = [
                                     <div class="flex items-center gap-2 mb-2 flex-wrap">
                                         <Badge variant="outline" class="text-xs">
                                             {{ documentType.code }}
-                                        </Badge>
-                                        <Badge v-if="documentType.category" :class="getCategoryColor(documentType.category)" class="text-xs">
-                                            {{ documentType.category }}
                                         </Badge>
                                     </div>
                                 </div>
@@ -873,15 +859,6 @@ const categoryOptions = [
 
                                 <!-- Quick Actions - Always at bottom -->
                                 <div class="flex flex-col gap-2 pt-2 border-t border-gray-100 mt-auto flex-shrink-0">
-                                    <Button
-                                        @click="router.visit(`/staff/document-types/${documentType.id}/certificate-templates`)"
-                                        variant="outline"
-                                        size="sm"
-                                        class="w-full h-8 text-blue-600 border-blue-200 hover:bg-blue-50"
-                                    >
-                                        <FileCode class="h-3 w-3 mr-1" />
-                                        Templates
-                                    </Button>
                                     <div class="flex gap-2">
                                         <Button @click="openEditSheet(documentType)" variant="outline" size="sm" class="flex-1 h-8 text-green-600 border-green-200 hover:bg-green-50">
                                             <Edit class="h-3 w-3 mr-1" />
@@ -1120,75 +1097,101 @@ const categoryOptions = [
 
                     <!-- Required Fields -->
                     <div class="bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 rounded-xl p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-2">
                             <Tag class="h-5 w-5 text-cyan-600" />
-                            Resident request fields
+                            Questions for residents
                         </h3>
-                        <p class="text-xs text-gray-600 mb-4">
-                            Configure fields residents fill when requesting this document (text, dates, numbers, dropdowns). Keys are auto-generated from labels if left blank.
+                        <p class="text-sm text-gray-700 mb-1 leading-relaxed">
+                            Add extra questions residents answer when they request this document. Pick how they should answer first, then write the question clearly.
                         </p>
+                        <p class="text-xs text-gray-500 mb-4">You can skip this section if you do not need anything beyond uploads and the main request form.</p>
 
                         <div class="space-y-4">
                             <Button type="button" variant="outline" size="sm" class="w-full sm:w-auto" @click="addCreateDynamicField">
                                 <Plus class="h-4 w-4 mr-1" />
-                                Add field
+                                Add a question
                             </Button>
 
                             <div v-if="Array.isArray(createForm.required_fields) && createForm.required_fields.length > 0" class="space-y-4">
                                 <div
                                     v-for="(field, index) in createForm.required_fields"
                                     :key="`create-field-${index}`"
-                                    class="p-4 bg-white rounded-lg border border-cyan-200 space-y-3"
+                                    class="p-5 bg-white rounded-xl border border-cyan-200/90 shadow-sm space-y-4"
                                 >
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div>
-                                            <Label class="text-xs text-gray-600">Label (shown to resident)</Label>
-                                            <Input v-model="field.label" placeholder="e.g. Purpose of request" class="mt-1" />
-                                        </div>
-                                        <div>
-                                            <Label class="text-xs text-gray-600">Field key (optional)</Label>
-                                            <Input v-model="field.key" placeholder="Auto from label if empty" class="mt-1 font-mono text-sm" />
-                                        </div>
-                                        <div>
-                                            <Label class="text-xs text-gray-600">Input type</Label>
-                                            <Select v-model="field.type">
-                                                <SelectTrigger class="mt-1">
-                                                    <SelectValue placeholder="Type" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem v-for="t in dynamicFieldTypes" :key="t" :value="t">{{ t }}</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div class="flex items-end gap-2 pb-1">
-                                            <div class="flex items-center gap-2">
-                                                <input
-                                                    :id="`create-req-${index}`"
-                                                    v-model="field.required"
-                                                    type="checkbox"
-                                                    class="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
-                                                />
-                                                <Label :for="`create-req-${index}`" class="text-sm cursor-pointer">Required</Label>
-                                            </div>
-                                        </div>
+                                    <div class="rounded-xl border-2 border-cyan-400/70 bg-gradient-to-br from-cyan-50 to-sky-50 p-4 space-y-2">
+                                        <Label class="text-base font-semibold text-cyan-950 tracking-tight">
+                                            How should they answer?
+                                        </Label>
+                                        <p class="text-xs text-cyan-900/80 leading-snug">
+                                            This controls what appears on the resident's form (short text, long text, date, list to choose from, etc.).
+                                        </p>
+                                        <Select v-model="field.type">
+                                            <SelectTrigger
+                                                class="mt-2 h-12 text-base font-medium border-2 border-cyan-300 bg-white shadow-sm hover:bg-cyan-50/80 focus:ring-cyan-500"
+                                            >
+                                                <SelectValue placeholder="Choose answer type…" />
+                                            </SelectTrigger>
+                                            <SelectContent class="max-h-72">
+                                                <SelectItem
+                                                    v-for="t in dynamicFieldTypes"
+                                                    :key="t"
+                                                    :value="t"
+                                                    class="text-base py-3 cursor-pointer"
+                                                >
+                                                    {{ fieldTypeLabels[t] }}
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
+
                                     <div>
-                                        <Label class="text-xs text-gray-600">Placeholder (optional)</Label>
-                                        <Input v-model="field.placeholder" class="mt-1" placeholder="Hint text" />
+                                        <Label class="text-sm font-medium text-gray-800">Question or label</Label>
+                                        <p class="text-xs text-gray-500 mt-0.5 mb-1.5">Shown to the resident above the answer box.</p>
+                                        <Input
+                                            v-model="field.label"
+                                            placeholder="e.g. What is the purpose of this request?"
+                                            class="mt-0 h-10"
+                                        />
+                                    </div>
+
+                                    <div class="flex flex-wrap items-start gap-3 rounded-lg bg-gray-50 border border-gray-100 px-3 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <input
+                                                :id="`create-req-${index}`"
+                                                v-model="field.required"
+                                                type="checkbox"
+                                                class="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                                            />
+                                            <Label :for="`create-req-${index}`" class="text-sm font-medium text-gray-800 cursor-pointer">
+                                                Must answer before submitting
+                                            </Label>
+                                        </div>
+                                        <p class="text-xs text-gray-500 w-full sm:w-auto sm:pl-1">
+                                            Leave unchecked if this question is optional.
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <Label class="text-sm font-medium text-gray-800">Hint inside the empty field (optional)</Label>
+                                        <p class="text-xs text-gray-500 mt-0.5 mb-1.5">Light gray example text; leave blank if you do not need it.</p>
+                                        <Input v-model="field.placeholder" placeholder="e.g. Briefly describe your reason" class="mt-0" />
                                     </div>
                                     <div v-if="field.type === 'select'">
-                                        <Label class="text-xs text-gray-600">Options (comma or new line separated)</Label>
-                                        <Textarea v-model="field.optionsText" class="mt-1" rows="2" placeholder="Option A, Option B" />
+                                        <Label class="text-sm font-medium text-gray-800">Dropdown choices</Label>
+                                        <p class="text-xs text-gray-500 mt-0.5 mb-1.5">
+                                            Type each choice on its own line, or separate with commas.
+                                        </p>
+                                        <Textarea v-model="field.optionsText" class="mt-0" rows="3" placeholder="Yes&#10;No&#10;Not sure" />
                                     </div>
-                                    <div class="flex justify-end">
+                                    <div class="flex justify-end pt-1 border-t border-gray-100">
                                         <Button type="button" variant="ghost" size="sm" class="text-red-600" @click="removeCreateDynamicField(index)">
                                             <X class="h-4 w-4 mr-1" />
-                                            Remove
+                                            Remove this question
                                         </Button>
                                     </div>
                                 </div>
                             </div>
-                            <p v-else class="text-sm text-gray-500 italic">No custom fields yet. Add fields if residents must supply extra information.</p>
+                            <p v-else class="text-sm text-gray-500 italic">No extra questions yet. Use "Add a question" if residents need to provide specific details.</p>
                         </div>
                     </div>
 
@@ -1460,76 +1463,102 @@ const categoryOptions = [
 
                     <!-- Required Fields -->
                     <div class="bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 rounded-xl p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-2">
                             <Tag class="h-5 w-5 text-cyan-600" />
-                            Resident request fields
+                            Questions for residents
                         </h3>
-                        <p class="text-xs text-gray-600 mb-4">
-                            Configure fields residents fill when requesting this document (text, dates, numbers, dropdowns).
+                        <p class="text-sm text-gray-700 mb-1 leading-relaxed">
+                            Add extra questions residents answer when they request this document. Pick how they should answer first, then write the question clearly.
                         </p>
+                        <p class="text-xs text-gray-500 mb-4">You can skip this section if you do not need anything beyond uploads and the main request form.</p>
 
                         <div class="space-y-4">
                             <Button type="button" variant="outline" size="sm" class="w-full sm:w-auto" @click="addEditDynamicField">
                                 <Plus class="h-4 w-4 mr-1" />
-                                Add field
+                                Add a question
                             </Button>
 
                             <div v-if="editForm && Array.isArray(editForm.required_fields) && editForm.required_fields.length > 0" class="space-y-4">
                                 <div
                                     v-for="(field, index) in editForm.required_fields"
                                     :key="`edit-field-${index}`"
-                                    class="p-4 bg-white rounded-lg border border-cyan-200 space-y-3"
+                                    class="p-5 bg-white rounded-xl border border-cyan-200/90 shadow-sm space-y-4"
                                 >
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div>
-                                            <Label class="text-xs text-gray-600">Label (shown to resident)</Label>
-                                            <Input v-model="field.label" placeholder="e.g. Purpose of request" class="mt-1" />
-                                        </div>
-                                        <div>
-                                            <Label class="text-xs text-gray-600">Field key (optional)</Label>
-                                            <Input v-model="field.key" placeholder="Auto from label if empty" class="mt-1 font-mono text-sm" />
-                                        </div>
-                                        <div>
-                                            <Label class="text-xs text-gray-600">Input type</Label>
-                                            <Select v-model="field.type">
-                                                <SelectTrigger class="mt-1">
-                                                    <SelectValue placeholder="Type" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem v-for="t in dynamicFieldTypes" :key="`e-${t}`" :value="t">{{ t }}</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div class="flex items-end gap-2 pb-1">
-                                            <div class="flex items-center gap-2">
-                                                <input
-                                                    :id="`edit-req-${index}`"
-                                                    v-model="field.required"
-                                                    type="checkbox"
-                                                    class="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
-                                                />
-                                                <Label :for="`edit-req-${index}`" class="text-sm cursor-pointer">Required</Label>
-                                            </div>
-                                        </div>
+                                    <div class="rounded-xl border-2 border-cyan-400/70 bg-gradient-to-br from-cyan-50 to-sky-50 p-4 space-y-2">
+                                        <Label class="text-base font-semibold text-cyan-950 tracking-tight">
+                                            How should they answer?
+                                        </Label>
+                                        <p class="text-xs text-cyan-900/80 leading-snug">
+                                            This controls what appears on the resident's form (short text, long text, date, list to choose from, etc.).
+                                        </p>
+                                        <Select v-model="field.type">
+                                            <SelectTrigger
+                                                class="mt-2 h-12 text-base font-medium border-2 border-cyan-300 bg-white shadow-sm hover:bg-cyan-50/80 focus:ring-cyan-500"
+                                            >
+                                                <SelectValue placeholder="Choose answer type…" />
+                                            </SelectTrigger>
+                                            <SelectContent class="max-h-72">
+                                                <SelectItem
+                                                    v-for="t in dynamicFieldTypes"
+                                                    :key="`e-${t}`"
+                                                    :value="t"
+                                                    class="text-base py-3 cursor-pointer"
+                                                >
+                                                    {{ fieldTypeLabels[t] }}
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
+
                                     <div>
-                                        <Label class="text-xs text-gray-600">Placeholder (optional)</Label>
-                                        <Input v-model="field.placeholder" class="mt-1" placeholder="Hint text" />
+                                        <Label class="text-sm font-medium text-gray-800">Question or label</Label>
+                                        <p class="text-xs text-gray-500 mt-0.5 mb-1.5">Shown to the resident above the answer box.</p>
+                                        <Input
+                                            v-model="field.label"
+                                            placeholder="e.g. What is the purpose of this request?"
+                                            class="mt-0 h-10"
+                                        />
+                                    </div>
+
+                                    <div class="flex flex-wrap items-start gap-3 rounded-lg bg-gray-50 border border-gray-100 px-3 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <input
+                                                :id="`edit-req-${index}`"
+                                                v-model="field.required"
+                                                type="checkbox"
+                                                class="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                                            />
+                                            <Label :for="`edit-req-${index}`" class="text-sm font-medium text-gray-800 cursor-pointer">
+                                                Must answer before submitting
+                                            </Label>
+                                        </div>
+                                        <p class="text-xs text-gray-500 w-full sm:w-auto sm:pl-1">
+                                            Leave unchecked if this question is optional.
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <Label class="text-sm font-medium text-gray-800">Hint inside the empty field (optional)</Label>
+                                        <p class="text-xs text-gray-500 mt-0.5 mb-1.5">Light gray example text; leave blank if you do not need it.</p>
+                                        <Input v-model="field.placeholder" placeholder="e.g. Briefly describe your reason" class="mt-0" />
                                     </div>
                                     <div v-if="field.type === 'select'">
-                                        <Label class="text-xs text-gray-600">Options (comma or new line separated)</Label>
-                                        <Textarea v-model="field.optionsText" class="mt-1" rows="2" placeholder="Option A, Option B" />
+                                        <Label class="text-sm font-medium text-gray-800">Dropdown choices</Label>
+                                        <p class="text-xs text-gray-500 mt-0.5 mb-1.5">
+                                            Type each choice on its own line, or separate with commas.
+                                        </p>
+                                        <Textarea v-model="field.optionsText" class="mt-0" rows="3" placeholder="Yes&#10;No&#10;Not sure" />
                                     </div>
-                                    <div class="flex justify-end">
+                                    <div class="flex justify-end pt-1 border-t border-gray-100">
                                         <Button type="button" variant="ghost" size="sm" class="text-red-600" @click="removeEditDynamicField(index)">
                                             <X class="h-4 w-4 mr-1" />
-                                            Remove
+                                            Remove this question
                                         </Button>
                                     </div>
                                 </div>
                             </div>
                             <div v-else-if="editForm && (!Array.isArray(editForm.required_fields) || editForm.required_fields.length === 0)" class="text-sm text-gray-500 italic">
-                                No custom fields added yet
+                                No extra questions yet. Use "Add a question" if residents need to provide specific details.
                             </div>
                         </div>
                     </div>
