@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Plus,
     FileText,
@@ -62,11 +63,21 @@ interface Transaction {
     };
 }
 
+interface TransactionInputField {
+    key: string;
+    label: string;
+    type: string;
+    required: boolean;
+    placeholder?: string | null;
+    options?: string[];
+}
+
 interface TransactionType {
     name: string;
     fee: number;
     required_documents: string[];
     required_fields?: string[];
+    input_fields?: TransactionInputField[];
 }
 
 interface Props {
@@ -108,6 +119,32 @@ const { formatDateShort } = useUtils();
 // Forms
 const createForm = createTransactionForm();
 const filterForm = createFilterForm(props.filters);
+
+const inputFieldsForCreate = computed((): TransactionInputField[] => {
+    const code = selectedType.value;
+    const t = code ? props.transactionTypes[code] : null;
+    if (!t) {
+        return [];
+    }
+    if (Array.isArray(t.input_fields) && t.input_fields.length > 0) {
+        return t.input_fields;
+    }
+    const rf = t.required_fields;
+    if (!Array.isArray(rf)) {
+        return [];
+    }
+    return rf.map((s: string, i: number) => ({
+        key: String(s)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_|_$/g, '') || `field_${i}`,
+        label: String(s),
+        type: 'text',
+        required: true,
+        placeholder: null,
+        options: [],
+    }));
+});
 
 const transactionUploadsBusy = computed(() =>
     Object.values(transactionDocumentUploadSlots.value).some((rows) => rows.some((r) => r.id === '' && !r.error)),
@@ -602,25 +639,74 @@ watch(sheetOpen, (newValue) => {
                                         </div>
 
                                         <!-- Required Fields Section -->
-                                        <div v-if="selectedType && transactionTypes[selectedType]?.required_fields?.length" class="space-y-4">
-                                            <Label class="text-base font-bold text-gray-800">Required Information</Label>
-                                            
+                                        <div v-if="selectedType && inputFieldsForCreate.length" class="space-y-4">
+                                            <Label class="text-base font-bold text-gray-800">Required information</Label>
+
                                             <div class="space-y-4">
                                                 <div
-                                                    v-for="field in transactionTypes[selectedType].required_fields"
-                                                    :key="field"
+                                                    v-for="field in inputFieldsForCreate"
+                                                    :key="field.key"
                                                     class="bg-gradient-to-r from-cyan-50 to-blue-50 border-2 border-cyan-200 rounded-2xl p-6"
                                                 >
-                                                    <Label :for="`field-${field}`" class="text-sm font-semibold text-gray-900 mb-2 block">
-                                                        {{ field }} <span class="text-red-500">*</span>
+                                                    <Label :for="`field-${field.key}`" class="text-sm font-semibold text-gray-900 mb-2 block">
+                                                        {{ field.label }}
+                                                        <span v-if="field.required" class="text-red-500">*</span>
                                                     </Label>
                                                     <Input
-                                                        :id="`field-${field}`"
-                                                        v-model="createForm.required_fields[field]"
-                                                        :placeholder="`Enter ${field.toLowerCase()}`"
+                                                        v-if="field.type === 'text'"
+                                                        :id="`field-${field.key}`"
+                                                        v-model="createForm.required_fields[field.key]"
+                                                        :placeholder="field.placeholder || undefined"
+                                                        :required="field.required"
                                                         class="w-full border-gray-300 focus:border-cyan-500 focus:ring-cyan-500"
-                                                        required
                                                     />
+                                                    <Input
+                                                        v-else-if="field.type === 'number'"
+                                                        :id="`field-${field.key}`"
+                                                        v-model="createForm.required_fields[field.key]"
+                                                        type="number"
+                                                        :placeholder="field.placeholder || undefined"
+                                                        :required="field.required"
+                                                        class="w-full border-gray-300 focus:border-cyan-500 focus:ring-cyan-500"
+                                                    />
+                                                    <Input
+                                                        v-else-if="field.type === 'date' || field.type === 'email'"
+                                                        :id="`field-${field.key}`"
+                                                        v-model="createForm.required_fields[field.key]"
+                                                        :type="field.type"
+                                                        :placeholder="field.placeholder || undefined"
+                                                        :required="field.required"
+                                                        class="w-full border-gray-300 focus:border-cyan-500 focus:ring-cyan-500"
+                                                    />
+                                                    <Textarea
+                                                        v-else-if="field.type === 'textarea'"
+                                                        :id="`field-${field.key}`"
+                                                        v-model="createForm.required_fields[field.key]"
+                                                        :placeholder="field.placeholder || undefined"
+                                                        :required="field.required"
+                                                        rows="3"
+                                                        class="w-full border-gray-300 focus:border-cyan-500 focus:ring-cyan-500"
+                                                    />
+                                                    <Select
+                                                        v-else-if="field.type === 'select'"
+                                                        v-model="createForm.required_fields[field.key]"
+                                                    >
+                                                        <SelectTrigger :id="`field-${field.key}`" class="w-full border-gray-300">
+                                                            <SelectValue :placeholder="field.placeholder || 'Choose…'" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem
+                                                                v-for="opt in field.options || []"
+                                                                :key="`${field.key}-${opt}`"
+                                                                :value="opt"
+                                                            >
+                                                                {{ opt }}
+                                                            </SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <p v-if="createForm.errors[`required_fields.${field.key}`]" class="text-sm text-red-600 mt-2">
+                                                        {{ createForm.errors[`required_fields.${field.key}`] }}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>

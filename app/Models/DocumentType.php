@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class DocumentType extends Model
 {
@@ -35,6 +37,139 @@ class DocumentType extends Model
         'processing_days' => 'integer',
         'sort_order' => 'integer',
     ];
+
+    protected $appends = [
+        'input_fields',
+    ];
+
+    /**
+     * @return array<int, array{key: string, label: string, type: string, required: bool, placeholder: ?string, options: array<int, string>}>
+     */
+    public static function normalizeDynamicInputFields(mixed $raw): array
+    {
+        if (! is_array($raw) || $raw === []) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $index => $item) {
+            if (is_string($item)) {
+                $label = trim($item);
+                if ($label === '') {
+                    continue;
+                }
+                $key = self::uniqueFieldKey(self::slugFieldKey($label, $index), $out);
+                $out[] = [
+                    'key' => $key,
+                    'label' => $label,
+                    'type' => 'text',
+                    'required' => true,
+                    'placeholder' => null,
+                    'options' => [],
+                ];
+
+                continue;
+            }
+
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $label = isset($item['label']) ? trim((string) $item['label']) : '';
+            $keySource = (isset($item['key']) && is_string($item['key']) && trim($item['key']) !== '')
+                ? trim($item['key'])
+                : ($label !== '' ? $label : 'field');
+            $key = self::uniqueFieldKey(self::sanitizeFieldKey($keySource, $index), $out);
+
+            $type = strtolower((string) ($item['type'] ?? 'text'));
+            $allowed = ['text', 'textarea', 'number', 'date', 'email', 'select'];
+            if (! in_array($type, $allowed, true)) {
+                $type = 'text';
+            }
+
+            $options = [];
+            if ($type === 'select' && isset($item['options'])) {
+                $opts = $item['options'];
+                if (is_string($opts)) {
+                    $opts = array_map('trim', explode(',', $opts));
+                }
+                if (is_array($opts)) {
+                    foreach ($opts as $o) {
+                        if (is_string($o) && trim($o) !== '') {
+                            $options[] = trim($o);
+                        }
+                    }
+                }
+            }
+
+            $out[] = [
+                'key' => $key,
+                'label' => $label !== '' ? $label : $key,
+                'type' => $type,
+                'required' => filter_var($item['required'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                'placeholder' => isset($item['placeholder']) && is_string($item['placeholder']) && trim($item['placeholder']) !== ''
+                    ? trim($item['placeholder'])
+                    : null,
+                'options' => $options,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<int, mixed>  $raw
+     * @return array<int, array{key: string, label: string, type: string, required: bool, placeholder: ?string, options: array<int, string>}>
+     */
+    public static function coerceRequiredFieldsForStorage(array $raw): array
+    {
+        return self::normalizeDynamicInputFields($raw);
+    }
+
+    protected function inputFields(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): array => self::normalizeDynamicInputFields($this->required_fields),
+        );
+    }
+
+    /**
+     * @param  array<int, array{key: string}>  $existing
+     */
+    private static function uniqueFieldKey(string $base, array $existing): string
+    {
+        $used = array_column($existing, 'key');
+        if (! in_array($base, $used, true)) {
+            return $base;
+        }
+        $n = 2;
+        while (in_array($base.'_'.$n, $used, true)) {
+            $n++;
+        }
+
+        return $base.'_'.$n;
+    }
+
+    private static function slugFieldKey(string $label, int $index): string
+    {
+        $slug = Str::slug($label, '_');
+        if ($slug === '') {
+            return 'field_'.$index;
+        }
+
+        return self::sanitizeFieldKey($slug, $index);
+    }
+
+    private static function sanitizeFieldKey(string $key, int $index): string
+    {
+        $key = strtolower(preg_replace('/[^a-z0-9_]+/', '_', $key) ?? '');
+        $key = trim($key, '_');
+        if ($key === '' || ! preg_match('/^[a-z][a-z0-9_]*$/', $key)) {
+            return 'field_'.$index;
+        }
+
+        return $key;
+    }
 
     /**
      * Get transactions of this document type
@@ -81,7 +216,7 @@ class DocumentType extends Model
      */
     public function getFormattedFeeAttribute(): string
     {
-        return '₱' . number_format((float) $this->fee_amount, 2);
+        return '₱'.number_format((float) $this->fee_amount, 2);
     }
 
     /**
@@ -115,7 +250,7 @@ class DocumentType extends Model
         while (static::where('code', $code)->when($excludeId, function ($query) use ($excludeId) {
             return $query->where('id', '!=', $excludeId);
         })->exists()) {
-            $code = $baseCode . '-' . $counter;
+            $code = $baseCode.'-'.$counter;
             $counter++;
         }
 

@@ -294,6 +294,7 @@ class TransactionService
                         'description' => $documentType->description,
                         'required_documents' => $documentType->required_documents ?? [],
                         'required_fields' => $documentType->required_fields ?? [],
+                        'input_fields' => $documentType->input_fields,
                         'fee' => $documentType->fee_amount,
                         'processing_days' => $documentType->processing_days,
                         'requires_payment' => $documentType->requires_payment,

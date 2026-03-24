@@ -153,7 +153,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onUnmounted } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { toast } from 'vue-sonner';
 import { runJsonAction } from '@/composables/useJsonActionFeedback';
@@ -190,20 +190,14 @@ const notifications = ref<Notification[]>([]);
 const unreadCount = ref(0);
 const isMarkingAllRead = ref(false);
 
-// Check if user is staff - if not, don't initialize
-const isStaff = ref(false);
+const page = usePage();
 
-// Detect if user is staff
-const checkUserRole = () => {
-  try {
-    const userRole = document.querySelector('meta[name="user-role"]')?.getAttribute('content');
-    const userData = window.page?.props?.auth?.user;
-    isStaff.value = userRole === 'staff' || userData?.role === 'staff' || userData?.role === 'admin';
-  } catch (e) {
-    console.log('Could not detect user role, defaulting to non-staff');
-    isStaff.value = false;
-  }
-};
+/** Inertia props update on every visit; meta tag + window.page do not (bell stayed hidden after client-side login). */
+const isStaff = computed(() => {
+    const user = (page.props.auth as { user?: { role?: string } } | undefined)?.user;
+    const role = user?.role;
+    return role === 'staff' || role === 'admin';
+});
 
 const toggleDropdown = () => {
   isDropdownOpen.value = !isDropdownOpen.value;
@@ -373,51 +367,70 @@ const getCategoryIcon = (category: string) => {
   }
 };
 
-// Poll for new notifications every 30 seconds
-let pollInterval: number | null = null;
+// Poll + Pusher: start/stop when staff session is active (props stay correct after Inertia login)
+let pollInterval: ReturnType<typeof setInterval> | null = null;
 let echoChannelName = '';
 
-onMounted(() => {
-  checkUserRole();
-  if (!isStaff.value) return;
-
-  loadUnreadCount();
-  pollInterval = setInterval(loadUnreadCount, 30000);
-
-  try {
-    const page = usePage();
-    const uid = (page as any)?.props?.auth?.user?.id;
-    const pusher = getPusher();
-    if (pusher && uid) {
-      echoChannelName = `private-App.Models.User.${uid}`;
-      const channel = pusher.subscribe(echoChannelName);
-      channel.bind('message.sent', (e: any) => {
-        if (e?.message?.sender?.id && e.message.sender.id === uid) return;
-        unreadCount.value = (unreadCount.value || 0) + 1;
-        const badge = document.getElementById('header-unread-badge');
-        if (badge) {
-          const current = parseInt(badge.textContent || '0', 10) || 0;
-          badge.textContent = String(current + 1);
-          (badge as HTMLElement).style.display = 'inline-flex';
-        }
-      });
-      channel.bind('notification.created', () => {
-        loadUnreadCount();
-      });
+const stopNotificationRealtime = (): void => {
+    if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
     }
-  } catch (_e) {}
-});
+    try {
+        const pusher = getPusher();
+        if (echoChannelName && pusher) {
+            pusher.unsubscribe(echoChannelName);
+        }
+    } catch (_e) {}
+    echoChannelName = '';
+};
+
+const startNotificationRealtime = (): void => {
+    stopNotificationRealtime();
+    void loadUnreadCount();
+    pollInterval = setInterval(() => {
+        void loadUnreadCount();
+    }, 30000);
+
+    try {
+        const uid = (page.props.auth as { user?: { id?: number } } | undefined)?.user?.id;
+        const pusher = getPusher();
+        if (pusher && uid) {
+            echoChannelName = `private-App.Models.User.${uid}`;
+            const channel = pusher.subscribe(echoChannelName);
+            channel.bind('message.sent', (e: any) => {
+                if (e?.message?.sender?.id && e.message.sender.id === uid) {
+                    return;
+                }
+                unreadCount.value = (unreadCount.value || 0) + 1;
+                const badge = document.getElementById('header-unread-badge');
+                if (badge) {
+                    const current = parseInt(badge.textContent || '0', 10) || 0;
+                    badge.textContent = String(current + 1);
+                    (badge as HTMLElement).style.display = 'inline-flex';
+                }
+            });
+            channel.bind('notification.created', () => {
+                void loadUnreadCount();
+            });
+        }
+    } catch (_e) {}
+};
+
+watch(
+    isStaff,
+    (staff) => {
+        if (staff) {
+            startNotificationRealtime();
+        } else {
+            stopNotificationRealtime();
+        }
+    },
+    { immediate: true },
+);
 
 onUnmounted(() => {
-  if (pollInterval) {
-    clearInterval(pollInterval);
-  }
-  try {
-    const pusher = getPusher();
-    if (echoChannelName && pusher) {
-      pusher.unsubscribe(echoChannelName);
-    }
-  } catch (_e) {}
+    stopNotificationRealtime();
 });
 </script>
 

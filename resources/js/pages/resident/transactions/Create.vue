@@ -14,6 +14,15 @@ import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { useFormHandlers } from '@/composables/useFormHandlers';
 
+interface TransactionInputField {
+    key: string;
+    label: string;
+    type: string;
+    required: boolean;
+    placeholder?: string | null;
+    options?: string[];
+}
+
 interface TransactionType {
     name: string;
     description: string;
@@ -23,6 +32,8 @@ interface TransactionType {
     requires_payment: boolean;
     requires_approval: boolean;
     category: string;
+    required_fields?: string[];
+    input_fields?: TransactionInputField[];
 }
 
 interface Props {
@@ -47,6 +58,31 @@ const {
 } = useFormHandlers();
 
 const form = createTransactionForm();
+
+const inputFieldsForForm = computed((): TransactionInputField[] => {
+    const t = form.type ? props.transactionTypes[form.type] : null;
+    if (!t) {
+        return [];
+    }
+    if (Array.isArray(t.input_fields) && t.input_fields.length > 0) {
+        return t.input_fields;
+    }
+    const rf = t.required_fields;
+    if (!Array.isArray(rf)) {
+        return [];
+    }
+    return rf.map((s: string, i: number) => ({
+        key: String(s)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_|_$/g, '') || `field_${i}`,
+        label: String(s),
+        type: 'text',
+        required: true,
+        placeholder: null,
+        options: [],
+    }));
+});
 
 const transactionUploadsBusy = computed(() =>
     Object.values(transactionDocumentUploadSlots.value).some((rows) => rows.some((r) => r.id === '' && !r.error)),
@@ -157,6 +193,66 @@ const getStatusClass = (status: string) => {
                                     rows="3"
                                 />
                                 <InputError :message="form.errors.description" class="mt-2" />
+                            </div>
+
+                            <div v-if="form.type && inputFieldsForForm.length" class="space-y-4">
+                                <h3 class="font-semibold text-sm text-gray-900">Required information</h3>
+                                <div
+                                    v-for="field in inputFieldsForForm"
+                                    :key="field.key"
+                                    class="rounded-lg border border-gray-200 bg-white p-4 space-y-2"
+                                >
+                                    <Label :for="`rf-${field.key}`" class="text-sm font-medium">
+                                        {{ field.label }}
+                                        <span v-if="field.required" class="text-red-500">*</span>
+                                    </Label>
+                                    <Input
+                                        v-if="field.type === 'text'"
+                                        :id="`rf-${field.key}`"
+                                        v-model="form.required_fields[field.key]"
+                                        :placeholder="field.placeholder || undefined"
+                                        :required="field.required"
+                                    />
+                                    <Input
+                                        v-else-if="field.type === 'number'"
+                                        :id="`rf-${field.key}`"
+                                        v-model="form.required_fields[field.key]"
+                                        type="number"
+                                        :placeholder="field.placeholder || undefined"
+                                        :required="field.required"
+                                    />
+                                    <Input
+                                        v-else-if="field.type === 'date' || field.type === 'email'"
+                                        :id="`rf-${field.key}`"
+                                        v-model="form.required_fields[field.key]"
+                                        :type="field.type"
+                                        :placeholder="field.placeholder || undefined"
+                                        :required="field.required"
+                                    />
+                                    <Textarea
+                                        v-else-if="field.type === 'textarea'"
+                                        :id="`rf-${field.key}`"
+                                        v-model="form.required_fields[field.key]"
+                                        :placeholder="field.placeholder || undefined"
+                                        :required="field.required"
+                                        rows="3"
+                                    />
+                                    <Select v-else-if="field.type === 'select'" v-model="form.required_fields[field.key]">
+                                        <SelectTrigger :id="`rf-${field.key}`" class="w-full">
+                                            <SelectValue :placeholder="field.placeholder || 'Choose…'" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem
+                                                v-for="opt in field.options || []"
+                                                :key="`${field.key}-${opt}`"
+                                                :value="opt"
+                                            >
+                                                {{ opt }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError :message="form.errors[`required_fields.${field.key}`]" class="mt-1" />
+                                </div>
                             </div>
 
                             <!-- Transaction Type Information -->

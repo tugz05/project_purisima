@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DocumentType;
 use App\Services\DocumentTypeService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class DocumentTypeController extends Controller
@@ -49,25 +50,11 @@ class DocumentTypeController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'code' => 'nullable|string|max:255|unique:document_types,code',
-            'description' => 'nullable|string',
-            'fee_amount' => 'required|numeric|min:0',
-            'required_documents' => 'nullable|array',
-            'required_documents.*' => 'string',
-            'required_fields' => 'nullable|array',
-            'required_fields.*' => 'string',
-            'processing_steps' => 'nullable|array',
-            'processing_steps.*' => 'string',
-            'processing_days' => 'required|integer|min:1',
-            'is_active' => 'boolean',
-            'requires_payment' => 'boolean',
-            'requires_approval' => 'boolean',
-            'category' => 'nullable|string|max:255',
-            'sort_order' => 'nullable|integer|min:0',
-            'notes' => 'nullable|string',
+        $request->merge([
+            'required_fields' => DocumentType::coerceRequiredFieldsForStorage($request->input('required_fields', []) ?? []),
         ]);
+
+        $validated = $request->validate($this->documentTypeValidationRules());
 
         $this->documentTypeService->create($validated);
 
@@ -100,25 +87,11 @@ class DocumentTypeController extends Controller
      */
     public function update(Request $request, DocumentType $documentType)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'code' => 'nullable|string|max:255|unique:document_types,code,' . $documentType->id,
-            'description' => 'nullable|string',
-            'fee_amount' => 'required|numeric|min:0',
-            'required_documents' => 'nullable|array',
-            'required_documents.*' => 'string',
-            'required_fields' => 'nullable|array',
-            'required_fields.*' => 'string',
-            'processing_steps' => 'nullable|array',
-            'processing_steps.*' => 'string',
-            'processing_days' => 'required|integer|min:1',
-            'is_active' => 'boolean',
-            'requires_payment' => 'boolean',
-            'requires_approval' => 'boolean',
-            'category' => 'nullable|string|max:255',
-            'sort_order' => 'nullable|integer|min:0',
-            'notes' => 'nullable|string',
+        $request->merge([
+            'required_fields' => DocumentType::coerceRequiredFieldsForStorage($request->input('required_fields', []) ?? []),
         ]);
+
+        $validated = $request->validate($this->documentTypeValidationRules($documentType->id));
 
         $this->documentTypeService->update($documentType, $validated);
 
@@ -141,5 +114,41 @@ class DocumentTypeController extends Controller
                 ->with('error', $e->getMessage());
         }
     }
-}
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function documentTypeValidationRules(?int $documentTypeId = null): array
+    {
+        $codeRule = 'nullable|string|max:255|unique:document_types,code';
+        if ($documentTypeId !== null) {
+            $codeRule .= ','.$documentTypeId;
+        }
+
+        return [
+            'name' => 'required|string|max:255',
+            'code' => $codeRule,
+            'description' => 'nullable|string',
+            'fee_amount' => 'required|numeric|min:0',
+            'required_documents' => 'nullable|array',
+            'required_documents.*' => 'string',
+            'required_fields' => 'nullable|array',
+            'required_fields.*.key' => ['required', 'string', 'max:64', 'regex:/^[a-z][a-z0-9_]*$/'],
+            'required_fields.*.label' => ['required', 'string', 'max:255'],
+            'required_fields.*.type' => ['required', 'string', Rule::in(['text', 'textarea', 'number', 'date', 'email', 'select'])],
+            'required_fields.*.required' => ['boolean'],
+            'required_fields.*.placeholder' => ['nullable', 'string', 'max:255'],
+            'required_fields.*.options' => ['nullable', 'array'],
+            'required_fields.*.options.*' => ['string', 'max:255'],
+            'processing_steps' => 'nullable|array',
+            'processing_steps.*' => 'string',
+            'processing_days' => 'required|integer|min:1',
+            'is_active' => 'boolean',
+            'requires_payment' => 'boolean',
+            'requires_approval' => 'boolean',
+            'category' => 'nullable|string|max:255',
+            'sort_order' => 'nullable|integer|min:0',
+            'notes' => 'nullable|string',
+        ];
+    }
+}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -91,6 +91,12 @@ interface Transaction {
         generated_by?: number;
     };
     resident_input_data?: Record<string, string>;
+    document_type?: {
+        id: number;
+        name: string;
+        code: string;
+        input_fields?: Array<{ key: string; label: string }>;
+    };
     resident: {
         id: number;
         name: string;
@@ -121,6 +127,20 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const residentInputLabeledRows = computed(() => {
+    const data = props.transaction.resident_input_data ?? {};
+    const defs = props.transaction.document_type?.input_fields ?? [];
+    const labelByKey: Record<string, string> = {};
+    defs.forEach((d) => {
+        labelByKey[d.key] = d.label;
+    });
+    return Object.entries(data).map(([key, value]) => ({
+        key,
+        label: labelByKey[key] ?? key.replace(/_/g, ' '),
+        value: value === null || value === undefined ? '' : String(value),
+    }));
+});
 
 // Composables
 const { staffTransactionShowBreadcrumbs } = useBreadcrumbs();
@@ -1197,16 +1217,16 @@ onUnmounted(() => {
                                         </div>
 
                                         <!-- Required Fields Information -->
-                                        <div v-if="props.transaction.resident_input_data && Object.keys(props.transaction.resident_input_data).length > 0" class="mt-4 pt-4 border-t border-gray-200">
+                                        <div v-if="residentInputLabeledRows.length > 0" class="mt-4 pt-4 border-t border-gray-200">
                                             <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 block">Required Information</Label>
                                             <div class="space-y-2">
                                                 <div
-                                                    v-for="(value, field) in props.transaction.resident_input_data"
-                                                    :key="field"
+                                                    v-for="row in residentInputLabeledRows"
+                                                    :key="row.key"
                                                     class="bg-white rounded-lg p-2.5 border border-gray-200"
                                                 >
-                                                    <Label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">{{ field }}</Label>
-                                                    <p class="text-sm text-gray-900 mt-1 font-medium">{{ value || 'N/A' }}</p>
+                                                    <Label class="text-xs font-semibold text-gray-600">{{ row.label }}</Label>
+                                                    <p class="text-sm text-gray-900 mt-1 font-medium">{{ row.value || 'N/A' }}</p>
                                                 </div>
                                             </div>
                                         </div>

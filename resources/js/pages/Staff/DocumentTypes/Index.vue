@@ -31,6 +31,17 @@ import StaffLayout from '@/layouts/staff/Layout.vue';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { useUtils } from '@/composables/useUtils';
 
+type DynamicFieldType = 'text' | 'textarea' | 'number' | 'date' | 'email' | 'select';
+
+interface DynamicInputFieldForm {
+    key: string;
+    label: string;
+    type: DynamicFieldType;
+    required: boolean;
+    placeholder: string;
+    optionsText: string;
+}
+
 interface DocumentType {
     id: number;
     code: string;
@@ -38,7 +49,7 @@ interface DocumentType {
     description?: string;
     fee_amount: number;
     required_documents?: string[];
-    required_fields?: string[];
+    required_fields?: string[] | DynamicInputFieldForm[] | Record<string, unknown>[];
     processing_steps?: string[];
     processing_days: number;
     is_active: boolean;
@@ -106,7 +117,7 @@ const createForm = useForm({
     description: '',
     fee_amount: 0,
     required_documents: [] as string[],
-    required_fields: [] as string[],
+    required_fields: [] as DynamicInputFieldForm[],
     processing_steps: [] as string[],
     processing_days: 1,
     is_active: true,
@@ -119,8 +130,98 @@ const createForm = useForm({
 
 // Required documents management
 const newRequiredDoc = ref('');
-const newRequiredField = ref('');
 const newProcessingStep = ref('');
+
+const dynamicFieldTypes: DynamicFieldType[] = ['text', 'textarea', 'number', 'date', 'email', 'select'];
+
+const emptyDynamicField = (): DynamicInputFieldForm => ({
+    key: '',
+    label: '',
+    type: 'text',
+    required: true,
+    placeholder: '',
+    optionsText: '',
+});
+
+const parseOptionsText = (text: string): string[] =>
+    text
+        .split(/[,\n]/)
+        .map((s) => s.trim())
+        .filter((s) => s !== '');
+
+const slugKeyFromLabel = (label: string, index: number): string => {
+    const s = label
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '');
+    return s !== '' ? s : `field_${index}`;
+};
+
+const normalizeIncomingDynamicField = (raw: unknown, index: number): DynamicInputFieldForm => {
+    if (typeof raw === 'string') {
+        return {
+            key: '',
+            label: raw.trim(),
+            type: 'text',
+            required: true,
+            placeholder: '',
+            optionsText: '',
+        };
+    }
+    if (raw && typeof raw === 'object') {
+        const o = raw as Record<string, unknown>;
+        const typeRaw = String(o.type ?? 'text');
+        const type = dynamicFieldTypes.includes(typeRaw as DynamicFieldType)
+            ? (typeRaw as DynamicFieldType)
+            : 'text';
+        let optionsText = '';
+        if (Array.isArray(o.options)) {
+            optionsText = o.options.map((x) => String(x)).join(', ');
+        } else if (typeof o.options === 'string') {
+            optionsText = o.options;
+        }
+        return {
+            key: typeof o.key === 'string' ? o.key : '',
+            label: typeof o.label === 'string' ? o.label : '',
+            type,
+            required: o.required !== false,
+            placeholder: typeof o.placeholder === 'string' ? o.placeholder : '',
+            optionsText,
+        };
+    }
+    return emptyDynamicField();
+};
+
+const finalizeRequiredFieldsForSubmit = (rows: DynamicInputFieldForm[]): Array<{
+    key: string;
+    label: string;
+    type: DynamicFieldType;
+    required: boolean;
+    placeholder: string | null;
+    options: string[];
+}> => {
+    const used = new Set<string>();
+    return rows
+        .filter((r) => r.label.trim() !== '')
+        .map((r, i) => {
+            let key = r.key.trim() || slugKeyFromLabel(r.label, i);
+            while (used.has(key)) {
+                key = `${key}_${used.size + 1}`;
+            }
+            used.add(key);
+            const options = r.type === 'select' ? parseOptionsText(r.optionsText) : [];
+            const ph = r.placeholder.trim();
+            return {
+                key,
+                label: r.label.trim(),
+                type: r.type,
+                required: Boolean(r.required),
+                placeholder: ph !== '' ? ph : null,
+                options,
+            };
+        });
+};
 
 const addRequiredDoc = () => {
     const value = newRequiredDoc.value.trim();
@@ -180,34 +281,14 @@ const removeRequiredDoc = (index: number) => {
     createForm.required_documents.splice(index, 1);
 };
 
-// Required fields management
-const addRequiredField = () => {
-    const value = newRequiredField.value.trim();
-    if (value) {
-        // Ensure array exists
-        if (!Array.isArray(createForm.required_fields)) {
-            createForm.required_fields = [];
-        }
-        
-        // Check if it contains multiple items (comma or newline separated)
-        const hasMultiple = /[,\n]/.test(value);
-        
-        if (hasMultiple) {
-            // Split by comma or newline and add all items
-            const items = value.split(/[,\n]/).map(item => item.trim()).filter(item => item !== '');
-            
-            if (items.length > 0) {
-                createForm.required_fields = [...createForm.required_fields, ...items];
-                newRequiredField.value = '';
-            }
-        } else {
-            createForm.required_fields = [...createForm.required_fields, value];
-            newRequiredField.value = '';
-        }
+const addCreateDynamicField = () => {
+    if (!Array.isArray(createForm.required_fields)) {
+        createForm.required_fields = [];
     }
+    createForm.required_fields.push(emptyDynamicField());
 };
 
-const removeRequiredField = (index: number) => {
+const removeCreateDynamicField = (index: number) => {
     createForm.required_fields.splice(index, 1);
 };
 
@@ -285,34 +366,17 @@ const removeEditRequiredDoc = (index: number) => {
     }
 };
 
-// Edit required fields management
-const addEditRequiredField = () => {
-    const value = newRequiredField.value.trim();
-    if (value && editForm.value) {
-        // Ensure required_fields is an array
-        if (!Array.isArray(editForm.value.required_fields)) {
-            editForm.value.required_fields = [];
-        }
-        
-        // Check if it contains multiple items (comma or newline separated)
-        const hasMultiple = /[,\n]/.test(value);
-        
-        if (hasMultiple) {
-            // Split by comma or newline and add all items
-            const items = value.split(/[,\n]/).map(item => item.trim()).filter(item => item !== '');
-            
-            if (items.length > 0) {
-                editForm.value.required_fields = [...editForm.value.required_fields, ...items];
-                newRequiredField.value = '';
-            }
-        } else {
-            editForm.value.required_fields = [...editForm.value.required_fields, value];
-            newRequiredField.value = '';
-        }
+const addEditDynamicField = () => {
+    if (!editForm.value) {
+        return;
     }
+    if (!Array.isArray(editForm.value.required_fields)) {
+        editForm.value.required_fields = [];
+    }
+    editForm.value.required_fields.push(emptyDynamicField());
 };
 
-const removeEditRequiredField = (index: number) => {
+const removeEditDynamicField = (index: number) => {
     if (editForm.value && Array.isArray(editForm.value.required_fields)) {
         const updated = [...editForm.value.required_fields];
         updated.splice(index, 1);
@@ -441,31 +505,10 @@ const parseArrayField = (value: any): any[] => {
 const openEditSheet = (documentType: DocumentType) => {
     selectedDocumentType.value = documentType;
 
-    // DEBUG: Log the raw documentType object
-    console.log('=== DEBUG: DocumentType received ===');
-    console.log('Full documentType object:', documentType);
-    console.log('Raw values:', {
-        is_active: documentType.is_active,
-        requires_payment: documentType.requires_payment,
-        requires_approval: documentType.requires_approval,
-    });
-    console.log('Value types:', {
-        is_active: typeof documentType.is_active,
-        requires_payment: typeof documentType.requires_payment,
-        requires_approval: typeof documentType.requires_approval,
-    });
-    console.log('Value equality checks:', {
-        'is_active === 1': documentType.is_active === 1,
-        'is_active === true': documentType.is_active === true,
-        'requires_payment === 1': documentType.requires_payment === 1,
-        'requires_payment === true': documentType.requires_payment === true,
-        'requires_approval === 0': documentType.requires_approval === 0,
-        'requires_approval === false': documentType.requires_approval === false,
-    });
-
     // Parse arrays properly - handle JSON strings, arrays, or null
     const requiredDocs = parseArrayField(documentType.required_documents);
-    const requiredFields = parseArrayField(documentType.required_fields);
+    const requiredFieldsRaw = parseArrayField(documentType.required_fields);
+    const requiredFields = requiredFieldsRaw.map((item, idx) => normalizeIncomingDynamicField(item, idx));
     const processingSteps = parseArrayField(documentType.processing_steps);
     
     // If no processing steps exist, use defaults
@@ -477,17 +520,6 @@ const openEditSheet = (documentType: DocumentType) => {
     const isActive = toBoolean(documentType.is_active);
     const requiresPayment = toBoolean(documentType.requires_payment);
     const requiresApproval = toBoolean(documentType.requires_approval);
-
-    console.log('After toBoolean conversion:', {
-        isActive,
-        requiresPayment,
-        requiresApproval,
-        types: {
-            isActive: typeof isActive,
-            requiresPayment: typeof requiresPayment,
-            requiresApproval: typeof requiresApproval,
-        }
-    });
 
     // Initialize edit form with document type data
     // CRITICAL: Ensure values are explicitly booleans, not 1/0
@@ -508,41 +540,17 @@ const openEditSheet = (documentType: DocumentType) => {
         notes: documentType.notes || '',
     });
 
-    console.log('Form initialized:', {
-        form_is_active: editForm.value.is_active,
-        form_requires_payment: editForm.value.requires_payment,
-        form_requires_approval: editForm.value.requires_approval,
-        form_types: {
-            is_active: typeof editForm.value.is_active,
-            requires_payment: typeof editForm.value.requires_payment,
-            requires_approval: typeof editForm.value.requires_approval,
-        }
-    });
-
     // Set checkbox refs BEFORE opening sheet - this ensures they have correct values when rendered
     editIsActiveChecked.value = Boolean(isActive);
     editRequiresPaymentChecked.value = Boolean(requiresPayment);
     editRequiresApprovalChecked.value = Boolean(requiresApproval);
     
-    console.log('Checkbox refs set BEFORE sheet open:', {
-        editIsActiveChecked: editIsActiveChecked.value,
-        editRequiresPaymentChecked: editRequiresPaymentChecked.value,
-        editRequiresApprovalChecked: editRequiresApprovalChecked.value,
-        types: {
-            editIsActiveChecked: typeof editIsActiveChecked.value,
-            editRequiresPaymentChecked: typeof editRequiresPaymentChecked.value,
-            editRequiresApprovalChecked: typeof editRequiresApprovalChecked.value,
-        }
-    });
-
     // Clear input fields
     newRequiredDoc.value = '';
     newProcessingStep.value = '';
 
     // Open sheet AFTER refs are set
     editSheetOpen.value = true;
-    
-    console.log('=== END DEBUG ===');
 };
 
 // Default processing steps for all document types
@@ -582,7 +590,8 @@ const submitCreate = () => {
 
     // Filter out empty strings
     createForm.required_documents = createForm.required_documents.filter((doc: any) => doc && String(doc).trim() !== '');
-    createForm.required_fields = createForm.required_fields.filter((field: any) => field && String(field).trim() !== '');
+    const requiredFieldsSnapshot = JSON.parse(JSON.stringify(createForm.required_fields)) as DynamicInputFieldForm[];
+    createForm.required_fields = finalizeRequiredFieldsForSubmit(createForm.required_fields as DynamicInputFieldForm[]);
     createForm.processing_steps = createForm.processing_steps.filter((step: any) => step && String(step).trim() !== '');
 
     // Convert null category to empty string for backend
@@ -601,6 +610,7 @@ const submitCreate = () => {
         },
         onError: (errors) => {
             console.error('Create errors:', errors);
+            createForm.required_fields = requiredFieldsSnapshot;
             toast.error('Failed to create document type. Please check the form for errors.');
         },
         onFinish: () => {
@@ -621,7 +631,8 @@ const submitEdit = () => {
 
         // Filter out empty strings
         editForm.value.required_documents = editForm.value.required_documents.filter((doc: any) => doc && String(doc).trim() !== '');
-        editForm.value.required_fields = editForm.value.required_fields.filter((field: any) => field && String(field).trim() !== '');
+        const editFieldsSnapshot = JSON.parse(JSON.stringify(editForm.value.required_fields)) as DynamicInputFieldForm[];
+        editForm.value.required_fields = finalizeRequiredFieldsForSubmit(editForm.value.required_fields as DynamicInputFieldForm[]);
         editForm.value.processing_steps = editForm.value.processing_steps.filter((step: any) => step && String(step).trim() !== '');
 
         // Convert null category to empty string for backend
@@ -641,6 +652,9 @@ const submitEdit = () => {
             },
             onError: (errors: any) => {
                 console.error('Edit errors:', errors);
+                if (editForm.value) {
+                    editForm.value.required_fields = editFieldsSnapshot;
+                }
                 toast.error('Failed to update document type. Please check the form for errors.');
             },
             onFinish: () => {
@@ -1108,40 +1122,73 @@ const categoryOptions = [
                     <div class="bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 rounded-xl p-6">
                         <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
                             <Tag class="h-5 w-5 text-cyan-600" />
-                            Required Fields
+                            Resident request fields
                         </h3>
-                        <p class="text-xs text-gray-600 mb-4">These are text fields that residents must fill in when requesting this document type.</p>
+                        <p class="text-xs text-gray-600 mb-4">
+                            Configure fields residents fill when requesting this document (text, dates, numbers, dropdowns). Keys are auto-generated from labels if left blank.
+                        </p>
 
                         <div class="space-y-4">
-                            <div class="space-y-2">
-                                <div class="flex gap-2">
-                                    <Input
-                                        v-model="newRequiredField"
-                                        placeholder="Enter field name(s) - Use commas or new lines for multiple"
-                                        class="flex-1 border-gray-200 focus:border-cyan-500 focus:ring-cyan-500"
-                                        @keyup.enter="addRequiredField"
-                                    />
-                                    <Button type="button" @click="addRequiredField" variant="outline" size="sm" class="px-4">
-                                        <Plus class="h-4 w-4 mr-1" />
-                                        Add
-                                    </Button>
-                                </div>
-                                <p class="flex items-start gap-2 text-xs text-gray-500">
-                                    <Lightbulb class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                                    <span>Tip: Examples: "Purpose", "Business Name", "Contact Number", etc.</span>
-                                </p>
-                            </div>
+                            <Button type="button" variant="outline" size="sm" class="w-full sm:w-auto" @click="addCreateDynamicField">
+                                <Plus class="h-4 w-4 mr-1" />
+                                Add field
+                            </Button>
 
-                            <div v-if="Array.isArray(createForm.required_fields) && createForm.required_fields.length > 0" class="space-y-2">
-                                <div v-for="(field, index) in createForm.required_fields" :key="`create-field-${index}`" class="flex items-center gap-2 p-3 bg-white rounded border border-gray-200 hover:border-cyan-300 transition-colors">
-                                    <div class="flex-1">
-                                        <span class="text-sm text-gray-900 font-medium">{{ field }}</span>
+                            <div v-if="Array.isArray(createForm.required_fields) && createForm.required_fields.length > 0" class="space-y-4">
+                                <div
+                                    v-for="(field, index) in createForm.required_fields"
+                                    :key="`create-field-${index}`"
+                                    class="p-4 bg-white rounded-lg border border-cyan-200 space-y-3"
+                                >
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <Label class="text-xs text-gray-600">Label (shown to resident)</Label>
+                                            <Input v-model="field.label" placeholder="e.g. Purpose of request" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <Label class="text-xs text-gray-600">Field key (optional)</Label>
+                                            <Input v-model="field.key" placeholder="Auto from label if empty" class="mt-1 font-mono text-sm" />
+                                        </div>
+                                        <div>
+                                            <Label class="text-xs text-gray-600">Input type</Label>
+                                            <Select v-model="field.type">
+                                                <SelectTrigger class="mt-1">
+                                                    <SelectValue placeholder="Type" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem v-for="t in dynamicFieldTypes" :key="t" :value="t">{{ t }}</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div class="flex items-end gap-2 pb-1">
+                                            <div class="flex items-center gap-2">
+                                                <input
+                                                    :id="`create-req-${index}`"
+                                                    v-model="field.required"
+                                                    type="checkbox"
+                                                    class="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                                                />
+                                                <Label :for="`create-req-${index}`" class="text-sm cursor-pointer">Required</Label>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <Button type="button" @click="removeRequiredField(index)" variant="ghost" size="sm" class="h-6 w-6 p-0 text-red-600 hover:bg-red-50 flex-shrink-0">
-                                        <X class="h-4 w-4" />
-                                    </Button>
+                                    <div>
+                                        <Label class="text-xs text-gray-600">Placeholder (optional)</Label>
+                                        <Input v-model="field.placeholder" class="mt-1" placeholder="Hint text" />
+                                    </div>
+                                    <div v-if="field.type === 'select'">
+                                        <Label class="text-xs text-gray-600">Options (comma or new line separated)</Label>
+                                        <Textarea v-model="field.optionsText" class="mt-1" rows="2" placeholder="Option A, Option B" />
+                                    </div>
+                                    <div class="flex justify-end">
+                                        <Button type="button" variant="ghost" size="sm" class="text-red-600" @click="removeCreateDynamicField(index)">
+                                            <X class="h-4 w-4 mr-1" />
+                                            Remove
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
+                            <p v-else class="text-sm text-gray-500 italic">No custom fields yet. Add fields if residents must supply extra information.</p>
                         </div>
                     </div>
 
@@ -1415,42 +1462,74 @@ const categoryOptions = [
                     <div class="bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 rounded-xl p-6">
                         <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
                             <Tag class="h-5 w-5 text-cyan-600" />
-                            Required Fields
+                            Resident request fields
                         </h3>
-                        <p class="text-xs text-gray-600 mb-4">These are text fields that residents must fill in when requesting this document type.</p>
+                        <p class="text-xs text-gray-600 mb-4">
+                            Configure fields residents fill when requesting this document (text, dates, numbers, dropdowns).
+                        </p>
 
                         <div class="space-y-4">
-                            <div class="space-y-2">
-                                <div class="flex gap-2">
-                                    <Input
-                                        v-model="newRequiredField"
-                                        placeholder="Enter field name(s) - Use commas or new lines for multiple"
-                                        class="flex-1 border-gray-200 focus:border-cyan-500 focus:ring-cyan-500"
-                                        @keyup.enter="addEditRequiredField"
-                                    />
-                                    <Button type="button" @click="addEditRequiredField" variant="outline" size="sm" class="px-4">
-                                        <Plus class="h-4 w-4 mr-1" />
-                                        Add
-                                    </Button>
-                                </div>
-                                <p class="flex items-start gap-2 text-xs text-gray-500">
-                                    <Lightbulb class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                                    <span>Tip: Examples: "Purpose", "Business Name", "Contact Number", etc.</span>
-                                </p>
-                            </div>
+                            <Button type="button" variant="outline" size="sm" class="w-full sm:w-auto" @click="addEditDynamicField">
+                                <Plus class="h-4 w-4 mr-1" />
+                                Add field
+                            </Button>
 
-                            <div v-if="editForm && Array.isArray(editForm.required_fields) && editForm.required_fields.length > 0" class="space-y-2">
-                                <div v-for="(field, index) in editForm.required_fields" :key="`edit-field-${index}`" class="flex items-center gap-2 p-3 bg-white rounded border border-gray-200 hover:border-cyan-300 transition-colors">
-                                    <div class="flex-1">
-                                        <span class="text-sm text-gray-900 font-medium">{{ field }}</span>
+                            <div v-if="editForm && Array.isArray(editForm.required_fields) && editForm.required_fields.length > 0" class="space-y-4">
+                                <div
+                                    v-for="(field, index) in editForm.required_fields"
+                                    :key="`edit-field-${index}`"
+                                    class="p-4 bg-white rounded-lg border border-cyan-200 space-y-3"
+                                >
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <Label class="text-xs text-gray-600">Label (shown to resident)</Label>
+                                            <Input v-model="field.label" placeholder="e.g. Purpose of request" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <Label class="text-xs text-gray-600">Field key (optional)</Label>
+                                            <Input v-model="field.key" placeholder="Auto from label if empty" class="mt-1 font-mono text-sm" />
+                                        </div>
+                                        <div>
+                                            <Label class="text-xs text-gray-600">Input type</Label>
+                                            <Select v-model="field.type">
+                                                <SelectTrigger class="mt-1">
+                                                    <SelectValue placeholder="Type" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem v-for="t in dynamicFieldTypes" :key="`e-${t}`" :value="t">{{ t }}</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div class="flex items-end gap-2 pb-1">
+                                            <div class="flex items-center gap-2">
+                                                <input
+                                                    :id="`edit-req-${index}`"
+                                                    v-model="field.required"
+                                                    type="checkbox"
+                                                    class="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                                                />
+                                                <Label :for="`edit-req-${index}`" class="text-sm cursor-pointer">Required</Label>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <Button type="button" @click="removeEditRequiredField(index)" variant="ghost" size="sm" class="h-6 w-6 p-0 text-red-600 hover:bg-red-50 flex-shrink-0">
-                                        <X class="h-4 w-4" />
-                                    </Button>
+                                    <div>
+                                        <Label class="text-xs text-gray-600">Placeholder (optional)</Label>
+                                        <Input v-model="field.placeholder" class="mt-1" placeholder="Hint text" />
+                                    </div>
+                                    <div v-if="field.type === 'select'">
+                                        <Label class="text-xs text-gray-600">Options (comma or new line separated)</Label>
+                                        <Textarea v-model="field.optionsText" class="mt-1" rows="2" placeholder="Option A, Option B" />
+                                    </div>
+                                    <div class="flex justify-end">
+                                        <Button type="button" variant="ghost" size="sm" class="text-red-600" @click="removeEditDynamicField(index)">
+                                            <X class="h-4 w-4 mr-1" />
+                                            Remove
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                             <div v-else-if="editForm && (!Array.isArray(editForm.required_fields) || editForm.required_fields.length === 0)" class="text-sm text-gray-500 italic">
-                                No required fields added yet
+                                No custom fields added yet
                             </div>
                         </div>
                     </div>

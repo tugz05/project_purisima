@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\DocumentType;
 use App\Services\PendingFileUploadService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -47,6 +48,44 @@ class TransactionRequest extends FormRequest
             ],
             'fee_amount' => ['nullable', 'numeric', 'min:0'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function (\Illuminate\Validation\Validator $v): void {
+            $typeCode = $this->input('type');
+            if (! is_string($typeCode) || $typeCode === '') {
+                return;
+            }
+
+            $documentType = DocumentType::where('code', $typeCode)->first();
+            if (! $documentType) {
+                return;
+            }
+
+            $defs = DocumentType::normalizeDynamicInputFields($documentType->required_fields);
+            $answers = $this->input('required_fields', []);
+            if (! is_array($answers)) {
+                $answers = [];
+            }
+
+            foreach ($defs as $def) {
+                if (! $def['required']) {
+                    continue;
+                }
+
+                $key = $def['key'];
+                $val = $answers[$key] ?? null;
+                $empty = $val === null || (is_string($val) && trim($val) === '');
+
+                if ($empty) {
+                    $v->errors()->add(
+                        'required_fields.'.$key,
+                        'The '.$def['label'].' field is required.'
+                    );
+                }
+            }
+        });
     }
 
     public function messages(): array

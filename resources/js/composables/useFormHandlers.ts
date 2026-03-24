@@ -134,6 +134,21 @@ export function useFormHandlers() {
             form.fee_amount = typeInfo.fee;
             form.submitted_documents = {};
             form.submitted_document_upload_ids = {};
+            form.required_fields = {};
+            const defs: Array<{ key: string }> =
+                Array.isArray(typeInfo.input_fields) && typeInfo.input_fields.length > 0
+                    ? typeInfo.input_fields
+                    : (Array.isArray(typeInfo.required_fields) ? typeInfo.required_fields : []).map((s: string, i: number) => ({
+                          key: String(s)
+                              .toLowerCase()
+                              .replace(/[^a-z0-9]+/g, '_')
+                              .replace(/^_|_$/g, '') || `field_${i}`,
+                      }));
+            defs.forEach((f) => {
+                if (f.key) {
+                    form.required_fields[f.key] = '';
+                }
+            });
             clearTransactionDocumentUploadSlots();
         }
     };
