@@ -5,6 +5,7 @@ import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { getPusher, isPusherAvailable } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
 import { subscribeToConversationChannel } from '@/composables/useMessagingPusher';
+import { playMessageSound } from '@/composables/useInAppAlertSounds';
 import { scheduleScrollToBottom } from '@/utils/scheduleScrollToBottom';
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { Button } from '@/components/ui/button';
@@ -277,6 +278,7 @@ const bindRealtime = () => {
             if (e.message.sender.id === authUserId.value) {
                 return;
             }
+            playMessageSound(e.message.id);
             appendMessageIfNew(e.message as Message);
             scrollToBottom();
         },

@@ -41,6 +41,7 @@ import { MESSAGING_QUICK_EMOJIS, postConversationMessage } from '@/utils/messagi
 import { mergeMessagingPendingAttachments } from '@/utils/messagingComposerUpload';
 import { useMessagingInPageUpload } from '@/composables/useMessagingInPageUpload';
 import { subscribeToConversationChannel, subscribeToStaffMessagingInboxChannel } from '@/composables/useMessagingPusher';
+import { playMessageSound } from '@/composables/useInAppAlertSounds';
 import { scheduleScrollToBottom } from '@/utils/scheduleScrollToBottom';
 
 interface Conversation {
@@ -613,6 +614,7 @@ const setupRealTimeMessaging = () => {
             if (e.message.sender.id === props.currentUser?.id) {
                 return;
             }
+            playMessageSound(e.message.id);
             appendMessageIfNew(e.message);
 
             const convIndex = props.conversations?.data?.findIndex((c) => c.id === e.conversation.id);
@@ -652,6 +654,7 @@ const setupUserChannel = () => {
             if (e.message.sender.id === props.currentUser.id) {
                 return;
             }
+            playMessageSound(e.message.id);
             const convId = e.conversation.id;
             const row = props.conversations?.data?.find((c) => c.id === convId);
             if (row) {

@@ -170,6 +170,7 @@ import {
   User,
 } from 'lucide-vue-next';
 import { getPusher } from '@/pusher';
+import { playMessageSound, playNotificationSound } from '@/composables/useInAppAlertSounds';
 
 interface Notification {
   id: number;
@@ -402,6 +403,7 @@ const startNotificationRealtime = (): void => {
                 if (e?.message?.sender?.id && e.message.sender.id === uid) {
                     return;
                 }
+                playMessageSound(e?.message?.id as number | undefined);
                 unreadCount.value = (unreadCount.value || 0) + 1;
                 const badge = document.getElementById('header-unread-badge');
                 if (badge) {
@@ -411,6 +413,7 @@ const startNotificationRealtime = (): void => {
                 }
             });
             channel.bind('notification.created', () => {
+                playNotificationSound();
                 void loadUnreadCount();
             });
         }

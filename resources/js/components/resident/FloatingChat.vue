@@ -4,6 +4,7 @@ import { usePage } from '@inertiajs/vue3';
 import { getPusher, isPusherAvailable } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
 import { subscribeToConversationChannel, subscribeToUserMessagingChannel } from '@/composables/useMessagingPusher';
+import { playMessageSound } from '@/composables/useInAppAlertSounds';
 import { scheduleScrollToBottom } from '@/utils/scheduleScrollToBottom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -389,6 +390,7 @@ const setupRealTimeMessaging = () => {
             if (e.message.sender.id === currentUser.value?.id) {
                 return;
             }
+            playMessageSound(e.message.id);
             addMessageIfNew(e.message);
             const targetConversationId = e.conversation?.id ?? convId;
             const row = conversations.value.find((c) => c.id === targetConversationId);
@@ -431,6 +433,7 @@ const setupUserMessagingChannel = () => {
             if (activelyViewing) {
                 return;
             }
+            playMessageSound(e.message.id);
             const conv = conversations.value.find((c) => c.id === cid);
             if (conv) {
                 conv.unread_count = (conv.unread_count || 0) + 1;

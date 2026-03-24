@@ -10,6 +10,7 @@ import { getPusher } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
 import { STAFF_MESSAGING_UNREAD_EVENT, dispatchStaffMessagingUnreadCount } from '@/staffMessagingEvents';
 import PwaInstallButton from '@/components/PwaInstallButton.vue';
+import { playMessageSound } from '@/composables/useInAppAlertSounds';
 
 withDefaults(
     defineProps<{
@@ -115,6 +116,7 @@ onMounted(() => {
                 if (e?.message?.sender?.id === currentUser?.id) {
                     return;
                 }
+                playMessageSound(e?.message?.id as number | undefined);
                 const fromPayload = e?.staff_messaging_unread_total;
                 if (typeof fromPayload === 'number' && !Number.isNaN(fromPayload)) {
                     applyUnreadFromServerPayload(fromPayload);
