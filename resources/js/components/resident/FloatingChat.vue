@@ -544,7 +544,7 @@ onBeforeUnmount(() => {
     >
         <div
             v-if="isOpen"
-            class="fixed z-[9999] flex flex-col overflow-hidden rounded-2xl border border-gray-300 bg-white shadow-2xl transform-gpu max-md:left-3 max-md:right-3 max-md:w-auto md:left-auto md:rounded-lg md:shadow-2xl"
+            class="fixed z-[9999] flex min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-300 bg-white shadow-2xl transform-gpu max-md:left-3 max-md:right-3 max-md:w-auto md:left-auto md:rounded-lg md:shadow-2xl"
             :class="[
                 isMinimized
                     ? 'h-14 md:w-80'
@@ -604,7 +604,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Messages + composer: flex column so height works on mobile -->
-        <div v-if="!isMinimized" class="flex min-h-0 flex-1 flex-col">
+        <div v-if="!isMinimized" class="flex min-h-0 min-w-0 flex-1 flex-col">
             <div
                 ref="messagesScrollRef"
                 class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain bg-gray-50 px-4 py-3"
@@ -677,13 +677,15 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-        <div class="shrink-0 border-t border-gray-200 bg-white p-3">
-            <div class="flex h-full items-center gap-2">
-                <div class="flex-1">
+        <div
+            class="shrink-0 w-full min-w-0 border-t border-gray-200 bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:p-3 sm:pb-3"
+        >
+            <div class="flex w-full min-w-0 items-stretch gap-2">
+                <div class="min-w-0 flex-1">
                     <Input
                         v-model="messageContent"
                         placeholder="Type a message..."
-                        class="rounded-lg border-gray-300 bg-white px-3 py-2.5 text-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none w-full"
+                        class="box-border h-10 w-full min-w-0 max-w-full rounded-lg border-gray-300 bg-white py-0 pl-3 pr-2 text-base leading-normal placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:h-9 sm:text-sm"
                         @keydown.enter.prevent="sendMessage"
                         @input="handleTyping"
                         @keydown.enter="stopTyping"
@@ -691,12 +693,14 @@ onBeforeUnmount(() => {
                     />
                 </div>
                 <Button
+                    type="button"
+                    aria-label="Send message"
                     @click="sendMessage"
                     :disabled="!messageContent.trim() || isSending || isLoading"
                     size="sm"
-                    class="h-10 px-3 bg-slate-700 hover:bg-slate-800 disabled:bg-gray-300 transition-colors"
+                    class="h-10 w-10 shrink-0 p-0 md:h-10 md:w-auto md:px-3 bg-slate-700 hover:bg-slate-800 disabled:bg-gray-300 transition-colors"
                 >
-                    <Send class="h-4 w-4 text-white" />
+                    <Send class="h-4 w-4 shrink-0 text-white" />
                 </Button>
             </div>
         </div>
