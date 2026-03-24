@@ -13,7 +13,7 @@ class BroadcastingController extends Controller
     public function authenticate(Request $request)
     {
         // Ensure user is authenticated
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
@@ -25,7 +25,7 @@ class BroadcastingController extends Controller
             \Log::info('Broadcasting auth attempt', [
                 'user_id' => auth()->id(),
                 'channel_name' => $channelName,
-                'socket_id' => $request->input('socket_id')
+                'socket_id' => $request->input('socket_id'),
             ]);
 
             // Handle conversation channels
@@ -36,12 +36,13 @@ class BroadcastingController extends Controller
                 if ($conversation && $conversation->isParticipant(auth()->user())) {
                     \Log::info('Conversation channel authorized', [
                         'conversation_id' => $conversationId,
-                        'user_id' => auth()->id()
+                        'user_id' => auth()->id(),
                     ]);
                     try {
                         return Broadcast::auth($request);
                     } catch (\Throwable $e) {
                         \Log::warning('Broadcast auth failed', ['message' => $e->getMessage()]);
+
                         return response()->json(['error' => 'Broadcast unavailable'], 503);
                     }
                 } else {
@@ -49,8 +50,21 @@ class BroadcastingController extends Controller
                         'conversation_id' => $conversationId,
                         'user_id' => auth()->id(),
                         'conversation_exists' => $conversation ? 'yes' : 'no',
-                        'is_participant' => $conversation ? $conversation->isParticipant(auth()->user()) : 'no'
+                        'is_participant' => $conversation ? $conversation->isParticipant(auth()->user()) : 'no',
                     ]);
+                }
+            }
+
+            if ($channelName === 'private-messaging.staff') {
+                $user = auth()->user();
+                if ($user && in_array($user->role, ['staff', 'admin'], true)) {
+                    try {
+                        return Broadcast::auth($request);
+                    } catch (\Throwable $e) {
+                        \Log::warning('Broadcast auth failed', ['message' => $e->getMessage()]);
+
+                        return response()->json(['error' => 'Broadcast unavailable'], 503);
+                    }
                 }
             }
 
@@ -59,12 +73,13 @@ class BroadcastingController extends Controller
                 $userId = str_replace('private-App.Models.User.', '', $channelName);
                 if (auth()->id() == $userId) {
                     \Log::info('User channel authorized', [
-                        'user_id' => auth()->id()
+                        'user_id' => auth()->id(),
                     ]);
                     try {
                         return Broadcast::auth($request);
                     } catch (\Throwable $e) {
                         \Log::warning('Broadcast auth failed', ['message' => $e->getMessage()]);
+
                         return response()->json(['error' => 'Broadcast unavailable'], 503);
                     }
                 }
@@ -73,11 +88,9 @@ class BroadcastingController extends Controller
 
         \Log::warning('Broadcasting auth denied', [
             'user_id' => auth()->id(),
-            'channel_name' => $request->input('channel_name', 'none')
+            'channel_name' => $request->input('channel_name', 'none'),
         ]);
 
         return response()->json(['error' => 'Unauthorized'], 403);
     }
 }
-
-

@@ -17,9 +17,8 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
 
-// Global user notifications for unread badges
-Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
-    return (int) $user->id === (int) $id;
+Broadcast::channel('messaging.staff', function ($user) {
+    return in_array($user->role, ['staff', 'admin'], true);
 });
 
 // Conversation channel authorization
@@ -27,11 +26,10 @@ Broadcast::channel('conversation.{conversationId}', function ($user, $conversati
     // Get the conversation
     $conversation = \App\Models\Conversation::find($conversationId);
 
-    if (!$conversation) {
+    if (! $conversation) {
         return false;
     }
 
     // Check if user is a participant in the conversation
     return $conversation->isParticipant($user);
 });
-

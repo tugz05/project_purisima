@@ -24,6 +24,11 @@ export type MessageSentPayload = {
         resident_has_unread?: boolean;
         staff_has_unread?: boolean;
     };
+    /** Present when a resident sent a message (shared staff inbox). */
+    staff_messaging_unread_total?: number | null;
+    /** Present when staff sent; resident should apply if recipient_user_id matches. */
+    recipient_user_id?: number | null;
+    recipient_messaging_unread_total?: number | null;
 };
 
 export type UserTypingPayload = {
@@ -60,6 +65,32 @@ export function subscribeToConversationChannel(
         try {
             channel.unbind('message.sent', onMessage);
             channel.unbind('user.typing', onTyping);
+            pusher.unsubscribe(name);
+        } catch {
+            // ignore
+        }
+    };
+}
+
+/**
+ * Shared staff inbox: all staff receive resident-originated messages for badges and list sync.
+ */
+export function subscribeToStaffMessagingInboxChannel(handlers: {
+    onMessageSent: (payload: MessageSentPayload) => void;
+}): () => void {
+    const pusher = getPusher();
+    if (!pusher || !isPusherAvailable()) {
+        return () => {};
+    }
+
+    const name = 'private-messaging.staff';
+    const channel = pusher.subscribe(name);
+    const onMessage = (e: MessageSentPayload) => handlers.onMessageSent(e);
+    channel.bind('message.sent', onMessage);
+
+    return () => {
+        try {
+            channel.unbind('message.sent', onMessage);
             pusher.unsubscribe(name);
         } catch {
             // ignore

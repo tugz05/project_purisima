@@ -8,7 +8,7 @@ import { MessageSquare } from 'lucide-vue-next';
 import type { BreadcrumbItemType } from '@/types';
 import { getPusher } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
-import { STAFF_MESSAGING_UNREAD_EVENT } from '@/staffMessagingEvents';
+import { STAFF_MESSAGING_UNREAD_EVENT, dispatchStaffMessagingUnreadCount } from '@/staffMessagingEvents';
 import PwaInstallButton from '@/components/PwaInstallButton.vue';
 
 withDefaults(
@@ -36,6 +36,17 @@ function initialMessagingUnread(): number {
 const headerUnread = ref<number>(initialMessagingUnread());
 let headerChannelName = '';
 let fetchUnreadDebounce: ReturnType<typeof setTimeout> | null = null;
+let pollingTimer: ReturnType<typeof setInterval> | null = null;
+
+const MESSAGING_UNREAD_POLL_MS = 20000;
+
+const applyUnreadFromServerPayload = (n: number): void => {
+    if (Number.isNaN(n)) {
+        return;
+    }
+    headerUnread.value = n;
+    dispatchStaffMessagingUnreadCount(n);
+};
 
 const scheduleUnreadRefresh = (): void => {
     if (!isStaff) {
@@ -52,13 +63,29 @@ const scheduleUnreadRefresh = (): void => {
                 const d = await r.json();
                 const n = Number(d.count);
                 if (!Number.isNaN(n)) {
-                    headerUnread.value = n;
+                    applyUnreadFromServerPayload(n);
                 }
             }
         } catch {
             // ignore
         }
-    }, 280);
+    }, 120);
+};
+
+const startMessagingUnreadPolling = (): void => {
+    if (!isStaff || getPusher() || pollingTimer) {
+        return;
+    }
+    pollingTimer = setInterval(() => {
+        scheduleUnreadRefresh();
+    }, MESSAGING_UNREAD_POLL_MS);
+};
+
+const stopMessagingUnreadPolling = (): void => {
+    if (pollingTimer) {
+        clearInterval(pollingTimer);
+        pollingTimer = null;
+    }
 };
 
 watch(
@@ -81,21 +108,30 @@ onMounted(() => {
     window.addEventListener(STAFF_MESSAGING_UNREAD_EVENT, onStaffMessagingUnread);
     try {
         const pusher = getPusher();
-        if (isStaff && pusher && currentUser?.id) {
-            headerChannelName = `private-App.Models.User.${currentUser.id}`;
+        if (isStaff && pusher) {
+            headerChannelName = 'private-messaging.staff';
             const channel = pusher.subscribe(headerChannelName);
             channel.bind('message.sent', (e: any) => {
-                if (e?.message?.sender?.id === currentUser.id) {
+                if (e?.message?.sender?.id === currentUser?.id) {
+                    return;
+                }
+                const fromPayload = e?.staff_messaging_unread_total;
+                if (typeof fromPayload === 'number' && !Number.isNaN(fromPayload)) {
+                    applyUnreadFromServerPayload(fromPayload);
                     return;
                 }
                 scheduleUnreadRefresh();
             });
+        } else if (isStaff) {
+            scheduleUnreadRefresh();
+            startMessagingUnreadPolling();
         }
     } catch (_e) {}
 });
 
 onUnmounted(() => {
     window.removeEventListener(STAFF_MESSAGING_UNREAD_EVENT, onStaffMessagingUnread);
+    stopMessagingUnreadPolling();
     if (fetchUnreadDebounce) {
         clearTimeout(fetchUnreadDebounce);
         fetchUnreadDebounce = null;

@@ -28,7 +28,7 @@ import {
 } from 'lucide-vue-next';
 import { getPusher, isPusherAvailable } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
-import { subscribeToConversationChannel, subscribeToUserMessagingChannel } from '@/composables/useMessagingPusher';
+import { subscribeToConversationChannel, subscribeToStaffMessagingInboxChannel } from '@/composables/useMessagingPusher';
 import { scheduleScrollToBottom } from '@/utils/scheduleScrollToBottom';
 
 interface Conversation {
@@ -398,7 +398,7 @@ const setupUserChannel = () => {
         return;
     }
 
-    unsubscribeUser = subscribeToUserMessagingChannel(props.currentUser.id, {
+    unsubscribeUser = subscribeToStaffMessagingInboxChannel({
         onMessageSent: async (e) => {
             if (e.message.sender.id === props.currentUser.id) {
                 return;
@@ -428,6 +428,11 @@ const setupUserChannel = () => {
                 } catch {
                     // ignore
                 }
+            }
+            const serverTotal = e.staff_messaging_unread_total;
+            if (typeof serverTotal === 'number' && !Number.isNaN(serverTotal)) {
+                sidebarUnreadCount.value = serverTotal;
+                dispatchStaffMessagingUnreadCount(serverTotal);
             }
         },
     });

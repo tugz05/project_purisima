@@ -4,7 +4,8 @@ namespace App\Events;
 
 use App\Models\Conversation;
 use App\Models\Message;
-use Illuminate\Broadcasting\Channel;
+use App\Models\User;
+use App\Services\MessagingService;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -39,19 +40,12 @@ class MessageSent implements ShouldBroadcastNow
             new PrivateChannel('conversation.'.$this->conversation->id),
         ];
 
-        // Also notify the other participant via their user channel for global badges
-        $recipientIds = [];
-        if ($this->message->sender_id !== $this->conversation->resident_id) {
-            $recipientIds[] = $this->conversation->resident_id;
-        }
-        if ($this->message->sender_id !== $this->conversation->staff_id) {
-            $recipientIds[] = $this->conversation->staff_id;
-        }
-
-        foreach ($recipientIds as $recipientId) {
-            if ($recipientId) {
-                $channels[] = new PrivateChannel('App.Models.User.'.$recipientId);
-            }
+        if ($this->message->sender_id === $this->conversation->resident_id) {
+            // Shared staff inbox: every staff/admin needs badge + list updates
+            $channels[] = new PrivateChannel('messaging.staff');
+        } elseif ($this->conversation->resident_id) {
+            // Staff sent → notify resident on their private channel (floating chat badge)
+            $channels[] = new PrivateChannel('App.Models.User.'.$this->conversation->resident_id);
         }
 
         return $channels;
@@ -70,6 +64,23 @@ class MessageSent implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
+        $staffMessagingUnreadTotal = null;
+        $recipientUserId = null;
+        $recipientMessagingUnreadTotal = null;
+
+        if ($this->message->sender_id === $this->conversation->resident_id) {
+            $staffUser = User::query()->find($this->conversation->staff_id);
+            if ($staffUser !== null) {
+                $staffMessagingUnreadTotal = app(MessagingService::class)->getUnreadCount($staffUser);
+            }
+        } elseif ($this->conversation->resident_id) {
+            $recipientUserId = $this->conversation->resident_id;
+            $recipient = User::query()->find($recipientUserId);
+            if ($recipient !== null) {
+                $recipientMessagingUnreadTotal = app(MessagingService::class)->getUnreadCount($recipient);
+            }
+        }
+
         return [
             'message' => [
                 'id' => $this->message->id,
@@ -94,6 +105,9 @@ class MessageSent implements ShouldBroadcastNow
                 'resident_has_unread' => $this->conversation->resident_has_unread,
                 'staff_has_unread' => $this->conversation->staff_has_unread,
             ],
+            'staff_messaging_unread_total' => $staffMessagingUnreadTotal,
+            'recipient_user_id' => $recipientUserId,
+            'recipient_messaging_unread_total' => $recipientMessagingUnreadTotal,
         ];
     }
 }

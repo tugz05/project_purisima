@@ -30,7 +30,7 @@ class NotificationController extends Controller
         $notifications = $this->notificationService->getUserNotifications($user, 20);
         $unreadCount = $this->notificationService->getUnreadCount($user);
 
-        return Inertia::render('staff/Notifications/Index', [
+        return Inertia::render('Staff/Notifications/Index', [
             'notifications' => $notifications,
             'unreadCount' => $unreadCount,
         ]);
