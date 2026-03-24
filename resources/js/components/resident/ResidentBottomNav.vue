@@ -58,8 +58,10 @@ const navItems = [
 </script>
 
 <template>
-    <nav class="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] md:hidden">
-        <div class="flex items-center justify-around h-[72px] px-1 pb-safe-area-inset-bottom">
+    <nav
+        class="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200/80 bg-white/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur-md md:hidden pb-[env(safe-area-inset-bottom,0px)]"
+    >
+        <div class="flex h-[72px] items-center justify-around px-1">
             <Link
                 v-for="item in navItems"
                 :key="item.title"
@@ -121,27 +123,10 @@ const navItems = [
                 />
             </Link>
         </div>
-
-        <!-- Safe area for devices with home indicator -->
-        <div class="h-safe-area-inset-bottom bg-white/95 backdrop-blur-md"></div>
     </nav>
 </template>
 
 <style scoped>
-/* Safe area support for devices with home indicator */
-.h-safe-area-inset-bottom {
-    height: env(safe-area-inset-bottom, 0px);
-}
-
-.pb-safe-area-inset-bottom {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-/* Ensure content doesn't get hidden behind the bottom nav */
-:global(body) {
-    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-}
-
 /* Smooth transitions for all interactive elements */
 nav a {
     -webkit-tap-highlight-color: transparent;

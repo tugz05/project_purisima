@@ -105,7 +105,7 @@
                         <h3 class="text-lg font-semibold text-gray-900 mb-2">No recent activity</h3>
                         <p class="text-gray-600 mb-4">Your recent transactions will appear here</p>
                         <Link
-                            :href="resident.transactions.create().url"
+                            :href="resident.transactions.index().url"
                             class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
                         >
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

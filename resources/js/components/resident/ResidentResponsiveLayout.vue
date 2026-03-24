@@ -147,7 +147,7 @@ onUnmounted(() => {
         </header>
 
         <!-- Mobile Content -->
-        <main class="flex-1 pb-20">
+        <main class="flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
             <slot />
         </main>
 
