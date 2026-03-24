@@ -7,11 +7,12 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__ . '/../routes/web.php',
-        commands: __DIR__ . '/../routes/console.php',
+        web: __DIR__.'/../routes/web.php',
+        commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
@@ -44,29 +45,29 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // Handle Inertia requests - return JSON instead of trying to render exception views
-        $exceptions->respond(function (\Illuminate\Http\Request $request, \Throwable $e) {
-            // For Inertia requests or API requests, return JSON response
-            if ($request->expectsJson() || $request->header('X-Inertia') || $request->is('api/*')) {
-                $statusCode = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
-                
-                // Handle validation exceptions
-                if ($e instanceof \Illuminate\Validation\ValidationException) {
-                    return response()->json([
-                        'message' => $e->getMessage(),
-                        'errors' => $e->errors(),
-                    ], 422);
-                }
-                
+        // Laravel passes ($response, $e, $request) to respond callbacks — see Handler::finalizeRenderedResponse().
+        $exceptions->respond(function (SymfonyResponse $response, \Throwable $e, Request $request): SymfonyResponse {
+            if (! $request->expectsJson() && ! $request->header('X-Inertia') && ! $request->is('api/*')) {
+                return $response;
+            }
+
+            $statusCode = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+
+            if ($e instanceof \Illuminate\Validation\ValidationException) {
                 return response()->json([
                     'message' => $e->getMessage(),
-                    'error' => config('app.debug') ? [
-                        'exception' => get_class($e),
-                        'file' => $e->getFile(),
-                        'line' => $e->getLine(),
-                        'trace' => config('app.debug') ? $e->getTraceAsString() : null,
-                    ] : null,
-                ], $statusCode);
+                    'errors' => $e->errors(),
+                ], 422);
             }
+
+            return response()->json([
+                'message' => $e->getMessage(),
+                'error' => config('app.debug') ? [
+                    'exception' => $e::class,
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                ] : null,
+            ], $statusCode);
         });
     })->create();
