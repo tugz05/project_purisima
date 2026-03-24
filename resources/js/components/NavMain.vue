@@ -24,6 +24,10 @@ const props = withDefaults(defineProps<Props>(), {
 
 const page = usePage();
 
+const formatNavBadge = (count: number): string => (count > 99 ? '99+' : String(count));
+
+const navItemShowsBadge = (item: NavItem): boolean => typeof item.badge === 'number' && item.badge > 0;
+
 const handleClick = (href: string, e: Event) => {
     if (props.disabled && href !== resident.onboarding.show().url) {
         e.preventDefault();
