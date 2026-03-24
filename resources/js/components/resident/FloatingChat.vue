@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import { getPusher, isPusherAvailable } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
@@ -61,6 +61,19 @@ let unsubscribeConversation: (() => void) | null = null;
 let unsubscribeUser: (() => void) | null = null;
 /** Unread total when conversation list is empty but server has unread messages */
 const bootstrapUnread = ref(0);
+const messagesScrollRef = ref<HTMLElement | null>(null);
+
+const scrollMessagesToBottom = (): void => {
+    nextTick(() => {
+        setTimeout(() => {
+            const el = messagesScrollRef.value;
+            if (el) {
+                el.scrollTop = el.scrollHeight;
+            }
+        }, 80);
+    });
+};
+
 // Utilities to safely add messages without duplicates
 const addMessageIfNew = (incomingMessage: any) => {
     if (!currentConversation.value) return;
@@ -69,13 +82,7 @@ const addMessageIfNew = (incomingMessage: any) => {
         return;
     }
     currentConversation.value.messages.push(incomingMessage);
-    // Auto-scroll to bottom
-    setTimeout(() => {
-        const messagesContainer = document.querySelector('.overflow-y-auto');
-        if (messagesContainer) {
-            (messagesContainer as HTMLElement).scrollTop = (messagesContainer as HTMLElement).scrollHeight;
-        }
-    }, 100);
+    scrollMessagesToBottom();
 };
 
 // Computed
@@ -410,12 +417,7 @@ const setupPollingUpdates = () => {
                         const deduped = fetchedMessages.filter(m => !existingIds.has(m.id));
                         if (deduped.length > 0) {
                             currentConversation.value.messages.push(...deduped);
-                            setTimeout(() => {
-                                const messagesContainer = document.querySelector('.overflow-y-auto');
-                                if (messagesContainer) {
-                                    (messagesContainer as HTMLElement).scrollTop = (messagesContainer as HTMLElement).scrollHeight;
-                                }
-                            }, 100);
+                            scrollMessagesToBottom();
                         }
                     }
                 }
@@ -462,6 +464,12 @@ watch(currentConversation, () => {
     }
 });
 
+watch(isOpen, (open) => {
+    if (open) {
+        scrollMessagesToBottom();
+    }
+});
+
 onBeforeUnmount(() => {
     if (typingTimeout.value) {
         clearTimeout(typingTimeout.value);
@@ -492,43 +500,62 @@ onBeforeUnmount(() => {
     >
         <Button
             @click="openChat"
+            :aria-label="
+                unreadCount > 0
+                    ? `Open support chat, ${unreadCount} unread message${unreadCount === 1 ? '' : 's'}`
+                    : 'Open support chat'
+            "
             :class="[
-                'h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 bg-blue-600 hover:bg-blue-700 md:h-16 md:w-16 transform hover:scale-110 active:scale-105',
+                'relative h-14 w-14 shrink-0 overflow-visible rounded-full bg-blue-600 shadow-lg transition-all duration-300 hover:bg-blue-700 hover:shadow-xl md:h-16 md:w-16 transform hover:scale-110 active:scale-105',
                 unreadCount > 0 ? '' : 'animate-pulse-glow',
             ]"
         >
-            <div class="relative flex items-center justify-center">
-                <MessageCircle class="h-7 w-7 md:h-8 md:w-8 shrink-0" />
+            <span class="relative flex h-full w-full items-center justify-center">
+                <MessageCircle class="h-7 w-7 shrink-0 md:h-8 md:w-8" />
                 <Badge
                     v-if="unreadCount > 0"
                     variant="destructive"
-                    class="absolute -top-0.5 -right-0.5 min-h-[1.125rem] min-w-[1.125rem] max-w-[2rem] px-1 rounded-full flex items-center justify-center text-[10px] font-semibold leading-none tabular-nums md:-top-2 md:-right-2 md:min-h-6 md:min-w-6 md:text-xs"
+                    aria-hidden="true"
+                    class="pointer-events-none absolute right-0 top-0 z-10 flex min-h-[1.125rem] min-w-[1.125rem] max-w-[2.5rem] translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums shadow-md md:min-h-6 md:min-w-6 md:px-2 md:text-xs"
                 >
                     {{ unreadBadgeLabel }}
                 </Badge>
-            </div>
+            </span>
         </Button>
     </div>
 
+    <!-- Mobile: dim page behind chat for focus + tap outside to close -->
+    <div
+        v-if="isOpen"
+        class="fixed inset-0 z-[9997] bg-slate-900/40 backdrop-blur-[2px] md:hidden"
+        aria-hidden="true"
+        @click="closeChat"
+    />
+
     <!-- Chat Window -->
-    <!-- Professional Enterprise Chat Window with Genie Effects -->
     <Transition
         name="chatbot-genie"
         enter-active-class="duration-500 ease-out"
         leave-active-class="duration-300 ease-in"
-        enter-from-class="opacity-0 scale-50 translate-x-full translate-y-full"
-        enter-to-class="opacity-100 scale-100 translate-x-0 translate-y-0"
-        leave-from-class="opacity-100 scale-100 translate-x-0 translate-y-0"
-        leave-to-class="opacity-0 scale-50 translate-x-full translate-y-full"
+        enter-from-class="opacity-0 max-md:translate-y-6 max-md:scale-95 md:translate-x-full md:translate-y-full md:scale-50"
+        enter-to-class="opacity-100 translate-x-0 translate-y-0 scale-100"
+        leave-from-class="opacity-100 translate-x-0 translate-y-0 scale-100"
+        leave-to-class="opacity-0 max-md:translate-y-6 max-md:scale-95 md:translate-x-full md:translate-y-full md:scale-50"
     >
         <div
             v-if="isOpen"
-            class="bg-white rounded-lg border border-gray-300 overflow-hidden transform-gpu"
-            :class="isMinimized ? 'w-80 h-14' : 'w-[400px] h-[560px]'"
-            style="position: fixed !important; bottom: 24px; right: 24px; z-index: 9999 !important; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); transform-origin: bottom right;"
+            class="fixed z-[9999] flex flex-col overflow-hidden rounded-2xl border border-gray-300 bg-white shadow-2xl transform-gpu max-md:left-3 max-md:right-3 max-md:w-auto md:left-auto md:rounded-lg md:shadow-2xl"
+            :class="[
+                isMinimized
+                    ? 'h-14 md:w-80'
+                    : 'max-md:h-[min(72dvh,calc(100svh-9.5rem))] md:h-[560px] md:w-[400px]',
+                'max-md:bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] md:bottom-6 md:right-6',
+            ]"
+            style="box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); transform-origin: bottom right;"
+            @click.stop
         >
         <!-- Professional Header -->
-        <div class="flex items-center justify-between px-4 py-3 bg-slate-700 border-b border-slate-600 rounded-t-lg">
+        <div class="flex shrink-0 items-center justify-between rounded-t-2xl border-b border-slate-600 bg-slate-700 px-4 py-3 md:rounded-t-lg">
             <div v-if="!isMinimized" class="flex items-center gap-3">
                 <div class="relative">
                     <Avatar class="h-8 w-8">
@@ -576,10 +603,12 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <!-- Professional Messages Area -->
-        <div v-if="!isMinimized" class="flex flex-col h-full">
-            <!-- Messages Container -->
-            <div class="px-4 py-3 space-y-2 bg-gray-50 overflow-y-auto" style="height: calc(100% - 140px); flex-shrink: 0;">
+        <!-- Messages + composer: flex column so height works on mobile -->
+        <div v-if="!isMinimized" class="flex min-h-0 flex-1 flex-col">
+            <div
+                ref="messagesScrollRef"
+                class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain bg-gray-50 px-4 py-3"
+            >
                 <!-- Loading State -->
                 <div v-if="isLoading" class="flex items-center justify-center h-full">
                     <div class="text-center">
@@ -648,11 +677,8 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-        </div>
-
-        <!-- Fixed Input Area - Always at Bottom -->
-        <div v-if="!isMinimized" class="absolute bottom-0 left-0 right-0 p-3 bg-white border-t border-gray-200" style="height: 80px; overflow: hidden;">
-            <div class="flex gap-2 items-center h-full">
+        <div class="shrink-0 border-t border-gray-200 bg-white p-3">
+            <div class="flex h-full items-center gap-2">
                 <div class="flex-1">
                     <Input
                         v-model="messageContent"
@@ -673,6 +699,7 @@ onBeforeUnmount(() => {
                     <Send class="h-4 w-4 text-white" />
                 </Button>
             </div>
+        </div>
         </div>
         </div>
     </Transition>
