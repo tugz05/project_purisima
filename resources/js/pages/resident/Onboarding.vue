@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import { ref, computed, watch, onUnmounted } from 'vue'
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -13,10 +13,23 @@ const props = withDefaults(
   },
 );
 
-const hasExistingAvatar = computed(() => {
-  const u = props.existingPhotoUrl?.trim();
-  return Boolean(u && u.length > 0);
+const page = usePage();
+
+/** Page prop from controller, with fallback to shared auth user (Google OAuth photo_url). */
+const resolvedExistingPhotoUrl = computed((): string | null => {
+  const fromProp = props.existingPhotoUrl?.trim();
+  if (fromProp) {
+    return fromProp;
+  }
+  const authUser = page.props.auth as { user?: { photo_url?: string | null } } | undefined;
+  const fromAuth = authUser?.user?.photo_url?.trim();
+  if (fromAuth) {
+    return fromAuth;
+  }
+  return null;
 });
+
+const hasExistingAvatar = computed(() => Boolean(resolvedExistingPhotoUrl.value));
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -75,6 +88,18 @@ onUnmounted(() => {
   revokePreview()
 })
 
+/** Single preview: new file takes priority, otherwise account / Google avatar from DB. */
+const activePreviewSrc = computed((): string => {
+  if (newPhotoPreviewUrl.value) {
+    return newPhotoPreviewUrl.value;
+  }
+  return resolvedExistingPhotoUrl.value ?? '';
+});
+
+const showProfilePreview = computed(() => activePreviewSrc.value.length > 0);
+
+const isPreviewFromUpload = computed(() => form.photo !== null);
+
 const onFileSelected = (file: File | null) => {
   form.photo = file
   items.value = []
@@ -108,6 +133,13 @@ const onDragOver = (e: DragEvent) => {
 const onDragLeave = (e: DragEvent) => {
   e.preventDefault()
   isDragging.value = false
+}
+
+const clearUploadedPhoto = (): void => {
+  onFileSelected(null)
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
 }
 
 const submit = () => {
@@ -195,29 +227,44 @@ const submit = () => {
             Upload a clear photo (JPG or PNG, max 2MB). Required unless you sign in with a provider that supplies a photo.
           </p>
           <div
-            v-if="hasExistingAvatar && !form.photo"
-            class="mb-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center"
+            v-if="showProfilePreview"
+            class="mb-4 flex flex-col gap-3 rounded-lg border border-emerald-200 bg-emerald-50/90 p-4 sm:flex-row sm:items-center"
           >
             <img
-              :src="existingPhotoUrl ?? ''"
-              alt="Current profile photo"
-              class="mx-auto h-24 w-24 shrink-0 rounded-full border-2 border-white object-cover shadow-md sm:mx-0"
+              :src="activePreviewSrc"
+              :alt="isPreviewFromUpload ? 'New photo preview' : 'Profile photo from your account'"
+              class="mx-auto h-24 w-24 shrink-0 rounded-full object-cover ring-2 ring-emerald-500/25 sm:mx-0"
+              loading="eager"
+              decoding="async"
+              referrerpolicy="no-referrer"
             />
-            <div class="min-w-0 text-center text-sm text-slate-600 sm:text-left">
-              <p class="font-medium text-slate-800">Current photo</p>
-              <p class="mt-1">This image will stay on your profile if you submit without choosing a new file.</p>
+            <div class="min-w-0 flex-1 text-center sm:text-left">
+              <p v-if="isPreviewFromUpload" class="text-sm font-medium text-emerald-950">
+                New photo selected — it will replace your current picture when you save.
+              </p>
+              <template v-else>
+                <p class="text-sm font-medium text-emerald-950">Profile photo preview</p>
+                <p class="mt-1 text-sm text-emerald-900/90">
+                  This picture is already on your account (for example from Google sign-in). It will stay unless you upload a different photo below.
+                </p>
+              </template>
+              <button
+                v-if="isPreviewFromUpload && hasExistingAvatar"
+                type="button"
+                class="mt-2 text-sm font-medium text-emerald-800 underline decoration-emerald-600/60 underline-offset-2 hover:text-emerald-950"
+                @click="clearUploadedPhoto"
+              >
+                Use account photo instead
+              </button>
+              <button
+                v-else-if="isPreviewFromUpload"
+                type="button"
+                class="mt-2 text-sm font-medium text-emerald-800 underline decoration-emerald-600/60 underline-offset-2 hover:text-emerald-950"
+                @click="clearUploadedPhoto"
+              >
+                Remove selected file
+              </button>
             </div>
-          </div>
-          <div
-            v-if="newPhotoPreviewUrl"
-            class="mb-4 flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50/80 p-4"
-          >
-            <img
-              :src="newPhotoPreviewUrl"
-              alt="New photo preview"
-              class="h-20 w-20 shrink-0 rounded-full object-cover ring-2 ring-emerald-500/30"
-            />
-            <p class="text-sm text-emerald-900">New photo selected — it will replace your current picture when you save.</p>
           </div>
           <label class="mb-1 block text-xs text-slate-500">Upload (JPG/PNG, max 2MB) — optional if you already have a photo above</label>
           <div

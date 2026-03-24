@@ -16,6 +16,8 @@ class OnboardingController extends Controller
     {
         /** @var \App\Models\User|null $user */
         $user = $request->user();
+        $user?->refresh();
+
         $existingPhotoUrl = $user !== null && is_string($user->photo_url) && trim($user->photo_url) !== ''
             ? trim($user->photo_url)
             : null;
