@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 class PaymentService
 {
+    public function __construct(
+        private PendingFileUploadService $pendingFileUploadService
+    ) {}
+
     /**
      * Process a payment for a transaction
      */
@@ -27,6 +31,30 @@ class PaymentService
 
             // Handle payment proof uploads
             $paymentProof = [];
+            if (isset($paymentData['payment_proof_upload_ids']) && is_array($paymentData['payment_proof_upload_ids'])) {
+                $cleanIds = array_values(array_filter(
+                    $paymentData['payment_proof_upload_ids'],
+                    fn ($id) => is_string($id) && $id !== ''
+                ));
+                if ($cleanIds !== []) {
+                    $metas = $this->pendingFileUploadService->consumeIds(
+                        $staffMember,
+                        $cleanIds,
+                        PendingFileUploadService::PURPOSE_PAYMENT_PROOF,
+                        'payment-proofs'
+                    );
+                    foreach ($metas as $meta) {
+                        $paymentProof[] = [
+                            'name' => $meta['name'],
+                            'path' => $meta['path'],
+                            'size' => $meta['size'],
+                            'mime_type' => $meta['mime_type'],
+                            'uploaded_at' => Carbon::now(),
+                        ];
+                    }
+                }
+            }
+
             if (isset($paymentData['payment_proof']) && is_array($paymentData['payment_proof'])) {
                 foreach ($paymentData['payment_proof'] as $file) {
                     if ($file instanceof \Illuminate\Http\UploadedFile) {

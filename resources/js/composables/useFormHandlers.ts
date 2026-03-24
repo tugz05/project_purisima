@@ -1,6 +1,14 @@
 import { ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import { toast } from 'vue-sonner';
+import { deletePendingUpload, uploadPendingFile } from '@/utils/uploadPendingFile';
+
+export interface TransactionDocumentUploadSlot {
+    id: string;
+    name: string;
+    progress: number;
+    error?: string;
+}
 
 export interface FormOptions {
     preserveState?: boolean;
@@ -13,6 +21,25 @@ export interface FormOptions {
 export function useFormHandlers() {
     const uploadProgress = ref<number | null>(null);
     const isDragging = ref(false);
+
+    const transactionDocumentUploadSlots = ref<Record<string, TransactionDocumentUploadSlot[]>>({});
+
+    const clearTransactionDocumentUploadSlots = (): void => {
+        transactionDocumentUploadSlots.value = {};
+    };
+
+    const syncTransactionUploadIdsFromSlots = (form: { submitted_document_upload_ids: Record<string, string[]> }): void => {
+        const ids: Record<string, string[]> = {};
+        Object.keys(transactionDocumentUploadSlots.value).forEach((doc) => {
+            const rowIds = transactionDocumentUploadSlots.value[doc]
+                .map((s) => s.id)
+                .filter((id) => id !== '');
+            if (rowIds.length > 0) {
+                ids[doc] = rowIds;
+            }
+        });
+        form.submitted_document_upload_ids = ids;
+    };
 
     // File handling utilities
     const handleFileSelection = (file: File | null, form: any, fieldName: string = 'photo') => {
@@ -89,6 +116,7 @@ export function useFormHandlers() {
             required_documents: [] as string[],
             required_fields: {} as Record<string, string>,
             submitted_documents: {} as Record<string, File[]>,
+            submitted_document_upload_ids: {} as Record<string, string[]>,
             fee_amount: 0,
         });
     };
@@ -104,30 +132,78 @@ export function useFormHandlers() {
             form.title = typeInfo.name;
             form.required_documents = typeInfo.required_documents;
             form.fee_amount = typeInfo.fee;
+            form.submitted_documents = {};
+            form.submitted_document_upload_ids = {};
+            clearTransactionDocumentUploadSlots();
         }
     };
 
-    // File upload functions
-    const addSubmittedDocument = (form: any, documentType: string, file: File) => {
-        if (!form.submitted_documents[documentType]) {
-            form.submitted_documents[documentType] = [];
+    const addMultipleSubmittedDocuments = async (form: any, documentType: string, files: FileList | File[]) => {
+        const list = Array.from(files as File[]);
+        if (!transactionDocumentUploadSlots.value[documentType]) {
+            transactionDocumentUploadSlots.value[documentType] = [];
         }
-        form.submitted_documents[documentType].push(file);
+        if (!form.submitted_document_upload_ids[documentType]) {
+            form.submitted_document_upload_ids[documentType] = [];
+        }
+
+        for (const file of list) {
+            const slotIndex = transactionDocumentUploadSlots.value[documentType].length;
+            transactionDocumentUploadSlots.value[documentType].push({
+                id: '',
+                name: file.name,
+                progress: 0,
+            });
+
+            try {
+                const result = await uploadPendingFile(file, 'transaction_submission', (p) => {
+                    const row = transactionDocumentUploadSlots.value[documentType][slotIndex];
+                    if (row) {
+                        row.progress = p;
+                    }
+                });
+                const row = transactionDocumentUploadSlots.value[documentType][slotIndex];
+                if (row) {
+                    row.id = result.id;
+                    row.progress = 100;
+                }
+            } catch {
+                transactionDocumentUploadSlots.value[documentType].splice(slotIndex, 1);
+                toast.error('Upload failed', {
+                    description: file.name,
+                });
+            }
+        }
+
+        form.submitted_documents[documentType] = [];
+        syncTransactionUploadIdsFromSlots(form);
     };
 
-    const removeSubmittedDocument = (form: any, documentType: string, index: number) => {
+    const addSubmittedDocument = async (form: any, documentType: string, file: File) => {
+        await addMultipleSubmittedDocuments(form, documentType, [file]);
+    };
+
+    const removeSubmittedDocument = async (form: any, documentType: string, index: number) => {
+        const slots = transactionDocumentUploadSlots.value[documentType];
+        if (!slots || !slots[index]) {
+            return;
+        }
+        const slot = slots[index];
+        if (slot.id) {
+            try {
+                await deletePendingUpload(slot.id);
+            } catch {
+                /* still remove from UI */
+            }
+        }
+        slots.splice(index, 1);
+        if (slots.length === 0) {
+            delete transactionDocumentUploadSlots.value[documentType];
+        }
         if (form.submitted_documents[documentType]) {
             form.submitted_documents[documentType].splice(index, 1);
         }
-    };
-
-    const addMultipleSubmittedDocuments = (form: any, documentType: string, files: FileList) => {
-        if (!form.submitted_documents[documentType]) {
-            form.submitted_documents[documentType] = [];
-        }
-        Array.from(files).forEach(file => {
-            form.submitted_documents[documentType].push(file);
-        });
+        syncTransactionUploadIdsFromSlots(form);
     };
 
     const submitTransactionCreate = (
@@ -135,43 +211,53 @@ export function useFormHandlers() {
         url: string,
         onSuccess?: () => void
     ) => {
-        // Create a FormData object to handle file uploads properly
+        syncTransactionUploadIdsFromSlots(form);
+
         const formData = new FormData();
 
-        // Add basic form fields
         formData.append('type', form.type);
         formData.append('title', form.title);
         formData.append('description', form.description || '');
         formData.append('fee_amount', form.fee_amount.toString());
 
-        // Add required documents array
         if (form.required_documents && Array.isArray(form.required_documents)) {
             form.required_documents.forEach((doc: string, index: number) => {
                 formData.append(`required_documents[${index}]`, doc);
             });
         }
 
-        // Add submitted documents organized by document type
-        Object.keys(form.submitted_documents).forEach(docType => {
-            if (form.submitted_documents[docType] && Array.isArray(form.submitted_documents[docType])) {
-                form.submitted_documents[docType].forEach((file: File, index: number) => {
-                    // Send files with document type as the key
+        if (form.required_fields && typeof form.required_fields === 'object') {
+            Object.keys(form.required_fields).forEach((key) => {
+                const value = form.required_fields[key];
+                formData.append(`required_fields[${key}]`, value ?? '');
+            });
+        }
+
+        Object.keys(form.submitted_document_upload_ids || {}).forEach((docType) => {
+            const ids = form.submitted_document_upload_ids[docType];
+            if (!Array.isArray(ids)) {
+                return;
+            }
+            ids.forEach((id: string, index: number) => {
+                if (id) {
+                    formData.append(`submitted_document_upload_ids[${docType}][${index}]`, id);
+                }
+            });
+        });
+
+        Object.keys(form.submitted_documents).forEach((docType) => {
+            const hasIds = (form.submitted_document_upload_ids[docType] || []).length > 0;
+            if (hasIds) {
+                return;
+            }
+            const docFiles = form.submitted_documents[docType];
+            if (docFiles && Array.isArray(docFiles)) {
+                docFiles.forEach((file: File, index: number) => {
                     formData.append(`submitted_documents[${docType}][${index}]`, file);
                 });
             }
         });
 
-        // Debug: Log the form data before submission
-        console.log('Form data being submitted:', {
-            type: form.type,
-            title: form.title,
-            description: form.description,
-            required_documents: form.required_documents,
-            submitted_documents: form.submitted_documents,
-            fee_amount: form.fee_amount
-        });
-
-        // Use Inertia's post method with FormData
         form.post(url, {
             data: formData,
             forceFormData: true,
@@ -181,19 +267,21 @@ export function useFormHandlers() {
                     action: {
                         label: 'View',
                         onClick: () => {
-                            // Could navigate to transaction details if needed
-                        }
-                    }
+                            //
+                        },
+                    },
                 });
-                if (onSuccess) onSuccess();
+                if (onSuccess) {
+                    onSuccess();
+                }
                 form.reset();
+                clearTransactionDocumentUploadSlots();
             },
-            onError: (errors: any) => {
-                console.error('Submission errors:', errors);
+            onError: () => {
                 toast('Submission Failed', {
                     description: 'Failed to submit your document request. Please try again.',
                 });
-            }
+            },
         });
     };
 
@@ -350,6 +438,8 @@ export function useFormHandlers() {
         addSubmittedDocument,
         removeSubmittedDocument,
         addMultipleSubmittedDocuments,
+        transactionDocumentUploadSlots,
+        clearTransactionDocumentUploadSlots,
 
         // Filter forms
         createFilterForm,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { computed, watch } from 'vue';
+import { Head } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import InputError from '@/components/InputError.vue';
 import { ArrowLeft, Upload, X } from 'lucide-vue-next';
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
+import { useFormHandlers } from '@/composables/useFormHandlers';
 
 interface TransactionType {
     name: string;
@@ -36,53 +37,41 @@ const breadcrumbs = useBreadcrumbs(() => [
     { label: 'Create Transaction', href: '/resident/transactions/create', title: 'Create Transaction' },
 ]);
 
-const selectedType = ref<string>('');
-const uploadedFiles = ref<Record<string, File[]>>({});
+const {
+    createTransactionForm,
+    updateFormForTransactionType,
+    submitTransactionCreate,
+    addMultipleSubmittedDocuments,
+    removeSubmittedDocument,
+    transactionDocumentUploadSlots,
+} = useFormHandlers();
 
-const form = useForm({
-    type: '',
-    title: '',
-    description: '',
-    required_documents: [] as string[],
-    submitted_documents: {} as Record<string, File[]>,
-    fee_amount: 0,
-});
+const form = createTransactionForm();
 
-watch(() => form.type, (newType) => {
-    if (newType && props.transactionTypes[newType]) {
-        const typeData = props.transactionTypes[newType];
-        form.title = typeData.name;
-        form.fee_amount = typeData.fee;
-        form.required_documents = typeData.required_documents || [];
+const transactionUploadsBusy = computed(() =>
+    Object.values(transactionDocumentUploadSlots.value).some((rows) => rows.some((r) => r.id === '' && !r.error)),
+);
 
-        // Initialize uploaded files for each required document
-        uploadedFiles.value = {};
-        typeData.required_documents?.forEach(doc => {
-            uploadedFiles.value[doc] = [];
-        });
-    }
-});
+watch(
+    () => form.type,
+    (newType) => {
+        if (newType && props.transactionTypes[newType]) {
+            updateFormForTransactionType(newType, form, props.transactionTypes);
+        }
+    },
+);
 
 const handleFileUpload = (documentType: string, files: File[]) => {
-    uploadedFiles.value[documentType] = files;
-    form.submitted_documents[documentType] = files;
+    void addMultipleSubmittedDocuments(form, documentType, files);
 };
 
 const removeFile = (documentType: string, index: number) => {
-    uploadedFiles.value[documentType].splice(index, 1);
-    form.submitted_documents[documentType] = uploadedFiles.value[documentType];
+    void removeSubmittedDocument(form, documentType, index);
 };
 
 const submit = () => {
-    form.post('/resident/transactions', {
-        onSuccess: () => {
-            form.reset();
-            selectedType.value = '';
-            uploadedFiles.value = {};
-        },
-        onError: (errors) => {
-            console.error('Form submission error:', errors);
-        }
+    submitTransactionCreate(form, '/resident/transactions', () => {
+        //
     });
 };
 
@@ -219,24 +208,31 @@ const getStatusClass = (status: string) => {
                                                 :multiple="true"
                                                 @upload="(files) => handleFileUpload(document, files)"
                                             />
-                                            <div v-if="uploadedFiles[document]?.length > 0" class="mt-2">
-                                                <div class="flex flex-wrap gap-2">
-                                                    <div
-                                                        v-for="(file, index) in uploadedFiles[document]"
-                                                        :key="index"
-                                                        class="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-md text-sm"
-                                                    >
-                                                        <Upload class="h-4 w-4" />
-                                                        {{ file.name }}
+                                            <div v-if="transactionDocumentUploadSlots[document]?.length" class="mt-2 space-y-2">
+                                                <div
+                                                    v-for="(slot, index) in transactionDocumentUploadSlots[document]"
+                                                    :key="slot.id || `u-${document}-${index}`"
+                                                    class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+                                                >
+                                                    <div class="flex items-center justify-between gap-2">
+                                                        <div class="flex items-center gap-2 min-w-0">
+                                                            <Upload class="h-4 w-4 shrink-0" />
+                                                            <span class="truncate">{{ slot.name }}</span>
+                                                        </div>
                                                         <Button
                                                             type="button"
                                                             variant="ghost"
                                                             size="sm"
+                                                            :disabled="slot.id === ''"
+                                                            class="h-7 w-7 p-0"
                                                             @click="removeFile(document, index)"
-                                                            class="h-4 w-4 p-0"
                                                         >
                                                             <X class="h-3 w-3" />
                                                         </Button>
+                                                    </div>
+                                                    <p v-if="slot.id === ''" class="text-xs text-blue-600 mt-1">Uploading… {{ slot.progress }}%</p>
+                                                    <div v-if="slot.id === ''" class="mt-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+                                                        <div class="h-full bg-blue-600 rounded-full transition-[width]" :style="{ width: `${slot.progress}%` }" />
                                                     </div>
                                                 </div>
                                             </div>
@@ -250,7 +246,7 @@ const getStatusClass = (status: string) => {
                         <div class="flex justify-end">
                             <Button
                                 type="submit"
-                                :disabled="form.processing || !form.type"
+                                :disabled="form.processing || !form.type || transactionUploadsBusy"
                                 class="min-w-[120px]"
                             >
                                 {{ form.processing ? 'Submitting...' : 'Submit Request' }}

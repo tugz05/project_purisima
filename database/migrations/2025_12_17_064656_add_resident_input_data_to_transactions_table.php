@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasColumn('transactions', 'resident_input_data')) {
+            return;
+        }
+
         Schema::table('transactions', function (Blueprint $table) {
             $table->json('resident_input_data')->nullable()->after('submitted_documents');
         });
@@ -21,6 +25,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasColumn('transactions', 'resident_input_data')) {
+            return;
+        }
+
         Schema::table('transactions', function (Blueprint $table) {
             $table->dropColumn('resident_input_data');
         });

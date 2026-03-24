@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { watch, nextTick, ref, onBeforeUnmount } from 'vue';
+import { watch, nextTick, ref, onBeforeUnmount, computed } from 'vue';
 import resident from '@/routes/resident';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -99,13 +99,19 @@ const {
     applyFilters: applyFiltersUtil,
     addSubmittedDocument,
     removeSubmittedDocument,
-    addMultipleSubmittedDocuments
+    addMultipleSubmittedDocuments,
+    transactionDocumentUploadSlots,
+    clearTransactionDocumentUploadSlots,
 } = useFormHandlers();
 const { formatDateShort } = useUtils();
 
 // Forms
 const createForm = createTransactionForm();
 const filterForm = createFilterForm(props.filters);
+
+const transactionUploadsBusy = computed(() =>
+    Object.values(transactionDocumentUploadSlots.value).some((rows) => rows.some((r) => r.id === '' && !r.error)),
+);
 
 // Sheet states
 const viewSheetOpen = ref(false);
@@ -246,7 +252,7 @@ const confirmPhoto = (docType: string) => {
         .then(blob => {
             const fileName = `${docType}_${Date.now()}.jpg`;
             const file = new File([blob], fileName, { type: 'image/jpeg' });
-            addSubmittedDocument(createForm, docType, file);
+            void addSubmittedDocument(createForm, docType, file);
             
             // Reset camera state
             cameraStates.value[docType].capturedImage = null;
@@ -323,6 +329,7 @@ watch(sheetOpen, (newValue) => {
         nextTick(() => {
             selectedType.value = '';
             createForm.reset();
+            clearTransactionDocumentUploadSlots();
         });
     }
 });
@@ -455,7 +462,7 @@ watch(sheetOpen, (newValue) => {
                                                             type="file"
                                                             multiple
                                                             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                                            @change="(e) => { const files = (e.target as HTMLInputElement).files; if (files) addMultipleSubmittedDocuments(createForm, doc, files); }"
+                                                            @change="(e) => { const el = e.target as HTMLInputElement; const files = el.files; if (files) { void addMultipleSubmittedDocuments(createForm, doc, files); } el.value = ''; }"
                                                             class="hidden"
                                                             :id="`upload-${doc}`"
                                                         />
@@ -541,27 +548,41 @@ watch(sheetOpen, (newValue) => {
                                                     </div>
 
                                                     <!-- Uploaded Files for this specific document -->
-                                                    <div v-if="createForm.submitted_documents[doc] && createForm.submitted_documents[doc].length > 0" class="space-y-2">
-                                                        <Label class="text-sm font-medium text-gray-700">Uploaded Files:</Label>
-                                                        <div v-for="(file, index) in createForm.submitted_documents[doc]" :key="index" class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                                                            <div class="flex items-center gap-3">
-                                                                <div class="bg-green-100 p-2 rounded-lg">
-                                                                    <FileText class="h-4 w-4 text-green-600" />
+                                                    <div v-if="transactionDocumentUploadSlots[doc]?.length" class="space-y-2">
+                                                        <Label class="text-sm font-medium text-gray-700">Uploaded files</Label>
+                                                        <div
+                                                            v-for="(slot, index) in transactionDocumentUploadSlots[doc]"
+                                                            :key="slot.id || `upload-${doc}-${index}`"
+                                                            class="flex flex-col gap-2 p-3 bg-green-50 border border-green-200 rounded-lg"
+                                                        >
+                                                            <div class="flex items-center justify-between gap-3">
+                                                                <div class="flex items-center gap-3 min-w-0">
+                                                                    <div class="bg-green-100 p-2 rounded-lg shrink-0">
+                                                                        <FileText class="h-4 w-4 text-green-600" />
+                                                                    </div>
+                                                                    <div class="min-w-0">
+                                                                        <span class="text-sm font-medium text-gray-700 truncate block">{{ slot.name }}</span>
+                                                                        <p v-if="slot.id === ''" class="text-xs text-blue-600 font-medium">Uploading… {{ slot.progress }}%</p>
+                                                                        <p v-else class="text-xs text-green-700">Ready</p>
+                                                                    </div>
                                                                 </div>
-                                                                <div>
-                                                                    <span class="text-sm font-medium text-gray-700">{{ file.name }}</span>
-                                                                    <p class="text-xs text-gray-500">({{ (file.size / 1024 / 1024).toFixed(2) }}MB)</p>
-                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    :disabled="slot.id === ''"
+                                                                    @click="() => void removeSubmittedDocument(createForm, doc, index)"
+                                                                    class="text-red-600 hover:text-red-700 p-1 shrink-0"
+                                                                >
+                                                                    <X class="h-4 w-4" />
+                                                                </Button>
                                                             </div>
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                @click="() => removeSubmittedDocument(createForm, doc, index)"
-                                                                class="text-red-600 hover:text-red-700 p-1"
-                                                            >
-                                                                <X class="h-4 w-4" />
-                                                            </Button>
+                                                            <div v-if="slot.id === ''" class="h-1.5 w-full bg-green-200/80 rounded-full overflow-hidden">
+                                                                <div
+                                                                    class="h-full bg-blue-600 transition-[width] duration-150 ease-out rounded-full"
+                                                                    :style="{ width: `${slot.progress}%` }"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -638,7 +659,7 @@ watch(sheetOpen, (newValue) => {
                                     <div class="flex flex-row gap-3 sm:gap-4">
                                         <Button
                                             type="button"
-                                            :disabled="createForm.processing"
+                                            :disabled="createForm.processing || transactionUploadsBusy"
                                             @click="submitCreate"
                                             size="lg"
                                             class="flex flex-1 h-12 sm:h-14 items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300"

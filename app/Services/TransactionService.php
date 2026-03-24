@@ -2,14 +2,18 @@
 
 namespace App\Services;
 
-use App\Models\Transaction;
 use App\Models\DocumentType;
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 class TransactionService
 {
+    public function __construct(
+        private PendingFileUploadService $pendingFileUploadService
+    ) {}
+
     /**
      * Create a new transaction
      */
@@ -18,7 +22,34 @@ class TransactionService
         return DB::transaction(function () use ($data, $resident) {
             $submittedDocuments = [];
 
-            // Handle file uploads if present
+            if (isset($data['submitted_document_upload_ids']) && is_array($data['submitted_document_upload_ids'])) {
+                foreach ($data['submitted_document_upload_ids'] as $documentType => $ids) {
+                    if (! is_array($ids)) {
+                        continue;
+                    }
+                    $cleanIds = array_values(array_filter($ids, fn ($id) => is_string($id) && $id !== ''));
+                    if ($cleanIds === []) {
+                        continue;
+                    }
+                    $metas = $this->pendingFileUploadService->consumeIds(
+                        $resident,
+                        $cleanIds,
+                        PendingFileUploadService::PURPOSE_TRANSACTION_SUBMISSION,
+                        'submitted-documents'
+                    );
+                    foreach ($metas as $meta) {
+                        $submittedDocuments[] = [
+                            'document_type' => $documentType,
+                            'name' => $meta['name'],
+                            'path' => $meta['path'],
+                            'size' => $meta['size'],
+                            'mime_type' => $meta['mime_type'],
+                        ];
+                    }
+                }
+            }
+
+            // Handle direct file uploads if present (legacy / fallback)
             if (isset($data['submitted_documents']) && is_array($data['submitted_documents'])) {
                 foreach ($data['submitted_documents'] as $documentType => $files) {
                     if (is_array($files)) {
@@ -42,16 +73,16 @@ class TransactionService
             $documentType = null;
             if (isset($data['type'])) {
                 $documentType = DocumentType::where('code', $data['type'])->first();
-                if (!$documentType) {
+                if (! $documentType) {
                     throw new \Exception("Document type with code '{$data['type']}' not found. Please select a valid document type.");
                 }
             } elseif (isset($data['document_type_id'])) {
                 $documentType = DocumentType::find($data['document_type_id']);
-                if (!$documentType) {
+                if (! $documentType) {
                     throw new \Exception("Document type with ID '{$data['document_type_id']}' not found.");
                 }
             } else {
-                throw new \Exception("Document type is required. Please select a valid document type.");
+                throw new \Exception('Document type is required. Please select a valid document type.');
             }
 
             $transaction = Transaction::create([
@@ -81,7 +112,7 @@ class TransactionService
                 $updateData['staff_id'] = $staff->id;
             }
 
-            if ($status === 'in_progress' && !$transaction->processed_at) {
+            if ($status === 'in_progress' && ! $transaction->processed_at) {
                 $updateData['processed_at'] = now();
             }
 
@@ -103,7 +134,7 @@ class TransactionService
                 } else {
                     $updateData['officer_of_the_day'] = $officerValue ?: null;
                 }
-                
+
                 \Log::info('TransactionService: Processing officer_of_the_day', [
                     'raw_value' => $officerValue,
                     'raw_type' => gettype($officerValue),
@@ -139,7 +170,7 @@ class TransactionService
 
             // Perform the update
             $result = $transaction->update($updateData);
-            
+
             \Log::info('TransactionService: After update', [
                 'transaction_id' => $transaction->id,
                 'update_result' => $result,
@@ -205,16 +236,16 @@ class TransactionService
             $searchTerm = $filters['search'];
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('transaction_id', 'like', "%{$searchTerm}%")
-                  ->orWhere('title', 'like', "%{$searchTerm}%")
-                  ->orWhereHas('resident', function ($residentQuery) use ($searchTerm) {
-                      $residentQuery->where('first_name', 'like', "%{$searchTerm}%")
-                                   ->orWhere('last_name', 'like', "%{$searchTerm}%")
-                                   ->orWhere('name', 'like', "%{$searchTerm}%");
-                  })
-                  ->orWhereHas('documentType', function ($docTypeQuery) use ($searchTerm) {
-                      $docTypeQuery->where('name', 'like', "%{$searchTerm}%")
-                                   ->orWhere('code', 'like', "%{$searchTerm}%");
-                  });
+                    ->orWhere('title', 'like', "%{$searchTerm}%")
+                    ->orWhereHas('resident', function ($residentQuery) use ($searchTerm) {
+                        $residentQuery->where('first_name', 'like', "%{$searchTerm}%")
+                            ->orWhere('last_name', 'like', "%{$searchTerm}%")
+                            ->orWhere('name', 'like', "%{$searchTerm}%");
+                    })
+                    ->orWhereHas('documentType', function ($docTypeQuery) use ($searchTerm) {
+                        $docTypeQuery->where('name', 'like', "%{$searchTerm}%")
+                            ->orWhere('code', 'like', "%{$searchTerm}%");
+                    });
             });
         }
 
@@ -225,8 +256,8 @@ class TransactionService
         // Handle special sorting cases
         if ($sortField === 'resident') {
             $query->join('users as residents', 'transactions.resident_id', '=', 'residents.id')
-                  ->orderBy('residents.first_name', $sortDirection)
-                  ->select('transactions.*');
+                ->orderBy('residents.first_name', $sortDirection)
+                ->select('transactions.*');
         } else {
             $query->orderBy($sortField, $sortDirection);
         }

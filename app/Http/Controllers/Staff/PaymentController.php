@@ -7,6 +7,7 @@ use App\Http\Requests\Staff\StaffPaymentHistoryRequest;
 use App\Models\Transaction;
 use App\Services\NotificationService;
 use App\Services\PaymentService;
+use App\Services\PendingFileUploadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -53,6 +54,17 @@ class PaymentController extends Controller
             'payment_notes' => ['nullable', 'string', 'max:1000'],
             'payment_proof' => ['nullable', 'array'],
             'payment_proof.*' => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'], // 5MB max
+            'payment_proof_upload_ids' => ['nullable', 'array'],
+            'payment_proof_upload_ids.*' => [
+                'required',
+                'string',
+                'ulid',
+                Rule::exists('pending_file_uploads', 'id')->where(function ($query) use ($request) {
+                    $query->where('user_id', $request->user()->id)
+                        ->where('purpose', PendingFileUploadService::PURPOSE_PAYMENT_PROOF)
+                        ->where('expires_at', '>', now());
+                }),
+            ],
         ]);
 
         try {

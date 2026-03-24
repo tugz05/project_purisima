@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
+import { deletePendingUpload, uploadPendingFile } from '@/utils/uploadPendingFile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -77,6 +78,7 @@ const paymentForm = useForm({
     payment_reference: '',
     payment_notes: '',
     payment_proof: [] as File[],
+    payment_proof_upload_ids: [] as string[],
 });
 
 // Form for marking payment as failed
@@ -93,29 +95,72 @@ const refundForm = useForm({
 const showFailedDialog = ref(false);
 const showRefundDialog = ref(false);
 
-// File upload handling
-const handleFileUpload = (event: Event) => {
+interface ProofSlot {
+    id: string;
+    name: string;
+    progress: number;
+}
+
+const proofSlots = ref<ProofSlot[]>([]);
+
+const proofUploadBusy = computed(() => proofSlots.value.some((s) => s.id === ''));
+
+// File upload handling (in-page upload; final POST sends only upload IDs)
+const handleFileUpload = async (event: Event) => {
     const target = event.target as HTMLInputElement;
-    if (target.files) {
-        paymentForm.payment_proof = Array.from(target.files);
+    if (!target.files?.length) {
+        return;
     }
+    const files = Array.from(target.files);
+    target.value = '';
+
+    for (const file of files) {
+        const idx = proofSlots.value.length;
+        proofSlots.value.push({ id: '', name: file.name, progress: 0 });
+        try {
+            const result = await uploadPendingFile(file, 'payment_proof', (p) => {
+                const row = proofSlots.value[idx];
+                if (row) {
+                    row.progress = p;
+                }
+            });
+            proofSlots.value[idx].id = result.id;
+            proofSlots.value[idx].progress = 100;
+            paymentForm.payment_proof_upload_ids.push(result.id);
+        } catch {
+            proofSlots.value.splice(idx, 1);
+            toast.error('Upload failed', { description: file.name });
+        }
+    }
+    paymentForm.payment_proof = [];
 };
 
-// Remove uploaded file
-const removeFile = (index: number) => {
-    paymentForm.payment_proof.splice(index, 1);
+const removeFile = async (index: number) => {
+    const slot = proofSlots.value[index];
+    if (slot?.id) {
+        try {
+            await deletePendingUpload(slot.id);
+        } catch {
+            //
+        }
+        paymentForm.payment_proof_upload_ids = paymentForm.payment_proof_upload_ids.filter((id) => id !== slot.id);
+    }
+    proofSlots.value.splice(index, 1);
 };
 
 // Submit payment processing
 const submitPayment = () => {
+    paymentForm.payment_proof = [];
     paymentForm.post(`/staff/transactions/${props.transaction.id}/payment`, {
         onSuccess: () => {
             toast.success('Payment processed successfully!');
+            proofSlots.value = [];
+            paymentForm.payment_proof_upload_ids = [];
         },
         onError: (errors) => {
             console.error('Payment processing failed:', errors);
             toast.error('Failed to process payment');
-        }
+        },
     });
 };
 
@@ -389,23 +434,35 @@ const formatCurrency = (amount: any) => {
                                         </p>
 
                                         <!-- Uploaded Files List -->
-                                        <div v-if="paymentForm.payment_proof.length > 0" class="space-y-2 mb-3">
-                                            <div v-for="(file, index) in paymentForm.payment_proof" :key="index"
-                                                 class="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                                                <div class="flex items-center gap-2">
-                                                    <FileText class="h-4 w-4 text-gray-500" />
-                                                    <span class="text-sm">{{ file.name }}</span>
-                                                    <span class="text-xs text-gray-500">({{ (file.size / 1024).toFixed(1) }} KB)</span>
+                                        <div v-if="proofSlots.length > 0" class="space-y-2 mb-3">
+                                            <div
+                                                v-for="(slot, index) in proofSlots"
+                                                :key="slot.id || `proof-${index}`"
+                                                class="flex flex-col gap-2 p-3 bg-gray-50 rounded-md"
+                                            >
+                                                <div class="flex items-center justify-between gap-2">
+                                                    <div class="flex items-center gap-2 min-w-0">
+                                                        <FileText class="h-4 w-4 text-gray-500 shrink-0" />
+                                                        <span class="text-sm truncate">{{ slot.name }}</span>
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        :disabled="slot.id === ''"
+                                                        @click="() => void removeFile(index)"
+                                                        class="text-red-600 hover:text-red-700 shrink-0"
+                                                    >
+                                                        <XCircle class="h-4 w-4" />
+                                                    </Button>
                                                 </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    @click="removeFile(index)"
-                                                    class="text-red-600 hover:text-red-700"
-                                                >
-                                                    <XCircle class="h-4 w-4" />
-                                                </Button>
+                                                <p v-if="slot.id === ''" class="text-xs text-blue-600">Uploading… {{ slot.progress }}%</p>
+                                                <div v-if="slot.id === ''" class="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                                                    <div
+                                                        class="h-full bg-blue-600 rounded-full transition-[width]"
+                                                        :style="{ width: `${slot.progress}%` }"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
 
@@ -418,7 +475,7 @@ const formatCurrency = (amount: any) => {
                                     <div class="flex gap-4 pt-4">
                                         <Button
                                             type="submit"
-                                            :disabled="paymentForm.processing"
+                                            :disabled="paymentForm.processing || proofUploadBusy"
                                             class="flex-1 bg-green-600 hover:bg-green-700"
                                         >
                                             <CheckCircle class="h-4 w-4 mr-2" />

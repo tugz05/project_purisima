@@ -203,6 +203,11 @@ Route::get('dashboard', function () {
     };
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('uploads/pending', [\App\Http\Controllers\PendingFileUploadController::class, 'store'])->name('uploads.pending.store');
+    Route::delete('uploads/pending/{pendingFileUpload}', [\App\Http\Controllers\PendingFileUploadController::class, 'destroy'])->name('uploads.pending.destroy');
+});
+
 // Role-based portals
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('dashboard', function () {
