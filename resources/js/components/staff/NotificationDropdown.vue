@@ -156,6 +156,8 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { toast } from 'vue-sonner';
+import { runJsonAction } from '@/composables/useJsonActionFeedback';
+import { laravelJsonFetch } from '@/utils/laravelJsonFetch';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -219,7 +221,7 @@ const loadNotifications = async () => {
 
   isLoading.value = true;
   try {
-    const response = await fetch('/staff/notifications/unread');
+    const response = await laravelJsonFetch('/staff/notifications/unread', { method: 'GET' });
     const data = await response.json();
     notifications.value = data.notifications;
     unreadCount.value = data.unreadCount;
@@ -235,7 +237,7 @@ const loadUnreadCount = async () => {
   if (!isStaff.value) return;
 
   try {
-    const response = await fetch('/staff/notifications/count');
+    const response = await laravelJsonFetch('/staff/notifications/count', { method: 'GET' });
     const data = await response.json();
     unreadCount.value = data.count;
   } catch (error) {
@@ -265,18 +267,21 @@ const handleNotificationClick = (notification: Notification) => {
 
 const markAsRead = async (notification: Notification) => {
   try {
-    await router.post(`/staff/notifications/mark-read/${notification.id}`, {}, {
-      preserveState: true,
-      preserveScroll: true,
-      onSuccess: () => {
-        notification.is_read = true;
-        unreadCount.value = Math.max(0, unreadCount.value - 1);
+    await runJsonAction(
+      `/staff/notifications/mark-read/${notification.id}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
       },
-      onError: (errors) => {
-        console.error('Failed to mark notification as read:', errors);
-        toast.error('Failed to mark notification as read');
-      }
-    });
+      {
+        successToast: false,
+        onSuccess: () => {
+          notification.is_read = true;
+          unreadCount.value = Math.max(0, unreadCount.value - 1);
+        },
+      },
+    );
   } catch (error) {
     console.error('Failed to mark notification as read:', error);
     toast.error('Failed to mark notification as read');
@@ -286,21 +291,23 @@ const markAsRead = async (notification: Notification) => {
 const markAllAsRead = async () => {
   isMarkingAllRead.value = true;
   try {
-    await router.post('/staff/notifications/mark-all-read', {}, {
-      preserveState: true,
-      preserveScroll: true,
-      onSuccess: () => {
-        notifications.value.forEach(notification => {
-          notification.is_read = true;
-        });
-        unreadCount.value = 0;
-        toast.success('All notifications marked as read');
+    await runJsonAction(
+      '/staff/notifications/mark-all-read',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
       },
-      onError: (errors) => {
-        console.error('Failed to mark all notifications as read:', errors);
-        toast.error('Failed to mark all notifications as read');
-      }
-    });
+      {
+        successToast: 'All notifications marked as read',
+        onSuccess: () => {
+          notifications.value.forEach((n) => {
+            n.is_read = true;
+          });
+          unreadCount.value = 0;
+        },
+      },
+    );
   } catch (error) {
     console.error('Failed to mark all notifications as read:', error);
     toast.error('Failed to mark all notifications as read');
@@ -311,23 +318,22 @@ const markAllAsRead = async () => {
 
 const deleteNotification = async (notification: Notification) => {
   try {
-    await router.delete(`/staff/notifications/${notification.id}`, {
-      preserveState: true,
-      preserveScroll: true,
-      onSuccess: () => {
-        const index = notifications.value.findIndex(n => n.id === notification.id);
-        if (index > -1) {
-          notifications.value.splice(index, 1);
-          if (!notification.is_read) {
-            unreadCount.value = Math.max(0, unreadCount.value - 1);
+    await runJsonAction(
+      `/staff/notifications/${notification.id}`,
+      { method: 'DELETE' },
+      {
+        successToast: false,
+        onSuccess: () => {
+          const index = notifications.value.findIndex((n) => n.id === notification.id);
+          if (index > -1) {
+            notifications.value.splice(index, 1);
+            if (!notification.is_read) {
+              unreadCount.value = Math.max(0, unreadCount.value - 1);
+            }
           }
-        }
+        },
       },
-      onError: (errors) => {
-        console.error('Failed to delete notification:', errors);
-        toast.error('Failed to delete notification');
-      }
-    });
+    );
   } catch (error) {
     console.error('Failed to delete notification:', error);
     toast.error('Failed to delete notification');

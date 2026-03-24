@@ -267,6 +267,7 @@ import {
   ChevronRight,
 } from 'lucide-vue-next';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
+import { runJsonAction } from '@/composables/useJsonActionFeedback';
 
 interface Notification {
   id: number;
@@ -328,18 +329,20 @@ const filteredNotifications = computed(() => {
 
 const markAsRead = async (notification: Notification) => {
   try {
-    await router.post(`/staff/notifications/mark-read/${notification.id}`, {}, {
-      preserveState: true,
-      preserveScroll: true,
-      onSuccess: () => {
-        notification.is_read = true;
-        toast.success('Notification marked as read');
+    await runJsonAction(
+      `/staff/notifications/mark-read/${notification.id}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
       },
-      onError: (errors) => {
-        console.error('Failed to mark notification as read:', errors);
-        toast.error('Failed to mark notification as read');
-      }
-    });
+      {
+        successToast: 'Notification marked as read',
+        onSuccess: () => {
+          notification.is_read = true;
+        },
+      },
+    );
   } catch (error) {
     console.error('Failed to mark notification as read:', error);
     toast.error('Failed to mark notification as read');
@@ -349,20 +352,22 @@ const markAsRead = async (notification: Notification) => {
 const markAllAsRead = async () => {
   isMarkingAllRead.value = true;
   try {
-    await router.post('/staff/notifications/mark-all-read', {}, {
-      preserveState: true,
-      preserveScroll: true,
-      onSuccess: () => {
-        props.notifications.data.forEach(notification => {
-          notification.is_read = true;
-        });
-        toast.success('All notifications marked as read');
+    await runJsonAction(
+      '/staff/notifications/mark-all-read',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
       },
-      onError: (errors) => {
-        console.error('Failed to mark all notifications as read:', errors);
-        toast.error('Failed to mark all notifications as read');
-      }
-    });
+      {
+        successToast: 'All notifications marked as read',
+        onSuccess: () => {
+          props.notifications.data.forEach((n) => {
+            n.is_read = true;
+          });
+        },
+      },
+    );
   } catch (error) {
     console.error('Failed to mark all notifications as read:', error);
     toast.error('Failed to mark all notifications as read');
@@ -377,21 +382,19 @@ const deleteNotification = async (notification: Notification) => {
   }
 
   try {
-    await router.delete(`/staff/notifications/${notification.id}`, {
-      preserveState: true,
-      preserveScroll: true,
-      onSuccess: () => {
-        const index = props.notifications.data.findIndex(n => n.id === notification.id);
-        if (index > -1) {
-          props.notifications.data.splice(index, 1);
-        }
-        toast.success('Notification deleted');
+    await runJsonAction(
+      `/staff/notifications/${notification.id}`,
+      { method: 'DELETE' },
+      {
+        successToast: 'Notification deleted',
+        onSuccess: () => {
+          const index = props.notifications.data.findIndex((n) => n.id === notification.id);
+          if (index > -1) {
+            props.notifications.data.splice(index, 1);
+          }
+        },
       },
-      onError: (errors) => {
-        console.error('Failed to delete notification:', errors);
-        toast.error('Failed to delete notification');
-      }
-    });
+    );
   } catch (error) {
     console.error('Failed to delete notification:', error);
     toast.error('Failed to delete notification');

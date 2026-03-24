@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { getPusher, isPusherAvailable } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
 import { subscribeToConversationChannel } from '@/composables/useMessagingPusher';
+import { scheduleScrollToBottom } from '@/utils/scheduleScrollToBottom';
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -88,6 +89,7 @@ const isTyping = ref(false);
 const otherUserTyping = ref(false);
 const messages = ref<Message[]>([...props.conversation.messages]);
 const messagesContainer = ref<HTMLElement>();
+const messagesEndRef = ref<HTMLElement | null>(null);
 const isSending = ref(false);
 const typingTimeout = ref<number | null>(null);
 
@@ -122,11 +124,7 @@ const appendMessageIfNew = (msg: Message) => {
 };
 
 const scrollToBottom = () => {
-    nextTick(() => {
-        if (messagesContainer.value) {
-            messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-        }
-    });
+    scheduleScrollToBottom(messagesContainer.value, messagesEndRef.value, [50, 200, 450]);
 };
 
 const sendMessage = async () => {
@@ -441,6 +439,8 @@ onBeforeUnmount(() => {
                             </div>
                         </div>
                     </div>
+
+                    <div ref="messagesEndRef" class="h-px w-full shrink-0" aria-hidden="true" />
                 </div>
 
                 <!-- Message Input -->

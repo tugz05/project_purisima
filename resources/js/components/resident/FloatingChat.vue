@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import { getPusher, isPusherAvailable } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
 import { subscribeToConversationChannel, subscribeToUserMessagingChannel } from '@/composables/useMessagingPusher';
+import { scheduleScrollToBottom } from '@/utils/scheduleScrollToBottom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -62,16 +63,10 @@ let unsubscribeUser: (() => void) | null = null;
 /** Unread total when conversation list is empty but server has unread messages */
 const bootstrapUnread = ref(0);
 const messagesScrollRef = ref<HTMLElement | null>(null);
+const messagesEndRef = ref<HTMLElement | null>(null);
 
 const scrollMessagesToBottom = (): void => {
-    nextTick(() => {
-        setTimeout(() => {
-            const el = messagesScrollRef.value;
-            if (el) {
-                el.scrollTop = el.scrollHeight;
-            }
-        }, 80);
-    });
+    scheduleScrollToBottom(messagesScrollRef.value, messagesEndRef.value, [80, 220, 520]);
 };
 
 // Utilities to safely add messages without duplicates
@@ -135,6 +130,8 @@ const openChat = async () => {
     if (conversations.value.length > 0) {
         currentConversation.value = conversations.value[0];
     }
+
+    scrollMessagesToBottom();
 };
 
 const closeChat = () => {
@@ -171,6 +168,7 @@ const createGeneralConversation = async () => {
                 isLoading.value = false;
                 bootstrapUnread.value = 0;
                 setupRealTimeMessaging();
+                scrollMessagesToBottom();
             } else {
                 isLoading.value = false;
             }
@@ -265,8 +263,8 @@ const sendMessage = async () => {
 
 const switchConversation = (conversation: Conversation) => {
     currentConversation.value = conversation;
-    // Mark messages as read
     conversation.unread_count = 0;
+    scrollMessagesToBottom();
 };
 
 // Typing indicator functions
@@ -465,7 +463,19 @@ watch(currentConversation, () => {
 });
 
 watch(isOpen, (open) => {
-    if (open) {
+    if (open && !isMinimized.value) {
+        scrollMessagesToBottom();
+    }
+});
+
+watch(isMinimized, (minimized) => {
+    if (!minimized && isOpen.value) {
+        scrollMessagesToBottom();
+    }
+});
+
+watch(isLoading, (loading) => {
+    if (!loading && isOpen.value && !isMinimized.value) {
         scrollMessagesToBottom();
     }
 });
@@ -675,6 +685,8 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
                 </div>
+
+                <div ref="messagesEndRef" class="h-px w-full shrink-0" aria-hidden="true" />
             </div>
 
         <div

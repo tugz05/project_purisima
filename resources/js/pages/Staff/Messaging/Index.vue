@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, watch, onBeforeUnmount, nextTick } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { dispatchStaffMessagingUnreadCount } from '@/staffMessagingEvents';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
@@ -29,6 +29,7 @@ import {
 import { getPusher, isPusherAvailable } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
 import { subscribeToConversationChannel, subscribeToUserMessagingChannel } from '@/composables/useMessagingPusher';
+import { scheduleScrollToBottom } from '@/utils/scheduleScrollToBottom';
 
 interface Conversation {
     id: number;
@@ -99,6 +100,13 @@ const otherUserTyping = ref(false);
 let unsubscribeConversation: (() => void) | null = null;
 let unsubscribeUser: (() => void) | null = null;
 
+const threadScrollRef = ref<HTMLElement | null>(null);
+const threadEndRef = ref<HTMLElement | null>(null);
+
+const scrollThreadToBottom = (): void => {
+    scheduleScrollToBottom(threadScrollRef.value, threadEndRef.value, [60, 200, 400]);
+};
+
 const sidebarUnreadCount = ref(
     (typeof page.props.messagingUnreadCount === 'number' ? page.props.messagingUnreadCount : null) ??
         props.unreadCount ??
@@ -134,6 +142,7 @@ const appendMessageIfNew = (msg: { id: number }) => {
         return;
     }
     messages.value.push(msg);
+    scrollThreadToBottom();
 };
 
 // Computed properties
@@ -241,6 +250,8 @@ const selectConversation = async (conversation: Conversation) => {
         console.error('Error loading conversation:', error);
     } finally {
         loadingMessages.value = false;
+        await nextTick();
+        scrollThreadToBottom();
     }
 };
 
@@ -354,12 +365,6 @@ const setupRealTimeMessaging = () => {
                 return;
             }
             appendMessageIfNew(e.message);
-            setTimeout(() => {
-                const el = document.querySelector('.overflow-y-auto');
-                if (el) {
-                    (el as HTMLElement).scrollTop = (el as HTMLElement).scrollHeight;
-                }
-            }, 50);
 
             const convIndex = props.conversations?.data?.findIndex((c) => c.id === e.conversation.id);
             if (convIndex !== undefined && convIndex >= 0 && props.conversations?.data) {
@@ -632,7 +637,7 @@ onBeforeUnmount(() => {
                     </div>
 
                     <!-- Messages Area - Only This Scrolls -->
-                    <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+                    <div ref="threadScrollRef" class="flex-1 overflow-y-auto p-4 bg-gray-50">
                         <div v-if="loadingMessages" class="flex items-center justify-center h-full">
                             <div class="text-center">
                                 <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -676,6 +681,8 @@ onBeforeUnmount(() => {
                                 </div>
                             </div>
                         </div>
+
+                        <div ref="threadEndRef" class="h-px w-full shrink-0" aria-hidden="true" />
                     </div>
 
                     <!-- Message Input Panel - Fixed at Bottom -->
