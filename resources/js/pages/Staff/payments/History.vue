@@ -409,72 +409,106 @@ const documentLabel = (row: PaymentRow) => row.document_type?.name ?? row.title;
                 </div>
 
                 <Card class="shadow-lg border-gray-200 overflow-hidden">
-                    <CardHeader class="border-b border-gray-100 bg-gray-50/80">
-                        <CardTitle class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-base sm:text-lg">
-                            <span class="flex items-center gap-2">
-                                <Banknote class="h-5 w-5 text-indigo-600" />
+                    <CardHeader class="border-b border-gray-100 bg-gray-50/80 px-5 py-4 sm:px-6 sm:py-5">
+                        <CardTitle class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-base sm:text-lg">
+                            <span class="flex items-center gap-3">
+                                <Banknote class="h-5 w-5 shrink-0 text-indigo-600" />
                                 Ledger ({{ payments.total }})
                             </span>
-                            <span class="text-sm font-normal text-gray-500"> Each row links to the source transaction for full context. </span>
+                            <span class="text-sm font-normal text-gray-500 leading-relaxed max-w-xl">
+                                Each row links to the source transaction for full context.
+                            </span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent class="p-0">
-                        <div class="overflow-x-auto">
-                            <Table>
+                        <div class="overflow-x-auto px-4 py-5 sm:px-6 sm:py-6">
+                            <Table class="w-full min-w-[72rem]">
                                 <TableHeader>
-                                    <TableRow class="bg-gray-50/90 hover:bg-gray-50/90">
-                                        <TableHead class="font-semibold text-gray-900 whitespace-nowrap">Receipt</TableHead>
-                                        <TableHead class="font-semibold text-gray-900 whitespace-nowrap">Transaction</TableHead>
-                                        <TableHead class="font-semibold text-gray-900 min-w-[160px]">Resident</TableHead>
-                                        <TableHead class="font-semibold text-gray-900 min-w-[140px]">Document</TableHead>
-                                        <TableHead class="font-semibold text-gray-900 text-right whitespace-nowrap">Fee</TableHead>
-                                        <TableHead class="font-semibold text-gray-900 text-right whitespace-nowrap">Paid</TableHead>
-                                        <TableHead class="font-semibold text-gray-900 whitespace-nowrap">Method</TableHead>
-                                        <TableHead class="font-semibold text-gray-900 whitespace-nowrap">Status</TableHead>
-                                        <TableHead class="font-semibold text-gray-900 whitespace-nowrap">Recorded</TableHead>
-                                        <TableHead class="font-semibold text-gray-900 whitespace-nowrap">Verified by</TableHead>
-                                        <TableHead class="font-semibold text-gray-900 text-right whitespace-nowrap">Actions</TableHead>
+                                    <TableRow class="bg-gray-50/90 hover:bg-gray-50/90 border-b border-gray-200">
+                                        <TableHead class="h-auto min-h-12 py-3.5 pl-1 pr-4 text-left font-semibold text-gray-900 whitespace-nowrap sm:pl-2">
+                                            Receipt
+                                        </TableHead>
+                                        <TableHead class="h-auto min-h-12 px-4 py-3.5 font-semibold text-gray-900 whitespace-nowrap">
+                                            Transaction
+                                        </TableHead>
+                                        <TableHead class="h-auto min-h-12 px-4 py-3.5 font-semibold text-gray-900 whitespace-normal min-w-[11rem] max-w-[15rem]">
+                                            Resident
+                                        </TableHead>
+                                        <TableHead class="h-auto min-h-12 px-4 py-3.5 font-semibold text-gray-900 whitespace-normal min-w-[9rem]">
+                                            Document
+                                        </TableHead>
+                                        <TableHead
+                                            class="h-auto min-h-12 pl-6 pr-4 py-3.5 text-right font-semibold text-gray-900 whitespace-nowrap tabular-nums"
+                                        >
+                                            Fee
+                                        </TableHead>
+                                        <TableHead class="h-auto min-h-12 px-4 py-3.5 text-right font-semibold text-gray-900 whitespace-nowrap tabular-nums">
+                                            Paid
+                                        </TableHead>
+                                        <TableHead class="h-auto min-h-12 px-4 py-3.5 font-semibold text-gray-900 whitespace-nowrap min-w-[6.5rem]">
+                                            Method
+                                        </TableHead>
+                                        <TableHead class="h-auto min-h-12 px-4 py-3.5 font-semibold text-gray-900 whitespace-nowrap">
+                                            Status
+                                        </TableHead>
+                                        <TableHead class="h-auto min-h-12 px-4 py-3.5 font-semibold text-gray-900 whitespace-nowrap">
+                                            Recorded
+                                        </TableHead>
+                                        <TableHead class="h-auto min-h-12 px-4 py-3.5 font-semibold text-gray-900 whitespace-nowrap min-w-[7rem]">
+                                            Verified by
+                                        </TableHead>
+                                        <TableHead
+                                            class="h-auto min-h-12 py-3.5 pl-4 pr-1 text-right font-semibold text-gray-900 whitespace-nowrap sm:pr-2"
+                                        >
+                                            Actions
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    <TableRow v-for="row in payments.data" :key="row.id" class="hover:bg-gray-50/80 border-gray-100">
-                                        <TableCell class="font-mono text-sm py-3">
+                                    <TableRow
+                                        v-for="row in payments.data"
+                                        :key="row.id"
+                                        class="border-b border-gray-100 hover:bg-gray-50/80 transition-colors"
+                                    >
+                                        <TableCell class="py-4 pl-1 pr-4 align-middle font-mono text-sm whitespace-nowrap sm:pl-2">
                                             {{ row.receipt_number ?? '—' }}
                                         </TableCell>
-                                        <TableCell class="font-mono text-sm py-3">
+                                        <TableCell class="px-4 py-4 align-middle font-mono text-sm whitespace-nowrap">
                                             {{ row.transaction_id }}
                                         </TableCell>
-                                        <TableCell class="py-3">
-                                            <div class="font-medium text-gray-900">{{ row.resident.name }}</div>
-                                            <div class="text-xs text-gray-500 truncate max-w-[200px]">{{ row.resident.email }}</div>
+                                        <TableCell class="px-4 py-4 align-top whitespace-normal min-w-[11rem] max-w-[15rem]">
+                                            <div class="flex flex-col gap-1.5">
+                                                <div class="font-medium leading-snug text-gray-900">{{ row.resident.name }}</div>
+                                                <div class="text-xs leading-normal text-gray-500 break-all">{{ row.resident.email }}</div>
+                                            </div>
                                         </TableCell>
-                                        <TableCell class="py-3 text-sm text-gray-800">
+                                        <TableCell class="px-4 py-4 align-middle text-sm leading-relaxed text-gray-800 whitespace-normal">
                                             {{ documentLabel(row) }}
                                         </TableCell>
-                                        <TableCell class="py-3 text-right tabular-nums font-medium">
+                                        <TableCell class="pl-6 pr-4 py-4 align-middle text-right text-sm tabular-nums font-medium whitespace-nowrap">
                                             {{ formatPeso(row.fee_amount) }}
                                         </TableCell>
-                                        <TableCell class="py-3 text-right tabular-nums">
+                                        <TableCell class="px-4 py-4 align-middle text-right text-sm tabular-nums whitespace-nowrap">
                                             {{ row.amount_paid != null ? formatPeso(row.amount_paid) : '—' }}
                                         </TableCell>
-                                        <TableCell class="py-3 text-sm">
+                                        <TableCell class="px-4 py-4 align-middle text-sm whitespace-nowrap">
                                             {{ getPaymentMethodLabel(row.payment_method) }}
                                         </TableCell>
-                                        <TableCell class="py-3">
+                                        <TableCell class="px-4 py-4 align-middle whitespace-normal">
                                             <Badge variant="outline" :class="getPaymentStatusBadgeClass(row.payment_status)" class="capitalize">
                                                 {{ row.payment_status }}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell class="py-3 text-sm text-gray-600 whitespace-nowrap">
+                                        <TableCell class="px-4 py-4 align-middle text-sm text-gray-600 whitespace-nowrap">
                                             {{ formatDateTime(recordedAt(row)) }}
                                         </TableCell>
-                                        <TableCell class="py-3 text-sm text-gray-700">
+                                        <TableCell class="px-4 py-4 align-middle text-sm text-gray-700 whitespace-nowrap">
                                             {{ row.payment_verifier?.name ?? '—' }}
                                         </TableCell>
-                                        <TableCell class="py-3 text-right">
-                                            <div class="flex justify-end gap-1 flex-wrap">
+                                        <TableCell class="py-4 pl-4 pr-1 text-right align-middle sm:pr-2">
+                                            <div class="flex flex-wrap items-center justify-end gap-2">
                                                 <Link :href="staff.transactions.show.url(row.id)">
-                                                    <Button variant="ghost" size="sm" class="h-8 gap-1">
+                                                    <Button variant="ghost" size="sm" class="h-9 gap-1.5 px-3">
                                                         <Eye class="h-4 w-4" />
                                                         <span class="hidden sm:inline">Transaction</span>
                                                     </Button>
@@ -483,7 +517,7 @@ const documentLabel = (row: PaymentRow) => row.document_type?.name ?? row.title;
                                                     v-if="row.payment_status === 'pending'"
                                                     :href="staff.payments.show.url(row.id)"
                                                 >
-                                                    <Button variant="outline" size="sm" class="h-8 gap-1">
+                                                    <Button variant="outline" size="sm" class="h-9 gap-1.5 px-3">
                                                         <CreditCard class="h-3.5 w-3.5" />
                                                         <span class="hidden sm:inline">Pay</span>
                                                     </Button>
@@ -492,7 +526,7 @@ const documentLabel = (row: PaymentRow) => row.document_type?.name ?? row.title;
                                         </TableCell>
                                     </TableRow>
                                     <TableRow v-if="payments.data.length === 0">
-                                        <TableCell colspan="11" class="py-16 text-center text-gray-500">
+                                        <TableCell colspan="11" class="px-6 py-16 text-center text-gray-500">
                                             No payment records match your filters. Try clearing search or widening the date range.
                                         </TableCell>
                                     </TableRow>
@@ -502,7 +536,7 @@ const documentLabel = (row: PaymentRow) => row.document_type?.name ?? row.title;
 
                         <div
                             v-if="payments.last_page > 1"
-                            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50/50"
+                            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-gray-200 bg-gray-50/50 px-5 py-4 sm:px-6 sm:py-5"
                         >
                             <div class="text-sm text-gray-600">
                                 <template v-if="payments.from != null && payments.to != null">
