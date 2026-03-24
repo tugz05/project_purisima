@@ -1,9 +1,22 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { dashboard } from '@/routes';
+
+const props = withDefaults(
+  defineProps<{
+    existingPhotoUrl?: string | null;
+  }>(),
+  {
+    existingPhotoUrl: null,
+  },
+);
+
+const hasExistingAvatar = computed(() => {
+  const u = props.existingPhotoUrl?.trim();
+  return Boolean(u && u.length > 0);
+});
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -38,6 +51,29 @@ type FileItem = { name: string; sizeKb: number; progress: number; uploaded: bool
 const items = ref<FileItem[]>([])
 
 const chooseFile = () => fileInput.value?.click()
+
+const newPhotoPreviewUrl = ref<string | null>(null)
+
+const revokePreview = () => {
+  if (newPhotoPreviewUrl.value) {
+    URL.revokeObjectURL(newPhotoPreviewUrl.value)
+    newPhotoPreviewUrl.value = null
+  }
+}
+
+watch(
+  () => form.photo,
+  (file) => {
+    revokePreview()
+    if (file) {
+      newPhotoPreviewUrl.value = URL.createObjectURL(file)
+    }
+  },
+)
+
+onUnmounted(() => {
+  revokePreview()
+})
 
 const onFileSelected = (file: File | null) => {
   form.photo = file
@@ -151,7 +187,39 @@ const submit = () => {
           </select>
         </div>
         <div class="sm:col-span-2">
-          <label class="mb-1 block text-sm text-[#334155]">Profile photo (JPG/PNG, max 2MB)</label>
+          <label class="mb-1 block text-sm font-medium text-[#334155]">Profile photo</label>
+          <p v-if="hasExistingAvatar" class="mb-3 text-sm text-slate-600">
+            Your account already has a profile picture (for example from Google). You can keep it or upload a new one to replace it.
+          </p>
+          <p v-else class="mb-3 text-sm text-slate-600">
+            Upload a clear photo (JPG or PNG, max 2MB). Required unless you sign in with a provider that supplies a photo.
+          </p>
+          <div
+            v-if="hasExistingAvatar && !form.photo"
+            class="mb-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center"
+          >
+            <img
+              :src="existingPhotoUrl ?? ''"
+              alt="Current profile photo"
+              class="mx-auto h-24 w-24 shrink-0 rounded-full border-2 border-white object-cover shadow-md sm:mx-0"
+            />
+            <div class="min-w-0 text-center text-sm text-slate-600 sm:text-left">
+              <p class="font-medium text-slate-800">Current photo</p>
+              <p class="mt-1">This image will stay on your profile if you submit without choosing a new file.</p>
+            </div>
+          </div>
+          <div
+            v-if="newPhotoPreviewUrl"
+            class="mb-4 flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50/80 p-4"
+          >
+            <img
+              :src="newPhotoPreviewUrl"
+              alt="New photo preview"
+              class="h-20 w-20 shrink-0 rounded-full object-cover ring-2 ring-emerald-500/30"
+            />
+            <p class="text-sm text-emerald-900">New photo selected — it will replace your current picture when you save.</p>
+          </div>
+          <label class="mb-1 block text-xs text-slate-500">Upload (JPG/PNG, max 2MB) — optional if you already have a photo above</label>
           <div
             class="flex cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed px-6 py-8 text-center"
             :class="isDragging ? 'border-[#0EA5E9] bg-[#F0F9FF]' : 'border-slate-200'"
@@ -165,6 +233,7 @@ const submit = () => {
             <div class="text-xs text-slate-500">PNG or JPG up to 2MB</div>
             <input ref="fileInput" type="file" accept="image/png,image/jpeg" class="hidden" @change="onInputChange" />
           </div>
+          <p v-if="form.errors.photo" class="mt-2 text-sm text-red-600">{{ form.errors.photo }}</p>
           <div v-if="items.length" class="mt-4 space-y-2">
             <div v-for="it in items" :key="it.name" class="rounded border px-3 py-2">
               <div class="flex items-center justify-between">

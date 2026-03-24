@@ -135,6 +135,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Shape used for messaging APIs and realtime payloads (includes profile / OAuth photo).
+     *
+     * @return array{id: int, name: string, email: string, role: string, photo_url: string|null}
+     */
+    public function messagingSenderPayload(): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'email' => $this->email,
+            'role' => $this->role,
+            'photo_url' => $this->photo_url,
+        ];
+    }
+
+    /**
      * Get the user's full name attribute.
      * Automatically generates name from first_name, middle_name, last_name, and suffix.
      */
@@ -149,7 +165,7 @@ class User extends Authenticatable
         ]);
 
         // If we have individual name parts, use them; otherwise use the stored name value
-        if (!empty($parts)) {
+        if (! empty($parts)) {
             return implode(' ', $parts);
         }
 
@@ -165,9 +181,9 @@ class User extends Authenticatable
         $this->attributes['name'] = $value;
 
         // If individual name fields are not set, try to parse the name
-        if (empty($this->attributes['first_name']) && !empty($value)) {
+        if (empty($this->attributes['first_name']) && ! empty($value)) {
             $nameParts = explode(' ', trim($value), 4);
-            
+
             if (count($nameParts) >= 1) {
                 $this->attributes['first_name'] = $nameParts[0];
             }
@@ -178,7 +194,7 @@ class User extends Authenticatable
                 // Check if last part is a suffix (Jr., Sr., II, III, etc.)
                 $lastPart = $nameParts[count($nameParts) - 1];
                 $suffixPattern = '/^(Jr\.?|Sr\.?|II|III|IV|V|VI|VII|VIII|IX|X)$/i';
-                
+
                 if (preg_match($suffixPattern, $lastPart)) {
                     $this->attributes['suffix'] = $lastPart;
                     $this->attributes['last_name'] = count($nameParts) >= 3 ? $nameParts[count($nameParts) - 2] : null;
@@ -198,7 +214,7 @@ class User extends Authenticatable
 
         static::saving(function ($user) {
             // If individual name fields are set, update the name attribute
-            if (!empty($user->first_name) || !empty($user->last_name)) {
+            if (! empty($user->first_name) || ! empty($user->last_name)) {
                 $parts = array_filter([
                     $user->first_name,
                     $user->middle_name,
@@ -206,7 +222,7 @@ class User extends Authenticatable
                     $user->suffix,
                 ]);
 
-                if (!empty($parts)) {
+                if (! empty($parts)) {
                     $user->name = implode(' ', $parts);
                 }
             }

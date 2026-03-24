@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Laravel\Socialite\Contracts\User as SocialiteUserContract;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
 
@@ -22,6 +22,7 @@ class SocialAuthController extends Controller
         $driver = Socialite::driver($provider);
         /** @var AbstractProvider $driver */
         $driver = $driver->stateless();
+
         return $driver->redirect();
     }
 
@@ -36,6 +37,7 @@ class SocialAuthController extends Controller
         /** @var AbstractProvider $driver */
         $driver = $driver->stateless();
         $socialUser = $driver->user();
+        $avatarUrl = $this->normalizeProviderAvatarUrl($socialUser);
 
         $user = User::where('email', $socialUser->getEmail())->first();
 
@@ -48,6 +50,7 @@ class SocialAuthController extends Controller
                 'role' => 'resident',
                 'provider' => $provider,
                 'provider_id' => $socialUser->getId(),
+                'photo_url' => $avatarUrl,
             ]);
 
             // Consider email verified if provided by provider
@@ -57,6 +60,8 @@ class SocialAuthController extends Controller
                 $user->email_verified_at = now();
                 $user->save();
             }
+        } else {
+            $this->syncOAuthProfile($user, $provider, $socialUser, $avatarUrl);
         }
 
         Auth::login($user, remember: true);
@@ -83,6 +88,47 @@ class SocialAuthController extends Controller
             abort(404);
         }
     }
+
+    protected function normalizeProviderAvatarUrl(SocialiteUserContract $socialUser): ?string
+    {
+        $url = $socialUser->getAvatar();
+        if (! is_string($url)) {
+            return null;
+        }
+        $url = trim($url);
+
+        return $url === '' ? null : $url;
+    }
+
+    /**
+     * Link OAuth metadata and refresh remote avatars without replacing uploaded (/storage) photos.
+     */
+    protected function syncOAuthProfile(User $user, string $provider, SocialiteUserContract $socialUser, ?string $avatarUrl): void
+    {
+        $updates = [];
+
+        if ($user->provider === null && $user->provider_id === null) {
+            $updates['provider'] = $provider;
+            $updates['provider_id'] = $socialUser->getId();
+        }
+
+        if ($avatarUrl !== null && $this->shouldApplyProviderAvatar($user->photo_url)) {
+            $updates['photo_url'] = $avatarUrl;
+        }
+
+        if ($updates !== []) {
+            $user->forceFill($updates)->save();
+        }
+    }
+
+    protected function shouldApplyProviderAvatar(?string $current): bool
+    {
+        if ($current === null || $current === '') {
+            return true;
+        }
+
+        $current = trim($current);
+
+        return str_starts_with($current, 'http://') || str_starts_with($current, 'https://');
+    }
 }
-
-

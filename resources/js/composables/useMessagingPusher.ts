@@ -15,6 +15,7 @@ export type MessageSentPayload = {
             name: string;
             email?: string;
             role?: string;
+            photo_url?: string | null;
         };
     };
     conversation: {
@@ -32,7 +33,7 @@ export type MessageSentPayload = {
 };
 
 export type UserTypingPayload = {
-    user: { id: number; name: string };
+    user: { id: number; name: string; photo_url?: string | null };
     is_typing: boolean;
     conversation_id: number;
 };

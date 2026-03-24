@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { userAvatarUrl } from '@/utils/userAvatar';
 import {
     MessageSquare,
     Search,
@@ -207,7 +208,7 @@ onMounted(() => {
                                     <!-- Avatar with Status -->
                                     <div class="relative">
                                         <Avatar class="h-12 w-12 ring-2 ring-white shadow-sm">
-                                            <AvatarImage :src="`https://ui-avatars.com/api/?name=${conversation.staff.name}&background=10b981&color=fff&bold=true`" />
+                                            <AvatarImage :src="userAvatarUrl(conversation.staff.name, conversation.staff.photo_url, { background: '10b981' })" />
                                             <AvatarFallback class="font-semibold">{{ getInitials(conversation.staff.name) }}</AvatarFallback>
                                         </Avatar>
                                         <!-- Staff indicator with different color -->

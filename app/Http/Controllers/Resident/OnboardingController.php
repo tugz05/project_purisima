@@ -6,14 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\ResidentProfileRequest;
 use App\Services\ResidentProfileService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class OnboardingController extends Controller
 {
-    public function show(): Response
+    public function show(Request $request): Response
     {
-        return Inertia::render('resident/Onboarding');
+        /** @var \App\Models\User|null $user */
+        $user = $request->user();
+        $existingPhotoUrl = $user !== null && is_string($user->photo_url) && trim($user->photo_url) !== ''
+            ? trim($user->photo_url)
+            : null;
+
+        return Inertia::render('resident/Onboarding', [
+            'existingPhotoUrl' => $existingPhotoUrl,
+        ]);
     }
 
     public function store(ResidentProfileRequest $request, ResidentProfileService $service): RedirectResponse
@@ -23,5 +32,3 @@ class OnboardingController extends Controller
         return redirect()->route('resident.dashboard');
     }
 }
-
-

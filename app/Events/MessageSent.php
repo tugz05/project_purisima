@@ -64,6 +64,8 @@ class MessageSent implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
+        $this->message->loadMissing('sender');
+
         $staffMessagingUnreadTotal = null;
         $recipientUserId = null;
         $recipientMessagingUnreadTotal = null;
@@ -91,12 +93,7 @@ class MessageSent implements ShouldBroadcastNow
                 'is_edited' => $this->message->is_edited,
                 'created_at' => $this->message->created_at->toISOString(),
                 'display_time' => $this->message->display_time,
-                'sender' => [
-                    'id' => $this->message->sender->id,
-                    'name' => $this->message->sender->name,
-                    'email' => $this->message->sender->email,
-                    'role' => $this->message->sender->role,
-                ],
+                'sender' => $this->message->sender->messagingSenderPayload(),
             ],
             'conversation' => [
                 'id' => $this->conversation->id,

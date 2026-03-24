@@ -33,11 +33,13 @@ import {
     X,
 } from 'lucide-vue-next';
 import { MESSAGING_QUICK_EMOJIS } from '@/utils/messagingAttachments';
+import { userAvatarUrl } from '@/utils/userAvatar';
 
 interface StaffMember {
     id: number;
     name: string;
     email: string;
+    photo_url?: string | null;
 }
 
 interface Props {
@@ -258,9 +260,7 @@ const createConversation = async (): Promise<void> => {
                                 >
                                     <div class="relative">
                                         <Avatar class="h-12 w-12 shadow-sm ring-2 ring-white">
-                                            <AvatarImage
-                                                :src="`https://ui-avatars.com/api/?name=${staff.name}&background=10b981&color=fff&bold=true`"
-                                            />
+                                            <AvatarImage :src="userAvatarUrl(staff.name, staff.photo_url, { background: '10b981' })" />
                                             <AvatarFallback class="font-semibold">{{
                                                 getInitials(staff.name)
                                             }}</AvatarFallback>
@@ -305,9 +305,7 @@ const createConversation = async (): Promise<void> => {
                             <CardContent class="p-6">
                                 <div class="flex items-center gap-3">
                                     <Avatar class="h-14 w-14 shadow-md ring-2 ring-white">
-                                        <AvatarImage
-                                            :src="`https://ui-avatars.com/api/?name=${selectedStaff.name}&background=10b981&color=fff&bold=true`"
-                                        />
+                                        <AvatarImage :src="userAvatarUrl(selectedStaff.name, selectedStaff.photo_url, { background: '10b981' })" />
                                         <AvatarFallback class="text-lg font-bold">{{
                                             getInitials(selectedStaff.name)
                                         }}</AvatarFallback>

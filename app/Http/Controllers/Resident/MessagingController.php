@@ -52,6 +52,7 @@ class MessagingController extends Controller
             return [
                 'id' => $conversation->id,
                 'staff_name' => $conversation->staff->name,
+                'staff_photo_url' => $conversation->staff->photo_url,
                 'messages' => $conversation->messages->map(function ($message) {
                     return [
                         'id' => $message->id,
@@ -60,10 +61,7 @@ class MessagingController extends Controller
                         'attachments' => $message->attachments,
                         'created_at' => $message->created_at,
                         'is_read' => $message->is_read,
-                        'sender' => [
-                            'id' => $message->sender->id,
-                            'name' => $message->sender->name,
-                        ],
+                        'sender' => $message->sender->messagingSenderPayload(),
                     ];
                 }),
                 'unread_count' => $conversation->resident_has_unread ? 1 : 0,
@@ -200,6 +198,7 @@ class MessagingController extends Controller
             $formattedConversation = [
                 'id' => $conversation->id,
                 'staff_name' => $conversation->staff->name,
+                'staff_photo_url' => $conversation->staff->photo_url,
                 'messages' => $conversation->messages->map(function ($message) {
                     return [
                         'id' => $message->id,
@@ -208,10 +207,7 @@ class MessagingController extends Controller
                         'attachments' => $message->attachments,
                         'created_at' => $message->created_at,
                         'is_read' => $message->is_read,
-                        'sender' => [
-                            'id' => $message->sender->id,
-                            'name' => $message->sender->name,
-                        ],
+                        'sender' => $message->sender->messagingSenderPayload(),
                     ];
                 }),
                 'unread_count' => 0,
@@ -284,6 +280,7 @@ class MessagingController extends Controller
             'conversation' => [
                 'id' => $conversation->id,
                 'staff_name' => $conversation->staff?->name,
+                'staff_photo_url' => $conversation->staff?->photo_url,
                 'messages' => $conversation->messages->map(function ($message) {
                     return [
                         'id' => $message->id,
@@ -292,10 +289,7 @@ class MessagingController extends Controller
                         'attachments' => $message->attachments,
                         'created_at' => $message->created_at,
                         'is_read' => $message->is_read,
-                        'sender' => [
-                            'id' => $message->sender->id,
-                            'name' => $message->sender->name,
-                        ],
+                        'sender' => $message->sender->messagingSenderPayload(),
                     ];
                 }),
                 'unread_count' => $conversation->resident_has_unread ? 1 : 0,
@@ -315,7 +309,7 @@ class MessagingController extends Controller
         // Get available staff members
         $staffMembers = User::query()
             ->whereIn('role', ['staff', 'admin'])
-            ->select('id', 'name', 'email')
+            ->select('id', 'name', 'email', 'photo_url')
             ->get();
 
         return Inertia::render('resident/Messaging/Create', [

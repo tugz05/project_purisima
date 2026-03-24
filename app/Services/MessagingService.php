@@ -236,7 +236,7 @@ class MessagingService
             })
             ->orderBy('name')
             ->limit($limit)
-            ->get(['id', 'name', 'email', 'role']);
+            ->get(['id', 'name', 'email', 'role', 'photo_url']);
     }
 
     /**

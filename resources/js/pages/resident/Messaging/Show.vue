@@ -7,6 +7,7 @@ import { messagingJsonFetch } from '@/utils/messagingHttp';
 import { subscribeToConversationChannel } from '@/composables/useMessagingPusher';
 import { playMessageSound } from '@/composables/useInAppAlertSounds';
 import { scheduleScrollToBottom } from '@/utils/scheduleScrollToBottom';
+import { userAvatarUrl } from '@/utils/userAvatar';
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +53,7 @@ interface Message {
         name: string;
         email: string;
         role?: string;
+        photo_url?: string | null;
     };
 }
 
@@ -66,11 +68,13 @@ interface Conversation {
         id: number;
         name: string;
         email: string;
+        photo_url?: string | null;
     };
     staff: {
         id: number;
         name: string;
         email: string;
+        photo_url?: string | null;
     };
     messages: Message[];
 }
@@ -344,7 +348,7 @@ onBeforeUnmount(() => {
                             <div class="flex items-center gap-3">
                                 <div class="relative">
                                     <Avatar class="h-10 w-10 ring-2 ring-green-500 ring-opacity-30">
-                                        <AvatarImage :src="`https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/person.svg`" />
+                                        <AvatarImage :src="userAvatarUrl(conversation.staff.name, conversation.staff.photo_url, { background: '2563eb' })" />
                                         <AvatarFallback class="text-white bg-green-600">{{ getInitials(conversation.staff.name) }}</AvatarFallback>
                                     </Avatar>
                                     <div class="absolute bottom-0 right-0 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"></div>
@@ -383,7 +387,7 @@ onBeforeUnmount(() => {
                         <div class="flex items-center gap-3">
                             <div class="relative">
                                 <Avatar class="h-12 w-12 ring-2 ring-white shadow-sm">
-                                    <AvatarImage :src="`https://ui-avatars.com/api/?name=${otherUser.name}&background=10b981&color=fff&bold=true`" />
+                                    <AvatarImage :src="userAvatarUrl(otherUser.name, otherUser.photo_url, { background: '10b981' })" />
                                     <AvatarFallback class="font-semibold">{{ getInitials(otherUser.name) }}</AvatarFallback>
                                 </Avatar>
                                 <div class="absolute bottom-0 right-0 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"></div>
@@ -455,7 +459,7 @@ onBeforeUnmount(() => {
                                 v-if="!isCurrentUser(message.sender.id)"
                                 class="h-8 w-8 ring-2 ring-gray-100 shadow-sm"
                             >
-                                <AvatarImage :src="`https://ui-avatars.com/api/?name=${message.sender.name}&background=10b981&color=fff&bold=true`" />
+                                <AvatarImage :src="userAvatarUrl(message.sender.name, message.sender.photo_url, { background: '10b981' })" />
                                 <AvatarFallback class="text-xs font-semibold">{{ getInitials(message.sender.name) }}</AvatarFallback>
                             </Avatar>
 
@@ -491,7 +495,7 @@ onBeforeUnmount(() => {
                     <div v-if="otherUserTyping" class="flex justify-start">
                         <div class="flex items-start gap-2">
                             <Avatar class="h-8 w-8 ring-2 ring-gray-100 shadow-sm">
-                                <AvatarImage :src="`https://ui-avatars.com/api/?name=${otherUser.name}&background=10b981&color=fff&bold=true`" />
+                                <AvatarImage :src="userAvatarUrl(otherUser.name, otherUser.photo_url, { background: '10b981' })" />
                                 <AvatarFallback class="text-xs font-semibold">{{ getInitials(otherUser.name) }}</AvatarFallback>
                             </Avatar>
                             <div class="bg-gray-100 rounded-2xl px-4 py-3 shadow-sm">

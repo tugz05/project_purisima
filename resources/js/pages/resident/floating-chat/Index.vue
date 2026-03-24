@@ -5,11 +5,8 @@ import FloatingChat from '@/components/resident/FloatingChat.vue';
 
 interface Conversation {
     id: number;
-    staff: {
-        id: number;
-        name: string;
-        email: string;
-    };
+    staff_name: string;
+    staff_photo_url?: string | null;
     messages: Array<{
         id: number;
         content: string;
@@ -20,9 +17,13 @@ interface Conversation {
         sender: {
             id: number;
             name: string;
+            email?: string;
+            role?: string;
+            photo_url?: string | null;
         };
     }>;
     unread_count: number;
+    is_active?: boolean;
 }
 
 interface StaffMember {
@@ -36,6 +37,7 @@ interface User {
     name: string;
     email: string;
     role: string;
+    photo_url?: string | null;
 }
 
 interface Props {

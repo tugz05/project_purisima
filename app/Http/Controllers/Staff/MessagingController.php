@@ -49,6 +49,7 @@ class MessagingController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'photo_url' => $user->photo_url,
             ],
         ]);
     }
@@ -67,6 +68,7 @@ class MessagingController extends Controller
                 'id' => $u->id,
                 'name' => $u->name,
                 'email' => $u->email,
+                'photo_url' => $u->photo_url,
             ])->values()->all(),
         ]);
     }

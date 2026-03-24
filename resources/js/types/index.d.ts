@@ -35,7 +35,10 @@ export interface User {
     id: number;
     name: string;
     email: string;
+    /** @deprecated Prefer photo_url from the API (OAuth / uploads). */
     avatar?: string;
+    photo_url?: string | null;
+    role?: string;
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;

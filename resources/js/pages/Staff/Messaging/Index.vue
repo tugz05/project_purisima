@@ -43,6 +43,7 @@ import { useMessagingInPageUpload } from '@/composables/useMessagingInPageUpload
 import { subscribeToConversationChannel, subscribeToStaffMessagingInboxChannel } from '@/composables/useMessagingPusher';
 import { playMessageSound } from '@/composables/useInAppAlertSounds';
 import { scheduleScrollToBottom } from '@/utils/scheduleScrollToBottom';
+import { userAvatarUrl } from '@/utils/userAvatar';
 
 interface Conversation {
     id: number;
@@ -55,11 +56,13 @@ interface Conversation {
         id: number;
         name: string;
         email: string;
+        photo_url?: string | null;
     };
     staff: {
         id: number;
         name: string;
         email: string;
+        photo_url?: string | null;
     };
     latestMessages: Array<{
         id: number;
@@ -68,6 +71,7 @@ interface Conversation {
         sender: {
             id: number;
             name: string;
+            photo_url?: string | null;
         };
     }>;
 }
@@ -76,6 +80,7 @@ interface SearchableResident {
     id: number;
     name: string;
     email: string;
+    photo_url?: string | null;
 }
 
 interface Props {
@@ -91,6 +96,7 @@ interface Props {
         name: string;
         email: string;
         role: string;
+        photo_url?: string | null;
     };
 }
 
@@ -798,7 +804,7 @@ onBeforeUnmount(() => {
                                     <!-- Avatar with Status -->
                                     <div class="relative flex-shrink-0">
                                         <Avatar class="h-9 w-9 ring-1 ring-white shadow-sm">
-                                            <AvatarImage :src="`https://ui-avatars.com/api/?name=${conversation.resident.name}&background=3b82f6&color=fff&bold=true`" />
+                                            <AvatarImage :src="userAvatarUrl(conversation.resident.name, conversation.resident.photo_url, { background: '3b82f6' })" />
                                             <AvatarFallback class="font-semibold text-sm">{{ getInitials(conversation.resident.name) }}</AvatarFallback>
                                         </Avatar>
                                         <!-- Online indicator -->
@@ -883,7 +889,7 @@ onBeforeUnmount(() => {
                                     <ArrowLeft class="h-4 w-4" />
                                 </Button>
                                 <Avatar class="h-10 w-10">
-                                    <AvatarImage :src="`https://ui-avatars.com/api/?name=${selectedConversation.resident.name}&background=10b981&color=fff&bold=true`" />
+                                    <AvatarImage :src="userAvatarUrl(selectedConversation.resident.name, selectedConversation.resident.photo_url, { background: '10b981' })" />
                                     <AvatarFallback>{{ getInitials(selectedConversation.resident.name) }}</AvatarFallback>
                                 </Avatar>
                                 <div>
@@ -1135,9 +1141,7 @@ onBeforeUnmount(() => {
                                 @click="composeSelectedResident = u"
                             >
                                 <Avatar class="h-9 w-9 shrink-0">
-                                    <AvatarImage
-                                        :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=3b82f6&color=fff&bold=true`"
-                                    />
+                                    <AvatarImage :src="userAvatarUrl(u.name, u.photo_url, { background: '3b82f6' })" />
                                     <AvatarFallback class="text-xs">{{ getInitials(u.name) }}</AvatarFallback>
                                 </Avatar>
                                 <div class="min-w-0 flex-1">

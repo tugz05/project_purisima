@@ -5,6 +5,7 @@ import { getPusher, isPusherAvailable } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
 import { subscribeToConversationChannel, subscribeToUserMessagingChannel } from '@/composables/useMessagingPusher';
 import { playMessageSound } from '@/composables/useInAppAlertSounds';
+import { userAvatarUrl } from '@/utils/userAvatar';
 import { scheduleScrollToBottom } from '@/utils/scheduleScrollToBottom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,12 +42,16 @@ interface Message {
     sender: {
         id: number;
         name: string;
+        email?: string;
+        role?: string;
+        photo_url?: string | null;
     };
 }
 
 interface Conversation {
     id: number;
     staff_name: string;
+    staff_photo_url?: string | null;
     messages: Message[];
     unread_count: number;
     is_active: boolean;
@@ -626,7 +631,7 @@ onBeforeUnmount(() => {
                 <div class="relative">
                     <Avatar class="h-8 w-8">
                         <AvatarImage
-                            :src="currentConversation ? `https://ui-avatars.com/api/?name=${currentConversation.staff_name}&background=6366f1&color=fff&bold=true` : 'https://ui-avatars.com/api/?name=Staff&background=6366f1&color=fff&bold=true'"
+                            :src="currentConversation ? userAvatarUrl(currentConversation.staff_name, currentConversation.staff_photo_url, { background: '6366f1' }) : userAvatarUrl('Staff', null, { background: '6366f1' })"
                         />
                         <AvatarFallback class="bg-indigo-500 text-white text-xs font-medium">
                             {{ currentConversation ? getInitials(currentConversation.staff_name) : 'ST' }}
