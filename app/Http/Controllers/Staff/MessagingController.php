@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Messaging\SendMessageRequest;
 use App\Http\Requests\Staff\SearchStaffMessagingUsersRequest;
 use App\Http\Requests\Staff\StartStaffMessagingConversationRequest;
 use App\Models\Conversation;
@@ -208,7 +209,7 @@ class MessagingController extends Controller
     /**
      * Send a message in a conversation.
      */
-    public function sendMessage(Request $request, Conversation $conversation): JsonResponse
+    public function sendMessage(SendMessageRequest $request, Conversation $conversation): JsonResponse
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
@@ -218,24 +219,25 @@ class MessagingController extends Controller
             abort(403, 'You are not authorized to send messages in this conversation.');
         }
 
-        $validated = $request->validate([
-            'content' => ['required', 'string', 'max:5000'],
-            'type' => ['sometimes', 'string', 'in:text,image,file'],
-            'attachments' => ['sometimes', 'array', 'max:5'],
-            'attachments.*' => ['file', 'mimes:jpg,jpeg,png,pdf,doc,docx', 'max:10240'], // 10MB max
-        ]);
-
         try {
-            $attachments = null;
-            if (isset($validated['attachments'])) {
-                $attachments = $this->handleFileUploads($validated['attachments']);
+            $content = $request->messagingContent();
+            $uploadedFiles = $request->messagingFiles();
+            $attachments = count($uploadedFiles) > 0 ? $this->handleFileUploads($uploadedFiles) : null;
+
+            $typeInput = $request->input('type');
+            $type = is_string($typeInput) && in_array($typeInput, ['text', 'image', 'file'], true)
+                ? $typeInput
+                : 'text';
+            if ($type === 'text' && $attachments !== null) {
+                $allImages = collect($attachments)->every(fn (array $a) => str_starts_with((string) ($a['mime_type'] ?? ''), 'image/'));
+                $type = $allImages ? 'image' : 'file';
             }
 
             $message = $this->messagingService->sendMessage(
                 $conversation,
                 $user,
-                $validated['content'],
-                $validated['type'] ?? 'text',
+                $content,
+                $type,
                 $attachments
             );
 

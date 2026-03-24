@@ -52,6 +52,12 @@ class MessagingService
     public function sendMessage(Conversation $conversation, User $sender, string $content, string $type = 'text', ?array $attachments = null): Message
     {
         return DB::transaction(function () use ($conversation, $sender, $content, $type, $attachments) {
+            $lastMessagePreview = $content !== ''
+                ? $content
+                : (is_array($attachments) && count($attachments) > 0
+                    ? '📎 '.$attachments[0]['name']
+                    : '');
+
             // Create the message
             $message = $conversation->messages()->create([
                 'sender_id' => $sender->id,
@@ -62,7 +68,7 @@ class MessagingService
 
             // Update conversation with last message info
             $conversation->update([
-                'last_message' => $content,
+                'last_message' => $lastMessagePreview,
                 'last_message_at' => Carbon::now(),
             ]);
 

@@ -4,6 +4,8 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->withoutMiddleware(ValidateCsrfToken::class);
@@ -155,5 +157,52 @@ test('staff cannot start a conversation with a non-resident user', function () {
 
     $this->postJson('/staff/messaging/conversations/start', [
         'resident_id' => $otherStaff->id,
+    ])->assertUnprocessable();
+});
+
+test('staff can send a message with image attachment and no text', function () {
+    Storage::fake('public');
+
+    $resident = User::factory()->create(['role' => 'resident']);
+    $staff = User::factory()->create(['role' => 'staff']);
+
+    $conversation = Conversation::create([
+        'resident_id' => $resident->id,
+        'staff_id' => $staff->id,
+        'subject' => 'Test',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($staff);
+
+    $file = UploadedFile::fake()->image('chat-photo.jpg');
+
+    $response = $this->post("/staff/messaging/conversations/{$conversation->id}/messages", [
+        'content' => '',
+        'attachments' => [$file],
+    ]);
+
+    $response->assertSuccessful()->assertJsonPath('success', true);
+
+    $message = Message::query()->where('conversation_id', $conversation->id)->latest('id')->first();
+    expect($message)->not->toBeNull();
+    expect($message->attachments)->toBeArray()->not->toBeEmpty();
+});
+
+test('staff cannot send empty message with no attachments', function () {
+    $resident = User::factory()->create(['role' => 'resident']);
+    $staff = User::factory()->create(['role' => 'staff']);
+
+    $conversation = Conversation::create([
+        'resident_id' => $resident->id,
+        'staff_id' => $staff->id,
+        'subject' => 'Test',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($staff);
+
+    $this->postJson("/staff/messaging/conversations/{$conversation->id}/messages", [
+        'content' => '',
     ])->assertUnprocessable();
 });

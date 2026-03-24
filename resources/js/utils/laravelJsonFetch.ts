@@ -25,6 +25,10 @@ function readXsrfTokenFromCookie(): string {
 export function laravelJsonFetch(url: string, options: RequestInit = {}): Promise<Response> {
     const headers = new Headers(options.headers ?? {});
 
+    if (typeof FormData !== 'undefined' && options.body instanceof FormData) {
+        headers.delete('Content-Type');
+    }
+
     const xsrf = readXsrfTokenFromCookie();
     if (xsrf && !headers.has('X-XSRF-TOKEN')) {
         headers.set('X-XSRF-TOKEN', xsrf);

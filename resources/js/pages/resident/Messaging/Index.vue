@@ -272,7 +272,7 @@ onMounted(() => {
                                 <CheckCircle class="h-4 w-4" />
                                 Quick response times
                             </div>
-                        </div -->
+                        </div>
                         <!-- CTA button -->
                         <div class="mt-8">
                             <Link href="/resident/messaging/create">

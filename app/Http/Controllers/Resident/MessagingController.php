@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Resident;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Messaging\SendMessageRequest;
+use App\Http\Requests\Resident\StoreResidentMessagingConversationRequest;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
@@ -252,7 +254,7 @@ class MessagingController extends Controller
 
         $unreadCount = $this->messagingService->getUnreadCount($user);
 
-        return Inertia::render('Resident/Messaging/Show', [
+        return Inertia::render('resident/Messaging/Show', [
             'conversation' => $conversation,
             'unreadCount' => $unreadCount,
         ]);
@@ -305,11 +307,12 @@ class MessagingController extends Controller
         $user = Auth::user();
 
         // Get available staff members
-        $staffMembers = User::whereHas('roles', function ($query) {
-            $query->whereIn('name', ['staff', 'admin']);
-        })->select('id', 'name', 'email')->get();
+        $staffMembers = User::query()
+            ->whereIn('role', ['staff', 'admin'])
+            ->select('id', 'name', 'email')
+            ->get();
 
-        return Inertia::render('Resident/Messaging/Create', [
+        return Inertia::render('resident/Messaging/Create', [
             'staffMembers' => $staffMembers,
         ]);
     }
@@ -317,17 +320,12 @@ class MessagingController extends Controller
     /**
      * Store a new conversation.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(StoreResidentMessagingConversationRequest $request): RedirectResponse
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $validated = $request->validate([
-            'staff_id' => ['required', 'exists:users,id'],
-            'subject' => ['nullable', 'string', 'max:255'],
-            'content' => ['required', 'string', 'max:5000'],
-        ]);
-
+        $validated = $request->validated();
         $staff = User::findOrFail($validated['staff_id']);
 
         // Ensure staff member has staff or admin role
@@ -338,16 +336,32 @@ class MessagingController extends Controller
         }
 
         try {
+            $subject = $validated['subject'] ?? null;
             $conversation = $this->messagingService->getOrCreateConversation(
                 $user,
                 $staff,
-                $validated['subject']
+                $subject
             );
+
+            $content = $request->messagingContent();
+            $uploadedFiles = $request->messagingFiles();
+            $attachments = count($uploadedFiles) > 0 ? $this->handleFileUploads($uploadedFiles) : null;
+
+            $typeInput = $request->input('type');
+            $type = is_string($typeInput) && in_array($typeInput, ['text', 'image', 'file'], true)
+                ? $typeInput
+                : 'text';
+            if ($type === 'text' && $attachments !== null) {
+                $allImages = collect($attachments)->every(fn (array $a) => str_starts_with((string) ($a['mime_type'] ?? ''), 'image/'));
+                $type = $allImages ? 'image' : 'file';
+            }
 
             $this->messagingService->sendMessage(
                 $conversation,
                 $user,
-                $validated['content']
+                $content,
+                $type,
+                $attachments
             );
 
             return redirect()->route('resident.messaging.show', $conversation)
@@ -362,41 +376,35 @@ class MessagingController extends Controller
     /**
      * Send a message in a conversation.
      */
-    public function sendMessage(Request $request, Conversation $conversation): JsonResponse
+    public function sendMessage(SendMessageRequest $request, Conversation $conversation): JsonResponse
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-
-        // Debug: Log conversation info
-        \Illuminate\Support\Facades\Log::info('Resident sendMessage called', [
-            'conversation_id' => $conversation->id,
-            'user_id' => $user->id,
-            'conversation_exists' => $conversation->exists,
-        ]);
 
         // Ensure user is a participant
         if (! $conversation->isParticipant($user)) {
             abort(403, 'You are not authorized to send messages in this conversation.');
         }
 
-        $validated = $request->validate([
-            'content' => ['required', 'string', 'max:5000'],
-            'type' => ['sometimes', 'string', 'in:text,image,file'],
-            'attachments' => ['sometimes', 'array', 'max:5'],
-            'attachments.*' => ['file', 'mimes:jpg,jpeg,png,pdf,doc,docx', 'max:10240'], // 10MB max
-        ]);
-
         try {
-            $attachments = null;
-            if (isset($validated['attachments'])) {
-                $attachments = $this->handleFileUploads($validated['attachments']);
+            $content = $request->messagingContent();
+            $uploadedFiles = $request->messagingFiles();
+            $attachments = count($uploadedFiles) > 0 ? $this->handleFileUploads($uploadedFiles) : null;
+
+            $typeInput = $request->input('type');
+            $type = is_string($typeInput) && in_array($typeInput, ['text', 'image', 'file'], true)
+                ? $typeInput
+                : 'text';
+            if ($type === 'text' && $attachments !== null) {
+                $allImages = collect($attachments)->every(fn (array $a) => str_starts_with((string) ($a['mime_type'] ?? ''), 'image/'));
+                $type = $allImages ? 'image' : 'file';
             }
 
             $message = $this->messagingService->sendMessage(
                 $conversation,
                 $user,
-                $validated['content'],
-                $validated['type'] ?? 'text',
+                $content,
+                $type,
                 $attachments
             );
 

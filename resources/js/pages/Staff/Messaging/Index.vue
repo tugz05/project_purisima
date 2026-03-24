@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, onBeforeUnmount, nextTick } from 'vue';
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import { dispatchStaffMessagingUnreadCount } from '@/staffMessagingEvents';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import StaffLayout from '@/layouts/staff/Layout.vue';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,12 +11,17 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import MessageAttachmentList from '@/components/messaging/MessageAttachmentList.vue';
+import {
     MessageSquare,
     Search,
     Plus,
-    Clock,
     CheckCircle,
-    CheckCircle2,
     Archive,
     MoreVertical,
     Send,
@@ -28,9 +32,14 @@ import {
     Video,
     X,
     User,
+    FileText,
+    Image as LucideImage,
 } from 'lucide-vue-next';
 import { getPusher, isPusherAvailable } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
+import { MESSAGING_QUICK_EMOJIS, postConversationMessage } from '@/utils/messagingAttachments';
+import { mergeMessagingPendingAttachments } from '@/utils/messagingComposerUpload';
+import { useMessagingInPageUpload } from '@/composables/useMessagingInPageUpload';
 import { subscribeToConversationChannel, subscribeToStaffMessagingInboxChannel } from '@/composables/useMessagingPusher';
 import { scheduleScrollToBottom } from '@/utils/scheduleScrollToBottom';
 
@@ -240,7 +249,18 @@ const selectedConversation = ref<Conversation | null>(null);
 const loadingMessages = ref(false);
 const messages = ref<any[]>([]);
 const newMessage = ref('');
+const pendingAttachmentFiles = ref<File[]>([]);
+const documentAttachmentInputRef = ref<HTMLInputElement | null>(null);
+const imageAttachmentInputRef = ref<HTMLInputElement | null>(null);
 const sendingMessage = ref(false);
+
+const {
+    isDraggingOver: isMessagingInPageDragOver,
+    onDragOver: onMessagingInPageDragOver,
+    onDragLeave: onMessagingInPageDragLeave,
+    onDrop: onMessagingInPageDrop,
+    onPaste: onMessagingInPagePaste,
+} = useMessagingInPageUpload(pendingAttachmentFiles);
 const typingTimeout = ref<number | null>(null);
 const isTyping = ref(false);
 const otherUserTyping = ref(false);
@@ -294,6 +314,83 @@ const appendMessageIfNew = (msg: { id: number }) => {
 
 // Computed properties
 const hasUnreadMessages = computed(() => sidebarUnreadCount.value > 0);
+
+const canSendStaffMessage = computed(() => {
+    return (
+        !!selectedConversation.value &&
+        !sendingMessage.value &&
+        (newMessage.value.trim().length > 0 || pendingAttachmentFiles.value.length > 0)
+    );
+});
+
+const isMessageFromCurrentUser = (message: { sender: { id: number } }): boolean => {
+    return message.sender.id === props.currentUser.id;
+};
+
+const addPendingFilesFromList = (fileList: FileList | null, kind: 'image' | 'document'): void => {
+    if (!fileList?.length) {
+        return;
+    }
+    const picked = Array.from(fileList);
+    const filtered =
+        kind === 'image'
+            ? picked.filter((f) => f.type.startsWith('image/'))
+            : picked.filter(
+                  (f) =>
+                      f.type === 'application/pdf' ||
+                      f.type === 'application/msword' ||
+                      f.type ===
+                          'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                      /\.(pdf|doc|docx)$/i.test(f.name),
+              );
+    pendingAttachmentFiles.value = mergeMessagingPendingAttachments(
+        pendingAttachmentFiles.value,
+        filtered,
+        5,
+    );
+};
+
+const onDocumentAttachmentChosen = (e: Event): void => {
+    const input = e.target as HTMLInputElement;
+    addPendingFilesFromList(input.files, 'document');
+    input.value = '';
+};
+
+const onImageAttachmentChosen = (e: Event): void => {
+    const input = e.target as HTMLInputElement;
+    addPendingFilesFromList(input.files, 'image');
+    input.value = '';
+};
+
+const removePendingAttachment = (index: number): void => {
+    pendingAttachmentFiles.value = pendingAttachmentFiles.value.filter((_, i) => i !== index);
+};
+
+const insertEmojiIntoNewMessage = (emoji: string): void => {
+    newMessage.value += emoji;
+    nextTick(() => document.getElementById('staff-messaging-new-message')?.focus());
+};
+
+const lastMessagePreviewFromSendResponse = (data: {
+    message?: { content?: string; attachments?: { name?: string }[] };
+    conversation?: { last_message?: string | null };
+}): string => {
+    if (data.conversation?.last_message) {
+        return String(data.conversation.last_message);
+    }
+    const m = data.message;
+    if (!m) {
+        return '';
+    }
+    if (m.content?.trim()) {
+        return m.content.trim();
+    }
+    if (m.attachments?.length) {
+        return `📎 ${m.attachments[0]?.name ?? 'Attachment'}`;
+    }
+
+    return '';
+};
 
 const formatLastMessageTime = (dateString: string | null) => {
     if (!dateString) return 'No messages';
@@ -403,7 +500,9 @@ const selectConversation = async (conversation: Conversation) => {
 };
 
 const sendMessage = async () => {
-    if (!newMessage.value.trim() || !selectedConversation.value || sendingMessage.value) return;
+    if (!canSendStaffMessage.value) {
+        return;
+    }
 
     sendingMessage.value = true;
 
@@ -411,14 +510,10 @@ const sendMessage = async () => {
     stopTyping();
 
     try {
-        const response = await messagingJsonFetch(`/staff/messaging/conversations/${selectedConversation.value.id}/messages`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                content: newMessage.value.trim(),
-            }),
+        const convId = selectedConversation.value!.id;
+        const response = await postConversationMessage(`/staff/messaging/conversations/${convId}/messages`, {
+            content: newMessage.value.trim(),
+            files: [...pendingAttachmentFiles.value],
         });
 
         if (response.ok) {
@@ -427,12 +522,18 @@ const sendMessage = async () => {
                 appendMessageIfNew(data.message);
             }
             newMessage.value = '';
+            pendingAttachmentFiles.value = [];
 
-            // Update the conversation in the sidebar
-            const convIndex = props.conversations?.data?.findIndex(c => c.id === selectedConversation.value?.id);
-            if (convIndex !== undefined && props.conversations?.data) {
-                props.conversations.data[convIndex].last_message = data.message.content;
-                props.conversations.data[convIndex].last_message_at = data.message.created_at;
+            const convIndex = props.conversations?.data?.findIndex((c) => c.id === selectedConversation.value?.id);
+            if (convIndex !== undefined && convIndex >= 0 && props.conversations?.data) {
+                const preview = lastMessagePreviewFromSendResponse(data);
+                const row = props.conversations.data[convIndex];
+                if (preview) {
+                    row.last_message = preview;
+                }
+                if (data.message?.created_at) {
+                    row.last_message_at = data.message.created_at;
+                }
             }
         }
     } catch (error) {
@@ -446,6 +547,7 @@ const closeConversation = () => {
     selectedConversation.value = null;
     messages.value = [];
     newMessage.value = '';
+    pendingAttachmentFiles.value = [];
 };
 
 // Typing indicator functions
@@ -769,7 +871,7 @@ onBeforeUnmount(() => {
                 </div>
 
                 <!-- Conversation Chat -->
-                <div v-else class="flex flex-col h-full">
+                <div v-else class="flex min-h-0 flex-col h-full">
                     <!-- Header - Fixed at Top -->
                     <div class="p-4 border-b border-gray-200 bg-white flex-shrink-0 sticky top-0 z-10">
                         <div class="flex items-center justify-between">
@@ -800,8 +902,24 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
 
+                    <div
+                        class="relative flex min-h-0 flex-1 flex-col"
+                        @dragover="onMessagingInPageDragOver"
+                        @dragleave="onMessagingInPageDragLeave"
+                        @drop="onMessagingInPageDrop"
+                    >
+                        <div
+                            v-if="isMessagingInPageDragOver"
+                            class="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center border-2 border-dashed border-blue-400 bg-blue-50/90"
+                        >
+                            <div class="rounded-lg bg-white px-4 py-3 text-center shadow-md">
+                                <p class="text-sm font-medium text-blue-900">Drop files to attach</p>
+                                <p class="mt-1 text-xs text-blue-700">PDF, Word, or images · up to 5 files</p>
+                            </div>
+                        </div>
+
                     <!-- Messages Area - Only This Scrolls -->
-                    <div ref="threadScrollRef" class="flex-1 overflow-y-auto p-4 bg-gray-50">
+                    <div ref="threadScrollRef" class="min-h-0 flex-1 overflow-y-auto p-4 bg-gray-50">
                         <div v-if="loadingMessages" class="flex items-center justify-center h-full">
                             <div class="text-center">
                                 <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -819,15 +937,21 @@ onBeforeUnmount(() => {
                                 v-for="message in messages"
                                 :key="message.id"
                                 class="flex mb-3 animate-in slide-in-from-bottom-2 duration-300"
-                                :class="message.sender.role === 'staff' ? 'justify-end' : 'justify-start'"
+                                :class="isMessageFromCurrentUser(message) ? 'justify-end' : 'justify-start'"
                             >
                                 <div
                                     class="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm transition-all duration-200 hover:shadow-md"
-                                    :class="message.sender.role === 'staff'
+                                    :class="isMessageFromCurrentUser(message)
                                         ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md'
                                         : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md'"
                                 >
-                                    <p class="text-sm leading-relaxed">{{ message.content }}</p>
+                                    <p v-if="message.content?.trim()" class="text-sm leading-relaxed break-words">
+                                        {{ message.content }}
+                                    </p>
+                                    <MessageAttachmentList
+                                        :attachments="message.attachments"
+                                        :tone="isMessageFromCurrentUser(message) ? 'staff-outgoing' : 'incoming'"
+                                    />
                                 </div>
                             </div>
 
@@ -850,33 +974,125 @@ onBeforeUnmount(() => {
                     </div>
 
                     <!-- Message Input Panel - Fixed at Bottom -->
-                    <div class="p-4 border-t border-gray-200 bg-white flex-shrink-0 sticky bottom-0 z-10 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                    <div class="flex-shrink-0 border-t border-gray-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                        <input
+                            ref="documentAttachmentInputRef"
+                            type="file"
+                            class="hidden"
+                            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            multiple
+                            @change="onDocumentAttachmentChosen"
+                        />
+                        <input
+                            ref="imageAttachmentInputRef"
+                            type="file"
+                            class="hidden"
+                            accept="image/jpeg,image/png,image/jpg"
+                            multiple
+                            @change="onImageAttachmentChosen"
+                        />
+                        <div
+                            v-if="pendingAttachmentFiles.length > 0"
+                            class="mb-2 flex flex-wrap gap-2"
+                        >
+                            <span
+                                v-for="(file, idx) in pendingAttachmentFiles"
+                                :key="`${file.name}-${idx}`"
+                                class="inline-flex max-w-full items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700"
+                            >
+                                <span class="truncate">{{ file.name }}</span>
+                                <button
+                                    type="button"
+                                    class="shrink-0 rounded-full p-0.5 hover:bg-gray-200"
+                                    aria-label="Remove attachment"
+                                    @click="removePendingAttachment(idx)"
+                                >
+                                    <X class="h-3 w-3" />
+                                </button>
+                            </span>
+                        </div>
                         <div class="flex items-end gap-3">
-                            <div class="flex gap-2">
-                                <Button variant="ghost" size="sm" class="p-2">
-                                    <Paperclip class="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" class="p-2">
-                                    <Smile class="h-4 w-4" />
-                                </Button>
+                            <div class="flex gap-1">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger as-child>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="p-2"
+                                            aria-label="Attach file"
+                                        >
+                                            <Paperclip class="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" class="w-52">
+                                        <DropdownMenuItem
+                                            class="cursor-pointer gap-2"
+                                            @click.prevent="documentAttachmentInputRef?.click()"
+                                        >
+                                            <FileText class="h-4 w-4" />
+                                            Attach file (PDF, Word)
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            class="cursor-pointer gap-2"
+                                            @click.prevent="imageAttachmentInputRef?.click()"
+                                        >
+                                            <LucideImage class="h-4 w-4" />
+                                            Upload a photo
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger as-child>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="p-2"
+                                            aria-label="Insert emoji"
+                                        >
+                                            <Smile class="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" class="w-64 p-2">
+                                        <div class="grid grid-cols-6 gap-1">
+                                            <button
+                                                v-for="emoji in MESSAGING_QUICK_EMOJIS"
+                                                :key="emoji"
+                                                type="button"
+                                                class="flex h-9 w-9 items-center justify-center rounded-md text-lg hover:bg-gray-100"
+                                                @click="insertEmojiIntoNewMessage(emoji)"
+                                            >
+                                                {{ emoji }}
+                                            </button>
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
                             <Input
+                                id="staff-messaging-new-message"
                                 v-model="newMessage"
                                 placeholder="Type a message..."
                                 class="flex-1 rounded-full border-gray-300 px-4 py-2"
                                 @keyup.enter="sendMessage"
                                 @input="handleTyping"
                                 @keydown.enter="stopTyping"
+                                @paste="onMessagingInPagePaste"
                                 :disabled="sendingMessage"
                             />
                             <Button
-                                @click="sendMessage"
-                                :disabled="!newMessage.trim() || sendingMessage"
+                                type="button"
+                                :disabled="!canSendStaffMessage"
                                 class="rounded-full h-10 w-10 p-0 bg-blue-600 hover:bg-blue-700"
+                                @click="sendMessage"
                             >
                                 <Send class="h-4 w-4" />
                             </Button>
                         </div>
+                        <p class="mt-2 text-center text-xs text-gray-400">
+                            Drop files on the chat or paste images from the clipboard while the message field is focused.
+                        </p>
+                    </div>
                     </div>
                 </div>
             </div>
