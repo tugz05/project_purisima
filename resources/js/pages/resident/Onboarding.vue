@@ -4,12 +4,27 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
 
+type ProfileDraft = {
+  first_name?: string
+  middle_name?: string
+  last_name?: string
+  suffix?: string
+  phone?: string
+  birth_date?: string
+  sex?: string
+  civil_status?: string
+  occupation?: string
+  purok?: string
+}
+
 const props = withDefaults(
   defineProps<{
-    existingPhotoUrl?: string | null;
+    existingPhotoUrl?: string | null
+    profileDraft?: ProfileDraft | null
   }>(),
   {
     existingPhotoUrl: null,
+    profileDraft: null,
   },
 );
 
@@ -38,17 +53,19 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+const d = props.profileDraft
+
 const form = useForm({
-  first_name: '',
-  middle_name: '',
-  last_name: '',
-  suffix: '',
-  phone: '',
-  birth_date: '',
-  sex: '',
-  civil_status: '',
-  occupation: '',
-  purok: '',
+  first_name: d?.first_name ?? '',
+  middle_name: d?.middle_name ?? '',
+  last_name: d?.last_name ?? '',
+  suffix: d?.suffix ?? '',
+  phone: d?.phone ?? '',
+  birth_date: d?.birth_date ?? '',
+  sex: d?.sex ?? '',
+  civil_status: d?.civil_status ?? '',
+  occupation: d?.occupation ?? '',
+  purok: d?.purok ?? '',
   photo: null as File | null,
 })
 

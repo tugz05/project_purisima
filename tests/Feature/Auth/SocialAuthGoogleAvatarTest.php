@@ -10,6 +10,7 @@ it('stores google avatar for new oauth user', function () {
     $oauthUser->shouldReceive('getName')->andReturn('Oauth User');
     $oauthUser->shouldReceive('getEmail')->andReturn('newoauth@example.com');
     $oauthUser->shouldReceive('getAvatar')->andReturn('https://lh3.googleusercontent.com/a/test');
+    $oauthUser->shouldReceive('getRaw')->andReturn([]);
 
     $provider = Mockery::mock(\Laravel\Socialite\Contracts\Provider::class);
     $provider->shouldReceive('stateless')->andReturnSelf();
@@ -36,6 +37,7 @@ it('does not replace storage photo with google avatar', function () {
     $oauthUser->shouldReceive('getName')->andReturn('Keep User');
     $oauthUser->shouldReceive('getEmail')->andReturn('keep@example.com');
     $oauthUser->shouldReceive('getAvatar')->andReturn('https://lh3.googleusercontent.com/a/new');
+    $oauthUser->shouldReceive('getRaw')->andReturn([]);
 
     $provider = Mockery::mock(\Laravel\Socialite\Contracts\Provider::class);
     $provider->shouldReceive('stateless')->andReturnSelf();

@@ -40,26 +40,40 @@ class SocialAuthController extends Controller
         $avatarUrl = $this->normalizeProviderAvatarUrl($socialUser);
 
         $user = User::where('email', $socialUser->getEmail())->first();
+        $profileHints = $this->oauthProfileHintsFromSocialUser($socialUser);
 
         if (! $user) {
-            $user = User::create([
-                'name' => $socialUser->getName() ?: $socialUser->getNickname() ?: 'User',
+            $attributes = [
                 'email' => $socialUser->getEmail(),
-                // Store a random password; the user will use the provider to sign in
                 'password' => Str::random(40),
                 'role' => 'resident',
                 'provider' => $provider,
                 'provider_id' => $socialUser->getId(),
                 'photo_url' => $avatarUrl,
-            ]);
+                'email_verified_at' => now(),
+            ];
 
-            // Consider email verified if provided by provider
-            if (method_exists($user, 'forceFill')) {
-                $user->forceFill(['email_verified_at' => now()])->save();
-            } else {
-                $user->email_verified_at = now();
-                $user->save();
+            if (filled($profileHints['first_name'])) {
+                $attributes['first_name'] = $profileHints['first_name'];
             }
+            if (filled($profileHints['middle_name'])) {
+                $attributes['middle_name'] = $profileHints['middle_name'];
+            }
+            if (filled($profileHints['last_name'])) {
+                $attributes['last_name'] = $profileHints['last_name'];
+            }
+            if (filled($profileHints['suffix'])) {
+                $attributes['suffix'] = $profileHints['suffix'];
+            }
+            if (filled($profileHints['sex'])) {
+                $attributes['sex'] = $profileHints['sex'];
+            }
+
+            if (! filled($profileHints['first_name']) && ! filled($profileHints['last_name'])) {
+                $attributes['name'] = $socialUser->getName() ?: $socialUser->getNickname() ?: 'User';
+            }
+
+            $user = User::create($attributes);
         } else {
             $this->syncOAuthProfile($user, $provider, $socialUser, $avatarUrl);
         }
@@ -106,6 +120,7 @@ class SocialAuthController extends Controller
     protected function syncOAuthProfile(User $user, string $provider, SocialiteUserContract $socialUser, ?string $avatarUrl): void
     {
         $updates = [];
+        $profileHints = $this->oauthProfileHintsFromSocialUser($socialUser);
 
         if ($user->provider === null && $user->provider_id === null) {
             $updates['provider'] = $provider;
@@ -116,9 +131,166 @@ class SocialAuthController extends Controller
             $updates['photo_url'] = $avatarUrl;
         }
 
+        if ($this->shouldBackfillResidentNameFromOAuth($user, $profileHints)) {
+            if (filled($profileHints['first_name'])) {
+                $updates['first_name'] = $profileHints['first_name'];
+            }
+            if (filled($profileHints['middle_name'])) {
+                $updates['middle_name'] = $profileHints['middle_name'];
+            }
+            if (filled($profileHints['last_name'])) {
+                $updates['last_name'] = $profileHints['last_name'];
+            }
+            if (filled($profileHints['suffix'])) {
+                $updates['suffix'] = $profileHints['suffix'];
+            }
+        }
+
+        if ($this->shouldBackfillSexFromOAuth($user, $profileHints) && filled($profileHints['sex'])) {
+            $updates['sex'] = $profileHints['sex'];
+        }
+
         if ($updates !== []) {
             $user->forceFill($updates)->save();
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function oauthRawPayload(SocialiteUserContract $socialUser): array
+    {
+        if (! method_exists($socialUser, 'getRaw')) {
+            return [];
+        }
+
+        $raw = $socialUser->getRaw();
+
+        return is_array($raw) ? $raw : [];
+    }
+
+    /**
+     * Basic profile hints from the provider payload (Google given_name/family_name, Facebook gender, etc.).
+     *
+     * @return array{first_name: ?string, middle_name: ?string, last_name: ?string, suffix: ?string, sex: ?string}
+     */
+    protected function oauthProfileHintsFromSocialUser(SocialiteUserContract $socialUser): array
+    {
+        $raw = $this->oauthRawPayload($socialUser);
+        $first = null;
+        $middle = null;
+        $last = null;
+        $suffix = null;
+        $sex = null;
+
+        $given = isset($raw['given_name']) ? trim((string) $raw['given_name']) : '';
+        $family = isset($raw['family_name']) ? trim((string) $raw['family_name']) : '';
+
+        if ($given !== '') {
+            $first = $given;
+        }
+        if ($family !== '') {
+            $last = $family;
+        }
+
+        if ($first === null && isset($raw['first_name'])) {
+            $t = trim((string) $raw['first_name']);
+            $first = $t !== '' ? $t : null;
+        }
+        if ($last === null && isset($raw['last_name'])) {
+            $t = trim((string) $raw['last_name']);
+            $last = $t !== '' ? $t : null;
+        }
+
+        if ($first === null && $last === null) {
+            [$first, $middle, $last] = $this->splitDisplayName($socialUser->getName() ?: $socialUser->getNickname());
+        }
+
+        if (isset($raw['gender'])) {
+            $mappedSex = $this->mapProviderGenderToSex((string) $raw['gender']);
+            if ($mappedSex !== null) {
+                $sex = $mappedSex;
+            }
+        }
+
+        return [
+            'first_name' => $first,
+            'middle_name' => $middle,
+            'last_name' => $last,
+            'suffix' => $suffix,
+            'sex' => $sex,
+        ];
+    }
+
+    /**
+     * @param  array{first_name: ?string, middle_name: ?string, last_name: ?string, suffix: ?string, sex: ?string}  $hints
+     */
+    protected function shouldBackfillResidentNameFromOAuth(User $user, array $hints): bool
+    {
+        if ($user->role !== 'resident') {
+            return false;
+        }
+
+        if (filled($user->first_name) || filled($user->last_name)) {
+            return false;
+        }
+
+        return filled($hints['first_name']) || filled($hints['last_name']);
+    }
+
+    /**
+     * @param  array{first_name: ?string, middle_name: ?string, last_name: ?string, suffix: ?string, sex: ?string}  $hints
+     */
+    protected function shouldBackfillSexFromOAuth(User $user, array $hints): bool
+    {
+        if ($user->role !== 'resident') {
+            return false;
+        }
+
+        if (filled($user->sex)) {
+            return false;
+        }
+
+        return filled($hints['sex']);
+    }
+
+    protected function mapProviderGenderToSex(string $gender): ?string
+    {
+        return match (strtolower(trim($gender))) {
+            'male' => 'male',
+            'female' => 'female',
+            default => null,
+        };
+    }
+
+    /**
+     * @return array{0: ?string, 1: ?string, 2: ?string}
+     */
+    protected function splitDisplayName(?string $fullName): array
+    {
+        $fullName = trim((string) $fullName);
+        if ($fullName === '') {
+            return [null, null, null];
+        }
+
+        $parts = preg_split('/\s+/u', $fullName, -1, PREG_SPLIT_NO_EMPTY);
+        if ($parts === false || $parts === []) {
+            return [null, null, null];
+        }
+
+        if (count($parts) === 1) {
+            return [$parts[0], null, null];
+        }
+
+        if (count($parts) === 2) {
+            return [$parts[0], null, $parts[1]];
+        }
+
+        $first = array_shift($parts);
+        $last = array_pop($parts);
+        $middle = implode(' ', $parts);
+
+        return [$first, $middle !== '' ? $middle : null, $last];
     }
 
     protected function shouldApplyProviderAvatar(?string $current): bool
