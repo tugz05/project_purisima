@@ -455,12 +455,33 @@ const closeAnnouncementView = () => {
     </header>
 
     <main id="main">
-      <!-- HERO -->
-      <section class="relative isolate overflow-hidden">
-        <div class="absolute inset-0 -z-10 bg-gradient-to-br from-blue-50 to-indigo-100"></div>
-        <div class="absolute inset-0 -z-10 bg-gradient-to-b from-[#0284C7]/80 via-[#0EA5E9]/70 to-[#38BDF8]/80"></div>
+      <!-- HERO: Tago Town Hall photo + blended overlays (navy / sky / cream aligned with LGU palette) -->
+      <section class="relative isolate min-h-[min(36rem,88svh)] overflow-hidden">
+        <img
+          src="/images/tago.png"
+          alt=""
+          width="1920"
+          height="1080"
+          decoding="async"
+          fetchpriority="high"
+          class="pointer-events-none absolute inset-0 -z-20 h-full w-full object-cover object-[center_35%_center] sm:object-[center_40%_center]"
+        />
+        <!-- Readability on the left (headline); open sky / landscape visible on the right -->
+        <div
+          class="absolute inset-0 -z-10 bg-gradient-to-r from-[#0a1628]/92 via-[#0c4a6e]/78 to-[#0369a1]/45"
+          aria-hidden="true"
+        />
+        <!-- Brand sky-cyan wash + warm cream (building façade) -->
+        <div
+          class="absolute inset-0 -z-10 bg-gradient-to-br from-[#0ea5e9]/35 via-transparent to-[#ea580c]/20"
+          aria-hidden="true"
+        />
+        <div
+          class="absolute inset-0 -z-10 bg-gradient-to-t from-[#f0f9ff]/30 via-transparent to-[#87ceeb]/15"
+          aria-hidden="true"
+        />
 
-        <div class="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-6 py-16 sm:py-20 md:grid-cols-2">
+        <div class="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-6 py-16 sm:py-20 md:grid-cols-2">
           <div data-reveal class="reveal">
             <h1 class="mb-4 text-3xl font-extrabold leading-tight tracking-tight text-white md:text-5xl">
               Unified Barangay Safety Platform
@@ -495,7 +516,7 @@ const closeAnnouncementView = () => {
 
           <!-- Right visual card -->
           <div data-reveal class="reveal">
-            <div class="relative overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-black/5">
+            <div class="relative overflow-hidden rounded-2xl bg-white/95 shadow-xl ring-1 ring-black/5 backdrop-blur-md">
               <div class="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#E0F2FE] blur-3xl"></div>
               <div class="relative space-y-4 p-6">
                 <div class="flex items-center gap-2 text-[#0369a1]"><Shield class="h-4 w-4" /><span class="text-sm font-semibold">Secure Incident Intake</span></div>
@@ -524,12 +545,29 @@ const closeAnnouncementView = () => {
         </div>
       </section>
 
+      <div class="relative isolate">
+        <!-- Soft Tago Town Hall continuation: same civic palette as hero (sky, navy wash, warm cream) -->
+        <div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+          <img
+            src="/images/tago.png"
+            alt=""
+            width="1920"
+            height="1080"
+            decoding="async"
+            loading="lazy"
+            class="h-full min-h-full w-full scale-105 object-cover object-[center_42%] opacity-[0.14] blur-[3px]"
+          />
+          <div class="absolute inset-0 bg-gradient-to-b from-[#f0f9ff]/92 via-sky-50/90 to-[#f3efe8]/88"></div>
+          <div class="absolute inset-0 bg-gradient-to-r from-[#0c4a6e]/[0.05] via-transparent to-[#c2410c]/[0.06]"></div>
+        </div>
+
       <!-- Primary Features: Calamity Reports & Location Tracking -->
-      <section class="relative px-6 py-20 overflow-hidden bg-gradient-to-br from-red-50 via-orange-50 to-amber-50">
+      <section id="about" class="relative px-6 py-20 overflow-hidden bg-gradient-to-br from-red-50/60 via-orange-50/50 to-amber-50/55 backdrop-blur-[2px]">
         <!-- Animated background elements -->
         <div class="absolute inset-0 overflow-hidden pointer-events-none">
-          <div class="absolute top-10 left-10 w-96 h-96 bg-red-200/20 rounded-full blur-3xl animate-pulse"></div>
-          <div class="absolute bottom-10 right-10 w-96 h-96 bg-orange-200/20 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+          <div class="absolute top-10 left-10 w-96 h-96 rounded-full bg-red-200/15 blur-3xl animate-pulse"></div>
+          <div class="absolute bottom-10 right-10 w-96 h-96 rounded-full bg-orange-200/15 blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+          <div class="absolute top-1/2 left-1/2 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-200/10 blur-3xl"></div>
         </div>
 
         <div class="relative mx-auto max-w-7xl">
@@ -549,7 +587,7 @@ const closeAnnouncementView = () => {
           <!-- Feature Cards -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
             <!-- Calamity Reports Feature -->
-            <div data-reveal class="reveal group relative bg-white rounded-3xl p-8 md:p-10 shadow-2xl border-2 border-red-100 hover:border-red-300 transition-all duration-500 transform hover:-translate-y-2 overflow-hidden">
+            <div data-reveal class="reveal group relative rounded-3xl border-2 border-red-100/80 bg-white/90 p-8 shadow-2xl backdrop-blur-md transition-all duration-500 hover:-translate-y-2 hover:border-red-300/90 transform overflow-hidden md:p-10">
               <!-- Background decoration -->
               <div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-red-100/30 to-orange-100/30 rounded-full -translate-y-32 translate-x-32"></div>
               
@@ -614,7 +652,7 @@ const closeAnnouncementView = () => {
             </div>
 
             <!-- Location Tracking Feature -->
-            <div data-reveal class="reveal group relative bg-white rounded-3xl p-8 md:p-10 shadow-2xl border-2 border-blue-100 hover:border-blue-300 transition-all duration-500 transform hover:-translate-y-2 overflow-hidden">
+            <div data-reveal class="reveal group relative rounded-3xl border-2 border-sky-200/80 bg-white/90 p-8 shadow-2xl backdrop-blur-md transition-all duration-500 hover:-translate-y-2 hover:border-sky-300/90 transform overflow-hidden md:p-10">
               <!-- Background decoration -->
               <div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-100/30 to-cyan-100/30 rounded-full -translate-y-32 translate-x-32"></div>
               
@@ -680,7 +718,7 @@ const closeAnnouncementView = () => {
           </div>
 
           <!-- How It Works -->
-          <div class="bg-white/80 backdrop-blur-sm rounded-3xl p-8 md:p-12 shadow-xl border border-gray-200">
+          <div class="rounded-3xl border border-white/60 bg-white/85 p-8 shadow-xl backdrop-blur-md md:p-12">
             <h3 class="text-2xl font-bold text-gray-900 text-center mb-8">How It Works</h3>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div class="text-center">
@@ -709,7 +747,7 @@ const closeAnnouncementView = () => {
       </section>
 
       <!-- Core Pillars -->
-      <section id="pillars" class="mt-12 grid grid-cols-1 gap-6 bg-white px-6 py-12 shadow-[0_1px_0_rgba(2,132,199,0.12),inset_0_0_0_1px_rgba(14,165,233,0.10)] lg:grid-cols-3 lg:px-16">
+      <section id="pillars" class="mt-12 grid grid-cols-1 gap-6 border border-white/50 bg-white/78 px-6 py-12 shadow-[0_1px_0_rgba(2,132,199,0.12),inset_0_0_0_1px_rgba(14,165,233,0.10)] backdrop-blur-md lg:grid-cols-3 lg:px-16">
         <div class="col-span-1 lg:col-span-2">
           <h2 class="mb-4 text-lg font-semibold text-[#0C4A6E]">Core pillars</h2>
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -751,19 +789,19 @@ const closeAnnouncementView = () => {
               <li class="flex items-center gap-2"><Activity class="h-4 w-4 text-[#16A34A]" /> Data‑driven dashboards</li>
             </ul>
             <div class="mt-4 grid grid-cols-2 gap-2 text-[12px]">
-              <a href="#" class="inline-flex items-center justify-center rounded border border-[#E2E8F0] bg-white px-3 py-2">Get Android App</a>
-              <a href="#" class="inline-flex items-center justify-center rounded border border-[#E2E8F0] bg-white px-3 py-2">Get iOS App</a>
+              <a href="#" class="inline-flex items-center justify-center rounded border border-white/70 bg-white/85 px-3 py-2 backdrop-blur-sm">Get Android App</a>
+              <a href="#" class="inline-flex items-center justify-center rounded border border-white/70 bg-white/85 px-3 py-2 backdrop-blur-sm">Get iOS App</a>
             </div>
           </div>
         </div>
       </section>
 
       <!-- Barangay Officials Showcase -->
-      <section class="relative bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 px-6 py-20 overflow-hidden">
-        <!-- Background decorations -->
+      <section class="relative overflow-hidden bg-gradient-to-br from-sky-100/50 via-blue-50/45 to-orange-50/35 px-6 py-20 backdrop-blur-[2px]">
+        <!-- Background decorations (sky + warm accent, aligned with town hall photo) -->
         <div class="absolute inset-0 overflow-hidden">
-          <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-200/30 to-purple-200/30 rounded-full blur-3xl"></div>
-          <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-indigo-200/30 to-pink-200/30 rounded-full blur-3xl"></div>
+          <div class="absolute -right-40 -top-40 h-80 w-80 rounded-full bg-gradient-to-br from-sky-200/35 to-[#2a4b8d]/15 blur-3xl"></div>
+          <div class="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-gradient-to-br from-orange-200/25 to-amber-100/30 blur-3xl"></div>
         </div>
 
         <!-- Announcements Section -->
@@ -788,7 +826,7 @@ const closeAnnouncementView = () => {
             <div
               v-for="(announcement, index) in announcements"
               :key="announcement.id"
-              class="group relative bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 transform hover:-translate-y-2"
+              class="group relative overflow-hidden rounded-3xl border border-white/70 bg-white/92 shadow-xl backdrop-blur-md transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl"
               :class="{ 'lg:col-span-2': announcement.is_featured && index === 0 }"
             >
               <!-- Priority Indicator -->
@@ -880,7 +918,7 @@ const closeAnnouncementView = () => {
 
           <!-- Loading State -->
           <div v-else-if="loadingAnnouncements" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div v-for="i in 3" :key="i" class="bg-white rounded-3xl shadow-xl overflow-hidden">
+            <div v-for="i in 3" :key="i" class="overflow-hidden rounded-3xl border border-white/60 bg-white/90 shadow-xl backdrop-blur-sm">
               <div class="h-48 bg-gray-200 animate-pulse"></div>
               <div class="p-8">
                 <div class="h-4 bg-gray-200 rounded animate-pulse mb-4"></div>
@@ -933,7 +971,7 @@ const closeAnnouncementView = () => {
             <div
               v-for="(official, index) in barangayOfficials"
               :key="`${official.first_name}-${official.last_name}`"
-              class="group relative bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 transform hover:-translate-y-2 opacity-100"
+              class="group relative overflow-hidden rounded-3xl border border-white/70 bg-white/92 opacity-100 shadow-xl backdrop-blur-md transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl"
             >
               <!-- Gradient overlay on hover -->
               <div class="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-purple-500/0 group-hover:from-blue-500/10 group-hover:to-purple-500/10 transition-all duration-500"></div>
@@ -1003,7 +1041,7 @@ const closeAnnouncementView = () => {
 
           <!-- Loading State -->
           <div v-else-if="loadingOfficials" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div v-for="i in 6" :key="i" class="bg-white rounded-2xl shadow-lg p-6 animate-pulse">
+            <div v-for="i in 6" :key="i" class="animate-pulse rounded-2xl border border-white/60 bg-white/80 p-6 shadow-lg backdrop-blur-sm">
               <div class="flex justify-center mb-4">
                 <div class="w-20 h-20 rounded-full bg-gray-200"></div>
               </div>
@@ -1040,11 +1078,11 @@ const closeAnnouncementView = () => {
       </section>
 
       <!-- Platform Features Overview -->
-      <section class="relative bg-gradient-to-br from-gray-50 via-white to-blue-50 px-6 py-20 overflow-hidden">
+      <section class="relative overflow-hidden bg-gradient-to-br from-stone-50/65 via-sky-50/50 to-blue-50/55 px-6 py-20 backdrop-blur-[2px]">
         <!-- Background decorations -->
         <div class="absolute inset-0 overflow-hidden">
-          <div class="absolute top-20 left-20 w-64 h-64 bg-gradient-to-br from-green-200/20 to-teal-200/20 rounded-full blur-3xl"></div>
-          <div class="absolute bottom-20 right-20 w-64 h-64 bg-gradient-to-br from-blue-200/20 to-indigo-200/20 rounded-full blur-3xl"></div>
+          <div class="absolute left-20 top-20 h-64 w-64 rounded-full bg-gradient-to-br from-emerald-200/18 to-teal-200/15 blur-3xl"></div>
+          <div class="absolute bottom-20 right-20 h-64 w-64 rounded-full bg-gradient-to-br from-sky-200/25 to-[#2a4b8d]/12 blur-3xl"></div>
         </div>
 
         <div class="relative mx-auto max-w-7xl">
@@ -1066,7 +1104,7 @@ const closeAnnouncementView = () => {
           <!-- Features Grid -->
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <!-- Document Management -->
-            <div data-reveal class="reveal group relative bg-white rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 border border-gray-100 transform hover:-translate-y-2 overflow-hidden">
+            <div data-reveal class="reveal group relative overflow-hidden rounded-3xl border border-white/70 bg-white/90 p-8 shadow-xl backdrop-blur-md transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl">
               <!-- Background decoration -->
               <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-100/50 to-indigo-100/50 rounded-full -translate-y-12 translate-x-12"></div>
 
@@ -1088,7 +1126,7 @@ const closeAnnouncementView = () => {
             </div>
 
             <!-- Incident Management -->
-            <div data-reveal class="reveal group relative bg-white rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 border border-gray-100 transform hover:-translate-y-2 overflow-hidden">
+            <div data-reveal class="reveal group relative overflow-hidden rounded-3xl border border-white/70 bg-white/90 p-8 shadow-xl backdrop-blur-md transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl">
               <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-red-100/50 to-orange-100/50 rounded-full -translate-y-12 translate-x-12"></div>
               <div class="relative">
                 <div class="flex items-center gap-4 mb-6">
@@ -1108,7 +1146,7 @@ const closeAnnouncementView = () => {
             </div>
 
             <!-- Community Engagement -->
-            <div data-reveal class="reveal group relative bg-white rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 border border-gray-100 transform hover:-translate-y-2 overflow-hidden">
+            <div data-reveal class="reveal group relative overflow-hidden rounded-3xl border border-white/70 bg-white/90 p-8 shadow-xl backdrop-blur-md transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl">
               <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-green-100/50 to-emerald-100/50 rounded-full -translate-y-12 translate-x-12"></div>
               <div class="relative">
                 <div class="flex items-center gap-4 mb-6">
@@ -1128,7 +1166,7 @@ const closeAnnouncementView = () => {
             </div>
 
             <!-- Staff Management -->
-            <div data-reveal class="reveal group relative bg-white rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 border border-gray-100 transform hover:-translate-y-2 overflow-hidden">
+            <div data-reveal class="reveal group relative overflow-hidden rounded-3xl border border-white/70 bg-white/90 p-8 shadow-xl backdrop-blur-md transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl">
               <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-100/50 to-pink-100/50 rounded-full -translate-y-12 translate-x-12"></div>
               <div class="relative">
                 <div class="flex items-center gap-4 mb-6">
@@ -1148,7 +1186,7 @@ const closeAnnouncementView = () => {
             </div>
 
             <!-- Analytics & Reporting -->
-            <div data-reveal class="reveal group relative bg-white rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 border border-gray-100 transform hover:-translate-y-2 overflow-hidden">
+            <div data-reveal class="reveal group relative overflow-hidden rounded-3xl border border-white/70 bg-white/90 p-8 shadow-xl backdrop-blur-md transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl">
               <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-100/50 to-blue-100/50 rounded-full -translate-y-12 translate-x-12"></div>
               <div class="relative">
                 <div class="flex items-center gap-4 mb-6">
@@ -1168,7 +1206,7 @@ const closeAnnouncementView = () => {
             </div>
 
             <!-- Mobile Accessibility -->
-            <div data-reveal class="reveal group relative bg-white rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 border border-gray-100 transform hover:-translate-y-2 overflow-hidden">
+            <div data-reveal class="reveal group relative overflow-hidden rounded-3xl border border-white/70 bg-white/90 p-8 shadow-xl backdrop-blur-md transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl">
               <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-teal-100/50 to-cyan-100/50 rounded-full -translate-y-12 translate-x-12"></div>
               <div class="relative">
                 <div class="flex items-center gap-4 mb-6">
@@ -1191,26 +1229,26 @@ const closeAnnouncementView = () => {
       </section>
 
       <!-- Services -->
-      <section id="services" class="bg-[#EFF6FF] px-6 py-12">
+      <section id="services" class="bg-sky-100/50 px-6 py-12 backdrop-blur-sm">
         <div class="mx-auto max-w-7xl">
           <div class="mb-6 flex items-center gap-2">
             <CheckCircle2 class="h-5 w-5 text-[#0284C7]" />
             <h2 class="text-lg font-semibold text-[#0C4A6E]">Online Services</h2>
           </div>
           <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div data-reveal class="reveal rounded-lg border border-[#E2E8F0] bg-white p-5">
+            <div data-reveal class="reveal rounded-lg border border-white/80 bg-white/88 p-5 backdrop-blur-sm">
               <h3 class="mb-1 font-medium">Report an Incident</h3>
               <p class="mb-3 text-[13px] text-[#475569]">Submit photos/videos, location, and description. Receive tracking ID.</p>
               <Link :href="isAuthed ? dashboard().url : login().url" class="inline-flex items-center gap-2 rounded-md bg-[#0EA5E9] px-3 py-2 text-sm font-semibold text-white hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[#7dd3fc]">
                 Start
               </Link>
             </div>
-            <div data-reveal class="reveal rounded-lg border border-[#E2E8F0] bg-white p-5">
+            <div data-reveal class="reveal rounded-lg border border-white/80 bg-white/88 p-5 backdrop-blur-sm">
               <h3 class="mb-1 font-medium">Clearance & Certifications</h3>
               <p class="mb-3 text-[13px] text-[#475569]">Request barangay clearance, residency, and related documents.</p>
               <a href="#" class="inline-flex items-center gap-2 rounded-md bg-[#10B981] px-3 py-2 text-sm font-semibold text-white hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[#a7f3d0]">Apply</a>
             </div>
-            <div data-reveal class="reveal rounded-lg border border-[#E2E8F0] bg-white p-5">
+            <div data-reveal class="reveal rounded-lg border border-white/80 bg-white/88 p-5 backdrop-blur-sm">
               <h3 class="mb-1 font-medium">Community Alerts</h3>
               <p class="mb-3 text-[13px] text-[#475569]">Opt‑in to SMS/push alerts for advisories, weather, and road status.</p>
               <a href="#" class="inline-flex items-center gap-2 rounded-md bg-[#F59E0B] px-3 py-2 text-sm font-semibold text-white hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[#fde68a]">Subscribe</a>
@@ -1220,7 +1258,7 @@ const closeAnnouncementView = () => {
       </section>
 
       <!-- FAQ -->
-      <section id="faq" class="bg-white px-6 py-12">
+      <section id="faq" class="bg-white/82 px-6 py-12 backdrop-blur-md">
         <div class="mx-auto max-w-4xl">
           <div class="mb-6 flex items-center gap-2">
             <Info class="h-5 w-5 text-[#2563EB]" />
@@ -1253,7 +1291,7 @@ const closeAnnouncementView = () => {
       </section>
 
       <!-- Footer -->
-      <footer id="contact" class="border-t border-[#E0F2FE] bg-[#F0F9FF]">
+      <footer id="contact" class="border-t border-sky-200/55 bg-[#f0f9ff]/88 backdrop-blur-md">
         <div class="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-6 py-10 md:grid-cols-4">
           <div class="space-y-2">
             <div class="flex items-center gap-2">
@@ -1302,7 +1340,7 @@ const closeAnnouncementView = () => {
             </ul>
           </div>
         </div>
-        <div class="border-t border-[#E0F2FE] bg-white">
+        <div class="border-t border-sky-200/50 bg-white/88 backdrop-blur-sm">
           <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-6 py-4 text-center text-[12px] text-[#0f172a] sm:flex-row">
             <span>© {{ new Date().getFullYear() }} Uni Respond. All rights reserved.</span>
             <span class="inline-flex items-center gap-1.5">
@@ -1313,6 +1351,7 @@ const closeAnnouncementView = () => {
           </div>
         </div>
       </footer>
+      </div>
     </main>
 
     <!-- Announcement View Modal -->

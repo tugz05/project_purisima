@@ -42,7 +42,7 @@
                 <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">Quick Actions</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     <Link
-                        href="/resident/transactions"
+                        :href="resident.transactions.index().url"
                         class="group bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 p-4 md:p-6 border border-gray-100 hover:border-blue-200"
                     >
                         <div class="flex items-center gap-4">
@@ -59,7 +59,7 @@
                     </Link>
 
                     <Link
-                        href="/resident/transactions/create"
+                        :href="resident.transactions.create().url"
                         class="group bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 p-4 md:p-6 border border-gray-100 hover:border-teal-200"
                     >
                         <div class="flex items-center gap-4">
@@ -105,7 +105,7 @@
                         <h3 class="text-lg font-semibold text-gray-900 mb-2">No recent activity</h3>
                         <p class="text-gray-600 mb-4">Your recent transactions will appear here</p>
                         <Link
-                            href="/resident/transactions/create"
+                            :href="resident.transactions.create().url"
                             class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
                         >
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -124,6 +124,7 @@
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { Link } from '@inertiajs/vue3';
 import { useAuth } from '@/composables/useAuth';
+import resident from '@/routes/resident';
 
 const { user, displayName, userInitials } = useAuth();
 
