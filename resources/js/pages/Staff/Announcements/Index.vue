@@ -1136,7 +1136,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { toast } from 'vue-sonner';
-import { route } from 'ziggy-js';
+import AnnouncementController from '@/actions/App/Http/Controllers/Staff/AnnouncementController';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -1262,7 +1262,7 @@ const openDeleteDialog = (announcement: any) => {
 };
 
 const submitCreate = () => {
-  createForm.post(route('staff.announcements.store'), {
+  createForm.post(AnnouncementController.store.url(), {
     forceFormData: true,
     onSuccess: () => {
       createSheetOpen.value = false;
@@ -1281,7 +1281,7 @@ const submitCreate = () => {
 };
 
 const submitEdit = () => {
-  editForm.put(route('staff.announcements.update', selectedAnnouncement.value.id), {
+  editForm.put(AnnouncementController.update.url(selectedAnnouncement.value.id), {
     forceFormData: true,
     onSuccess: () => {
       editSheetOpen.value = false;
@@ -1300,7 +1300,7 @@ const submitEdit = () => {
 };
 
 const submitDelete = () => {
-  deleteForm.delete(route('staff.announcements.destroy', selectedAnnouncement.value.id), {
+  deleteForm.delete(AnnouncementController.destroy.url(selectedAnnouncement.value.id), {
     onSuccess: () => {
       deleteDialogOpen.value = false;
       toast.success('Announcement deleted successfully!', {
@@ -1319,7 +1319,7 @@ const submitDelete = () => {
 
 const togglePublication = async (announcement: any) => {
   try {
-    const response = await fetch(route('staff.announcements.toggle-publication', announcement.id), {
+    const response = await fetch(AnnouncementController.togglePublication.url(announcement.id), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1343,7 +1343,7 @@ const togglePublication = async (announcement: any) => {
 
 const toggleFeatured = async (announcement: any) => {
   try {
-    const response = await fetch(route('staff.announcements.toggle-featured', announcement.id), {
+    const response = await fetch(AnnouncementController.toggleFeatured.url(announcement.id), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1367,7 +1367,7 @@ const toggleFeatured = async (announcement: any) => {
 
 const deleteAttachment = async (attachment: any) => {
   try {
-    const response = await fetch(route('staff.announcements.delete-attachment', selectedAnnouncement.value.id), {
+    const response = await fetch(AnnouncementController.deleteAttachment.url(selectedAnnouncement.value.id), {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

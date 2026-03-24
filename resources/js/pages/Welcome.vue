@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import AnnouncementController from '@/actions/App/Http/Controllers/Staff/AnnouncementController';
 import { dashboard, login, register } from '@/routes';
 import { Head, Link, usePage } from '@inertiajs/vue3';
-import { route } from 'ziggy-js';
 import {
   Shield, Bell, Activity, FileText, Users, Smartphone, ClipboardCheck,
   Send, AlertTriangle, MapPin, Phone, Mail, Globe, Accessibility, Lock,
@@ -903,7 +903,7 @@ const closeAnnouncementView = () => {
           <div class="text-center mt-12">
             <Link
               v-if="isAuthed"
-              :href="route('staff.announcements.index')"
+              :href="AnnouncementController.index.url()"
               class="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-xl hover:from-green-600 hover:to-teal-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
             >
               <span class="font-semibold">View All Announcements</span>
