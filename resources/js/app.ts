@@ -11,6 +11,14 @@ import { initializeTheme } from './composables/useAppearance';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
+document.addEventListener('inertia:success', (event: Event) => {
+    const page = (event as CustomEvent<{ page: { props?: Record<string, unknown> } }>).detail?.page;
+    const token = page?.props?.csrf_token;
+    if (typeof token === 'string' && token.length > 0) {
+        document.querySelector('meta[name="csrf-token"]')?.setAttribute('content', token);
+    }
+});
+
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
     resolve: (name) => resolvePageComponent(`./pages/${name}.vue`, import.meta.glob<DefineComponent>('./pages/**/*.vue')),

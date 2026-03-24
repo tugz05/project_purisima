@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import {
     MessageSquare,
     Search,
@@ -25,6 +27,7 @@ import {
     Phone,
     Video,
     X,
+    User,
 } from 'lucide-vue-next';
 import { getPusher, isPusherAvailable } from '@/pusher';
 import { messagingJsonFetch } from '@/utils/messagingHttp';
@@ -59,6 +62,12 @@ interface Conversation {
     }>;
 }
 
+interface SearchableResident {
+    id: number;
+    name: string;
+    email: string;
+}
+
 interface Props {
     conversations: {
         data: Conversation[];
@@ -87,6 +96,144 @@ const breadcrumbs = createBreadcrumbs([
 
 const searchQuery = ref(props.search || '');
 const isLoading = ref(false);
+
+const composeDialogOpen = ref(false);
+const composeUserQuery = ref('');
+const composeUsers = ref<SearchableResident[]>([]);
+const composeUsersLoading = ref(false);
+const composeSelectedResident = ref<SearchableResident | null>(null);
+const composeFirstMessage = ref('');
+const composeStarting = ref(false);
+const composeError = ref<string | null>(null);
+let composeSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+const resetComposeState = (): void => {
+    composeUserQuery.value = '';
+    composeUsers.value = [];
+    composeUsersLoading.value = false;
+    composeSelectedResident.value = null;
+    composeFirstMessage.value = '';
+    composeError.value = null;
+    composeStarting.value = false;
+    if (composeSearchTimer !== null) {
+        clearTimeout(composeSearchTimer);
+        composeSearchTimer = null;
+    }
+};
+
+const onComposeDialogOpenChange = (open: boolean): void => {
+    composeDialogOpen.value = open;
+    if (!open) {
+        resetComposeState();
+    }
+};
+
+const normalizeStaffConversationFromApi = (raw: Record<string, unknown>): Conversation => {
+    const latest = (raw.latest_messages ?? raw.latestMessages) as Conversation['latestMessages'] | undefined;
+
+    return {
+        id: Number(raw.id),
+        subject: (raw.subject as string | null) ?? null,
+        last_message: (raw.last_message as string | null) ?? null,
+        last_message_at: (raw.last_message_at as string | null) ?? null,
+        resident_has_unread: Boolean(raw.resident_has_unread),
+        staff_has_unread: Boolean(raw.staff_has_unread),
+        resident: raw.resident as Conversation['resident'],
+        staff: raw.staff as Conversation['staff'],
+        latestMessages: Array.isArray(latest) ? latest : [],
+    };
+};
+
+watch(composeUserQuery, (q) => {
+    if (!composeDialogOpen.value) {
+        return;
+    }
+    if (composeSearchTimer !== null) {
+        clearTimeout(composeSearchTimer);
+        composeSearchTimer = null;
+    }
+    const trimmed = q.trim();
+    if (trimmed.length < 2) {
+        composeUsers.value = [];
+        composeUsersLoading.value = false;
+        return;
+    }
+    composeUsersLoading.value = true;
+    composeSearchTimer = setTimeout(async () => {
+        composeSearchTimer = null;
+        try {
+            const params = new URLSearchParams({ q: trimmed });
+            const response = await messagingJsonFetch(`/staff/messaging/search-users?${params.toString()}`, {
+                method: 'GET',
+            });
+            if (response.ok) {
+                const data = (await response.json()) as { users?: SearchableResident[] };
+                composeUsers.value = data.users ?? [];
+            } else {
+                composeUsers.value = [];
+            }
+        } catch {
+            composeUsers.value = [];
+        } finally {
+            composeUsersLoading.value = false;
+        }
+    }, 300);
+});
+
+const submitStartConversation = async (): Promise<void> => {
+    if (!composeSelectedResident.value || composeStarting.value) {
+        return;
+    }
+    composeStarting.value = true;
+    composeError.value = null;
+    try {
+        const body: { resident_id: number; content?: string } = {
+            resident_id: composeSelectedResident.value.id,
+        };
+        const trimmed = composeFirstMessage.value.trim();
+        if (trimmed) {
+            body.content = trimmed;
+        }
+        const response = await messagingJsonFetch('/staff/messaging/conversations/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const msg =
+                (data.errors?.resident_id?.[0] as string | undefined) ||
+                (data.errors?.conversation?.[0] as string | undefined) ||
+                (data.message as string | undefined) ||
+                'Could not start the conversation.';
+            composeError.value = msg;
+            return;
+        }
+        const rawConv = data.conversation as Record<string, unknown> | undefined;
+        if (!rawConv) {
+            composeError.value = 'Unexpected response from server.';
+            return;
+        }
+        const conv = normalizeStaffConversationFromApi(rawConv);
+        const list = props.conversations?.data;
+        if (list) {
+            const idx = list.findIndex((c) => c.id === conv.id);
+            if (idx === -1) {
+                list.unshift(conv);
+            } else {
+                Object.assign(list[idx], conv);
+            }
+        }
+        onComposeDialogOpenChange(false);
+        await selectConversation(conv);
+    } catch {
+        composeError.value = 'Something went wrong. Please try again.';
+    } finally {
+        composeStarting.value = false;
+    }
+};
 
 // Conversation viewer state
 const selectedConversation = ref<Conversation | null>(null);
@@ -475,12 +622,24 @@ onBeforeUnmount(() => {
             <div class="w-full sm:w-80 bg-white border-r border-gray-200 flex flex-col" :class="selectedConversation ? 'hidden sm:flex' : 'flex'">
                 <!-- Header -->
                 <div class="p-4 border-b border-gray-200 bg-white">
-                    <div class="flex items-center justify-between mb-3">
-                        <h1 class="text-lg font-semibold text-gray-900">Messages</h1>
-                        <div v-if="hasUnreadMessages" class="relative">
-                            <Badge variant="destructive" class="text-xs px-2 py-1">
-                                {{ sidebarUnreadCount }}
-                            </Badge>
+                    <div class="flex items-center justify-between mb-3 gap-2">
+                        <h1 class="text-lg font-semibold text-gray-900 shrink-0">Messages</h1>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                class="h-8 gap-1"
+                                @click="onComposeDialogOpenChange(true)"
+                            >
+                                <Plus class="h-4 w-4" />
+                                <span class="hidden sm:inline">New message</span>
+                            </Button>
+                            <div v-if="hasUnreadMessages" class="relative">
+                                <Badge variant="destructive" class="text-xs px-2 py-1">
+                                    {{ sidebarUnreadCount }}
+                                </Badge>
+                            </div>
                         </div>
                     </div>
 
@@ -722,6 +881,89 @@ onBeforeUnmount(() => {
                 </div>
             </div>
         </div>
+
+        <Dialog :open="composeDialogOpen" @update:open="onComposeDialogOpenChange">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Message a resident</DialogTitle>
+                    <DialogDescription>
+                        Search by name or email, then optionally add a first message to open the conversation.
+                    </DialogDescription>
+                </DialogHeader>
+                <div class="space-y-4 pt-1">
+                    <div class="relative">
+                        <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <Input
+                            v-model="composeUserQuery"
+                            placeholder="Search residents by name or email…"
+                            class="pl-9"
+                            autocomplete="off"
+                        />
+                    </div>
+                    <div v-if="composeUsersLoading" class="flex items-center gap-2 text-sm text-gray-500 py-2">
+                        <div class="h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        Searching…
+                    </div>
+                    <ul
+                        v-else-if="composeUsers.length > 0"
+                        class="max-h-52 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100"
+                    >
+                        <li v-for="u in composeUsers" :key="u.id">
+                            <button
+                                type="button"
+                                class="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
+                                :class="composeSelectedResident?.id === u.id ? 'bg-blue-50' : ''"
+                                @click="composeSelectedResident = u"
+                            >
+                                <Avatar class="h-9 w-9 shrink-0">
+                                    <AvatarImage
+                                        :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=3b82f6&color=fff&bold=true`"
+                                    />
+                                    <AvatarFallback class="text-xs">{{ getInitials(u.name) }}</AvatarFallback>
+                                </Avatar>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-medium text-gray-900">{{ u.name }}</p>
+                                    <p class="truncate text-xs text-gray-500">{{ u.email }}</p>
+                                </div>
+                            </button>
+                        </li>
+                    </ul>
+                    <div
+                        v-else-if="composeUserQuery.trim().length >= 2"
+                        class="flex items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-3 py-6 text-sm text-gray-500"
+                    >
+                        <User class="h-5 w-5 shrink-0 text-gray-400" />
+                        No residents match that search.
+                    </div>
+                    <p v-else class="text-sm text-gray-500">Type at least 2 characters to search.</p>
+
+                    <div v-if="composeSelectedResident" class="space-y-2">
+                        <p class="text-xs text-gray-600">
+                            To:
+                            <span class="font-medium text-gray-900">{{ composeSelectedResident.name }}</span>
+                        </p>
+                        <Textarea
+                            v-model="composeFirstMessage"
+                            placeholder="Optional first message…"
+                            :rows="3"
+                            class="resize-none"
+                        />
+                    </div>
+
+                    <p v-if="composeError" class="text-sm text-red-600">{{ composeError }}</p>
+                </div>
+                <DialogFooter class="gap-2 sm:gap-0">
+                    <Button type="button" variant="outline" @click="onComposeDialogOpenChange(false)">Cancel</Button>
+                    <Button
+                        type="button"
+                        :disabled="!composeSelectedResident || composeStarting"
+                        @click="submitStartConversation"
+                    >
+                        {{ composeStarting ? 'Opening…' : 'Open conversation' }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </StaffLayout>
 </template>
 

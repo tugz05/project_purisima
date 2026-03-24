@@ -285,6 +285,8 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
     // Messaging routes
     Route::prefix('messaging')->name('messaging.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Staff\MessagingController::class, 'index'])->name('index');
+        Route::get('/search-users', [\App\Http\Controllers\Staff\MessagingController::class, 'searchUsers'])->name('search-users');
+        Route::post('/conversations/start', [\App\Http\Controllers\Staff\MessagingController::class, 'startConversation'])->name('conversations.start');
         Route::get('/conversations/{conversation}', [\App\Http\Controllers\Staff\MessagingController::class, 'show'])->name('show');
         Route::get('/conversations/{conversation}/json', [\App\Http\Controllers\Staff\MessagingController::class, 'showAsJson'])->name('show-json');
         Route::post('/conversations/{conversation}/messages', [\App\Http\Controllers\Staff\MessagingController::class, 'sendMessage'])->name('send-message');

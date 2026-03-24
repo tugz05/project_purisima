@@ -2,28 +2,28 @@
 
 namespace App\Services;
 
+use App\Events\MessageSent;
+use App\Events\UserTyping;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\TypingIndicator;
 use App\Models\User;
-use App\Events\MessageSent;
 use App\Support\BroadcastHelper;
-use App\Events\UserTyping;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class MessagingService
 {
     /**
      * Get or create a conversation between resident and staff.
      */
-    public function getOrCreateConversation(User $resident, User $staff, string $subject = null): Conversation
+    public function getOrCreateConversation(User $resident, User $staff, ?string $subject = null): Conversation
     {
         \Illuminate\Support\Facades\Log::info('getOrCreateConversation called', [
             'resident_id' => $resident->id,
             'staff_id' => $staff->id,
-            'subject' => $subject
+            'subject' => $subject,
         ]);
 
         $conversation = Conversation::firstOrCreate(
@@ -40,7 +40,7 @@ class MessagingService
         \Illuminate\Support\Facades\Log::info('Conversation result', [
             'conversation_id' => $conversation->id,
             'was_recently_created' => $conversation->wasRecentlyCreated,
-            'exists' => $conversation->exists
+            'exists' => $conversation->exists,
         ]);
 
         return $conversation;
@@ -49,7 +49,7 @@ class MessagingService
     /**
      * Send a message in a conversation.
      */
-    public function sendMessage(Conversation $conversation, User $sender, string $content, string $type = 'text', array $attachments = null): Message
+    public function sendMessage(Conversation $conversation, User $sender, string $content, string $type = 'text', ?array $attachments = null): Message
     {
         return DB::transaction(function () use ($conversation, $sender, $content, $type, $attachments) {
             // Create the message
@@ -144,9 +144,10 @@ class MessagingService
     /**
      * Get active typing indicators for a conversation.
      */
-    public function getActiveTypingIndicators(Conversation $conversation, User $excludeUser = null): Collection
+    public function getActiveTypingIndicators(Conversation $conversation, ?User $excludeUser = null): Collection
     {
         $excludeUserId = $excludeUser ? $excludeUser->id : null;
+
         return TypingIndicator::getActiveForConversation($conversation->id, $excludeUserId);
     }
 
@@ -213,6 +214,26 @@ class MessagingService
     }
 
     /**
+     * Search residents staff may message (by name or email).
+     *
+     * @return Collection<int, User>
+     */
+    public function searchResidentsForStaffMessaging(string $query, int $limit = 15): Collection
+    {
+        $needle = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $query).'%';
+
+        return User::query()
+            ->where('role', 'resident')
+            ->where(function ($q) use ($needle) {
+                $q->where('name', 'like', $needle)
+                    ->orWhere('email', 'like', $needle);
+            })
+            ->orderBy('name')
+            ->limit($limit)
+            ->get(['id', 'name', 'email', 'role']);
+    }
+
+    /**
      * Search conversations for a user.
      */
     public function searchConversations(User $user, string $query, int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
@@ -220,14 +241,14 @@ class MessagingService
         return Conversation::forUser($user)
             ->active()
             ->where(function ($q) use ($query) {
-                $q->where('subject', 'like', '%' . $query . '%')
-                  ->orWhere('last_message', 'like', '%' . $query . '%')
-                  ->orWhereHas('resident', function ($residentQuery) use ($query) {
-                      $residentQuery->where('name', 'like', '%' . $query . '%');
-                  })
-                  ->orWhereHas('staff', function ($staffQuery) use ($query) {
-                      $staffQuery->where('name', 'like', '%' . $query . '%');
-                  });
+                $q->where('subject', 'like', '%'.$query.'%')
+                    ->orWhere('last_message', 'like', '%'.$query.'%')
+                    ->orWhereHas('resident', function ($residentQuery) use ($query) {
+                        $residentQuery->where('name', 'like', '%'.$query.'%');
+                    })
+                    ->orWhereHas('staff', function ($staffQuery) use ($query) {
+                        $staffQuery->where('name', 'like', '%'.$query.'%');
+                    });
             })
             ->with(['resident', 'staff', 'latestMessages' => function ($query) {
                 $query->limit(1)->with('sender');

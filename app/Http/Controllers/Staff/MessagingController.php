@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Staff\SearchStaffMessagingUsersRequest;
+use App\Http\Requests\Staff\StartStaffMessagingConversationRequest;
 use App\Models\Conversation;
-use App\Models\Message;
 use App\Models\User;
 use App\Services\MessagingService;
 use Illuminate\Http\JsonResponse;
@@ -49,6 +50,65 @@ class MessagingController extends Controller
                 'role' => $user->role,
             ],
         ]);
+    }
+
+    /**
+     * Search residents to start or open a direct conversation.
+     */
+    public function searchUsers(SearchStaffMessagingUsersRequest $request): JsonResponse
+    {
+        $q = $request->searchQuery()['q'];
+
+        $users = $this->messagingService->searchResidentsForStaffMessaging($q, 15);
+
+        return response()->json([
+            'users' => $users->map(fn (User $u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+            ])->values()->all(),
+        ]);
+    }
+
+    /**
+     * Get or create a conversation with a resident and optionally send the first message.
+     */
+    public function startConversation(StartStaffMessagingConversationRequest $request): JsonResponse
+    {
+        /** @var \App\Models\User $staff */
+        $staff = Auth::user();
+
+        $validated = $request->validated();
+        $resident = User::query()->findOrFail($validated['resident_id']);
+
+        $content = isset($validated['content']) ? trim((string) $validated['content']) : '';
+        $content = $content === '' ? null : $content;
+
+        try {
+            $conversation = $this->messagingService->getOrCreateConversation(
+                $resident,
+                $staff,
+                'Direct Chat'
+            );
+
+            if ($content !== null) {
+                $this->messagingService->sendMessage($conversation, $staff, $content);
+            }
+
+            $conversation->load(['resident', 'staff', 'latestMessages' => function ($query) {
+                $query->limit(1)->with('sender');
+            }]);
+
+            return response()->json([
+                'success' => true,
+                'conversation' => $conversation,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+            throw ValidationException::withMessages([
+                'conversation' => 'Failed to start conversation: '.$e->getMessage(),
+            ]);
+        }
     }
 
     /**

@@ -38,6 +38,7 @@ import {
     Move,
     AlertTriangle,
     HelpCircle,
+    ClipboardList,
     type LucideIcon,
 } from 'lucide-vue-next';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -95,7 +96,14 @@ interface Transaction {
         id: number;
         name: string;
         code: string;
-        input_fields?: Array<{ key: string; label: string }>;
+        input_fields?: Array<{
+            key: string;
+            label: string;
+            type?: string;
+            required?: boolean;
+            placeholder?: string | null;
+            options?: string[];
+        }>;
     };
     resident: {
         id: number;
@@ -128,17 +136,42 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const residentInputLabeledRows = computed(() => {
-    const data = props.transaction.resident_input_data ?? {};
+const requestFieldTypeLabel = (type?: string): string => {
+    const map: Record<string, string> = {
+        text: 'Short text',
+        textarea: 'Paragraph',
+        number: 'Number',
+        date: 'Date',
+        email: 'Email',
+        select: 'Dropdown',
+    };
+    return map[type ?? 'text'] ?? 'Text';
+};
+
+/** All configured request fields for this document type, with resident answers (or empty). */
+const staffRequestFieldRows = computed(() => {
     const defs = props.transaction.document_type?.input_fields ?? [];
-    const labelByKey: Record<string, string> = {};
-    defs.forEach((d) => {
-        labelByKey[d.key] = d.label;
-    });
-    return Object.entries(data).map(([key, value]) => ({
+    const answers = props.transaction.resident_input_data ?? {};
+    if (defs.length > 0) {
+        return defs.map((d) => {
+            const raw = answers[d.key];
+            const value =
+                raw !== null && raw !== undefined && String(raw).trim() !== '' ? String(raw) : '';
+            return {
+                key: d.key,
+                label: d.label,
+                required: d.required !== false,
+                typeLabel: requestFieldTypeLabel(d.type),
+                value,
+            };
+        });
+    }
+    return Object.entries(answers).map(([key, val]) => ({
         key,
-        label: labelByKey[key] ?? key.replace(/_/g, ' '),
-        value: value === null || value === undefined ? '' : String(value),
+        label: key.replace(/_/g, ' '),
+        required: false,
+        typeLabel: 'Text',
+        value: val === null || val === undefined ? '' : String(val),
     }));
 });
 
@@ -715,7 +748,9 @@ onUnmounted(() => {
                         <Card class="shadow-lg border-gray-200">
                             <CardHeader class="pb-3">
                                 <CardTitle class="text-lg">Documents Status</CardTitle>
-                                <CardDescription class="text-sm">Required vs Submitted documents</CardDescription>
+                                <CardDescription class="text-sm">
+                                    Required documents, request fields, and submitted files
+                                </CardDescription>
                             </CardHeader>
                             <CardContent class="space-y-4">
                                 <!-- Required Documents -->
@@ -729,6 +764,48 @@ onUnmounted(() => {
                                     </div>
                                     <div v-else class="text-sm text-gray-500 italic p-2 bg-gray-50 rounded-lg">
                                         No specific documents required
+                                    </div>
+                                </div>
+
+                                <!-- Required request fields (document type schema + answers) -->
+                                <div v-if="staffRequestFieldRows.length > 0" class="pt-2 border-t border-gray-100">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <ClipboardList class="h-4 w-4 text-cyan-600" />
+                                        <Label class="text-sm font-medium text-gray-700">Required request fields</Label>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mb-3">
+                                        Extra questions defined for this document type and what the resident entered.
+                                    </p>
+                                    <div class="space-y-2">
+                                        <div
+                                            v-for="row in staffRequestFieldRows"
+                                            :key="row.key"
+                                            class="flex flex-col gap-2 p-3 rounded-lg border border-cyan-100 bg-gradient-to-br from-cyan-50/80 to-sky-50/40"
+                                        >
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span class="text-sm font-semibold text-gray-900">{{ row.label }}</span>
+                                                <Badge variant="outline" class="text-[10px] font-normal">{{ row.typeLabel }}</Badge>
+                                                <Badge
+                                                    v-if="row.required"
+                                                    variant="secondary"
+                                                    class="text-[10px] bg-amber-100 text-amber-900 border-amber-200"
+                                                >
+                                                    Required
+                                                </Badge>
+                                                <Badge v-else variant="outline" class="text-[10px] text-gray-500 font-normal">
+                                                    Optional
+                                                </Badge>
+                                            </div>
+                                            <div>
+                                                <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Answer</span>
+                                                <p class="text-sm text-gray-900 mt-1 whitespace-pre-wrap break-words font-medium">
+                                                    {{
+                                                        row.value ||
+                                                            (row.required ? 'Not provided yet' : '—')
+                                                    }}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1216,17 +1293,30 @@ onUnmounted(() => {
                                             </div>
                                         </div>
 
-                                        <!-- Required Fields Information -->
-                                        <div v-if="residentInputLabeledRows.length > 0" class="mt-4 pt-4 border-t border-gray-200">
-                                            <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 block">Required Information</Label>
+                                        <!-- Required request fields (same data as Documents card, compact) -->
+                                        <div v-if="staffRequestFieldRows.length > 0" class="mt-4 pt-4 border-t border-gray-200">
+                                            <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block">
+                                                Required request fields
+                                            </Label>
+                                            <p class="text-[11px] text-gray-400 mb-2">Configured questions and answers</p>
                                             <div class="space-y-2">
                                                 <div
-                                                    v-for="row in residentInputLabeledRows"
+                                                    v-for="row in staffRequestFieldRows"
                                                     :key="row.key"
                                                     class="bg-white rounded-lg p-2.5 border border-gray-200"
                                                 >
-                                                    <Label class="text-xs font-semibold text-gray-600">{{ row.label }}</Label>
-                                                    <p class="text-sm text-gray-900 mt-1 font-medium">{{ row.value || 'N/A' }}</p>
+                                                    <div class="flex flex-wrap items-center gap-1.5 mb-1">
+                                                        <span class="text-xs font-semibold text-gray-800">{{ row.label }}</span>
+                                                        <Badge v-if="row.required" variant="outline" class="text-[9px] px-1 py-0 h-4">
+                                                            Req.
+                                                        </Badge>
+                                                    </div>
+                                                    <p class="text-sm text-gray-900 font-medium leading-snug">
+                                                        {{
+                                                            row.value ||
+                                                                (row.required ? 'Not provided yet' : '—')
+                                                        }}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
