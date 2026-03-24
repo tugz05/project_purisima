@@ -56,6 +56,8 @@ class MessagingController extends Controller
                     return [
                         'id' => $message->id,
                         'content' => $message->content,
+                        'type' => $message->type,
+                        'attachments' => $message->attachments,
                         'created_at' => $message->created_at,
                         'is_read' => $message->is_read,
                         'sender' => [
@@ -202,6 +204,8 @@ class MessagingController extends Controller
                     return [
                         'id' => $message->id,
                         'content' => $message->content,
+                        'type' => $message->type,
+                        'attachments' => $message->attachments,
                         'created_at' => $message->created_at,
                         'is_read' => $message->is_read,
                         'sender' => [
@@ -284,6 +288,8 @@ class MessagingController extends Controller
                     return [
                         'id' => $message->id,
                         'content' => $message->content,
+                        'type' => $message->type,
+                        'attachments' => $message->attachments,
                         'created_at' => $message->created_at,
                         'is_read' => $message->is_read,
                         'sender' => [

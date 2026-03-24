@@ -22,7 +22,6 @@ import {
     MessageSquare,
     Send,
     ArrowLeft,
-    Paperclip,
     CheckCircle,
     CheckCircle2,
     Archive,
@@ -31,6 +30,7 @@ import {
     Smile,
     FileText,
     Image as LucideImage,
+    Upload,
     X,
 } from 'lucide-vue-next';
 import { MESSAGING_QUICK_EMOJIS, postConversationMessage } from '@/utils/messagingAttachments';
@@ -545,20 +545,50 @@ onBeforeUnmount(() => {
                             </button>
                         </span>
                     </div>
-                    <div class="flex items-end gap-3">
-                        <div class="flex-1">
+                    <div class="flex items-end gap-2 sm:gap-3">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger as-child>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    class="h-10 shrink-0 gap-1.5 rounded-full border-green-200 px-3 text-green-800 hover:bg-green-50"
+                                    aria-label="Upload file or photo"
+                                >
+                                    <Upload class="h-4 w-4 shrink-0" />
+                                    <span class="hidden text-xs font-medium sm:inline">Upload</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" class="w-52">
+                                <DropdownMenuItem
+                                    class="cursor-pointer gap-2"
+                                    @click.prevent="documentAttachmentInputRef?.click()"
+                                >
+                                    <FileText class="h-4 w-4" />
+                                    Attach file (PDF, Word)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    class="cursor-pointer gap-2"
+                                    @click.prevent="imageAttachmentInputRef?.click()"
+                                >
+                                    <LucideImage class="h-4 w-4" />
+                                    Upload a photo
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <div class="min-w-0 flex-1">
                             <div class="relative">
                                 <Textarea
                                     id="resident-messaging-input"
                                     v-model="messageContent"
                                     placeholder="Type a message..."
                                     rows="1"
-                                    class="resize-none rounded-full border-gray-300 pr-28 focus:border-green-500 focus:ring-green-500"
+                                    class="resize-none rounded-full border-gray-300 pr-14 focus:border-green-500 focus:ring-green-500"
                                     @input="handleTyping"
                                     @keydown.enter.prevent="sendMessage"
                                     @paste="onMessagingInPagePaste"
                                 />
-                                <div class="absolute inset-y-0 right-0 flex items-center gap-0.5 pr-2">
+                                <div class="absolute inset-y-0 right-0 flex items-center pr-2">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger as-child>
                                             <Button
@@ -583,35 +613,6 @@ onBeforeUnmount(() => {
                                                     {{ emoji }}
                                                 </button>
                                             </div>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger as-child>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                class="h-8 w-8 p-0"
-                                                aria-label="Attach file"
-                                            >
-                                                <Paperclip class="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" class="w-52">
-                                            <DropdownMenuItem
-                                                class="cursor-pointer gap-2"
-                                                @click.prevent="documentAttachmentInputRef?.click()"
-                                            >
-                                                <FileText class="h-4 w-4" />
-                                                Attach file (PDF, Word)
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                class="cursor-pointer gap-2"
-                                                @click.prevent="imageAttachmentInputRef?.click()"
-                                            >
-                                                <LucideImage class="h-4 w-4" />
-                                                Upload a photo
-                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>

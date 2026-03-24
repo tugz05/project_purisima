@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
     downloadMessagingAttachment,
@@ -7,7 +8,7 @@ import {
     openMessagingAttachmentInNewTab,
     type MessagingAttachment,
 } from '@/utils/messagingAttachments';
-import { Download, ExternalLink, FileText, Image as ImageIcon } from 'lucide-vue-next';
+import { Download, ExternalLink, FileText, Image as ImageIcon, X } from 'lucide-vue-next';
 
 const props = defineProps<{
     attachments: MessagingAttachment[] | null | undefined;
@@ -45,6 +46,33 @@ const iconBtnClass = () => {
 
     return map[props.tone];
 };
+
+const lightbox = ref<{ url: string; name: string } | null>(null);
+
+const openImageLightbox = (attachment: MessagingAttachment): void => {
+    lightbox.value = {
+        url: messagingAttachmentPublicUrl(attachment.path),
+        name: attachment.name,
+    };
+};
+
+const closeImageLightbox = (): void => {
+    lightbox.value = null;
+};
+
+const onLightboxKeydown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') {
+        closeImageLightbox();
+    }
+};
+
+onMounted(() => {
+    window.addEventListener('keydown', onLightboxKeydown);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', onLightboxKeydown);
+});
 </script>
 
 <template>
@@ -57,11 +85,16 @@ const iconBtnClass = () => {
                     tone === 'incoming' ? 'border-gray-200 bg-white' : 'border-white/25 bg-black/10'
                 "
             >
-                <a
-                    :href="messagingAttachmentPublicUrl(attachment.path)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="block"
+                <button
+                    type="button"
+                    class="block w-full cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    :class="
+                        tone === 'incoming'
+                            ? 'focus-visible:ring-blue-500'
+                            : 'focus-visible:ring-white focus-visible:ring-offset-transparent'
+                    "
+                    :aria-label="`View ${attachment.name} full screen`"
+                    @click="openImageLightbox(attachment)"
                 >
                     <img
                         :src="messagingAttachmentPublicUrl(attachment.path)"
@@ -69,7 +102,7 @@ const iconBtnClass = () => {
                         class="max-h-56 w-full object-contain"
                         loading="lazy"
                     />
-                </a>
+                </button>
                 <div
                     class="flex flex-wrap items-center gap-1 border-t px-2 py-1.5"
                     :class="tone === 'incoming' ? 'border-gray-200 bg-gray-50' : 'border-white/20 bg-black/20'"
@@ -82,7 +115,7 @@ const iconBtnClass = () => {
                         size="sm"
                         class="h-7 px-2 text-xs"
                         :class="iconBtnClass()"
-                        @click.prevent="openMessagingAttachmentInNewTab(attachment)"
+                        @click.prevent="openImageLightbox(attachment)"
                     >
                         <ExternalLink class="mr-1 h-3 w-3" />
                         View
@@ -133,4 +166,39 @@ const iconBtnClass = () => {
             </div>
         </template>
     </div>
+
+    <Teleport to="body">
+        <div
+            v-if="lightbox"
+            class="fixed inset-0 z-[11000] flex flex-col items-center justify-center bg-black/95 p-4"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="`Full screen image: ${lightbox.name}`"
+            @click.self="closeImageLightbox"
+        >
+            <button
+                type="button"
+                class="absolute right-3 top-3 z-[11001] rounded-full bg-white/15 p-2.5 text-white transition-colors hover:bg-white/25"
+                aria-label="Close full screen image"
+                @click="closeImageLightbox"
+            >
+                <X class="h-6 w-6" />
+            </button>
+            <img
+                :src="lightbox.url"
+                :alt="lightbox.name"
+                class="max-h-[min(92dvh,92vh)] max-w-full object-contain"
+                @click.stop
+            />
+            <a
+                :href="lightbox.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="mt-4 rounded-lg bg-white/10 px-4 py-2 text-sm text-white transition-colors hover:bg-white/20"
+                @click.stop
+            >
+                Open in new tab
+            </a>
+        </div>
+    </Teleport>
 </template>

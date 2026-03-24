@@ -81,6 +81,46 @@ test('resident can start a conversation with image only', function () {
     expect($message->attachments)->toBeArray()->not->toBeEmpty();
 });
 
+test('resident messaging conversation json includes message attachments', function () {
+    $resident = User::factory()->create([
+        'role' => 'resident',
+        'profile_completed_at' => now(),
+    ]);
+    $staff = User::factory()->create(['role' => 'staff']);
+
+    $conversation = Conversation::create([
+        'resident_id' => $resident->id,
+        'staff_id' => $staff->id,
+        'subject' => 'Test',
+        'is_active' => true,
+    ]);
+
+    $attachments = [
+        [
+            'name' => 'pic.jpg',
+            'path' => 'message-attachments/test.jpg',
+            'mime_type' => 'image/jpeg',
+            'size' => 100,
+        ],
+    ];
+
+    Message::create([
+        'conversation_id' => $conversation->id,
+        'sender_id' => $staff->id,
+        'content' => 'See image',
+        'type' => 'image',
+        'attachments' => $attachments,
+        'is_read' => true,
+    ]);
+
+    $this->actingAs($resident);
+
+    $response = $this->getJson("/resident/messaging/conversations/{$conversation->id}/json");
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('conversation.messages.0.attachments.0.name', 'pic.jpg');
+});
+
 test('resident cannot start a conversation with empty message and no attachments', function () {
     $resident = User::factory()->create([
         'role' => 'resident',

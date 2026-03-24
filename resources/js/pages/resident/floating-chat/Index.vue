@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import FloatingChat from '@/components/resident/FloatingChat.vue';
@@ -14,6 +13,8 @@ interface Conversation {
     messages: Array<{
         id: number;
         content: string;
+        type?: string;
+        attachments?: unknown[] | null;
         created_at: string;
         is_read: boolean;
         sender: {
@@ -43,7 +44,7 @@ interface Props {
     currentUser: User;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 </script>
 
 <template>
