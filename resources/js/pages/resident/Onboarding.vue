@@ -3,6 +3,7 @@ import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import { ref, computed, watch, onUnmounted } from 'vue'
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
+import { PUROK_OPTIONS } from '@/purokOptions';
 
 type ProfileDraft = {
   first_name?: string
@@ -69,9 +70,12 @@ const form = useForm({
   photo: null as File | null,
 })
 
-const purokOptions = [
-  'Purok 1','Purok 2','Purok 3','Purok 4','Purok 5','Purok 6','Purok 7','Purok 8','Purok 9','Purok 10'
-]
+const purokOptions = PUROK_OPTIONS
+
+const hasLegacyPurok = computed(() => {
+  const p = form.purok
+  return typeof p === 'string' && p.length > 0 && !PUROK_OPTIONS.includes(p)
+})
 
 const isDragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -232,6 +236,7 @@ const submit = () => {
           <label class="mb-1 block text-sm text-[#334155]">Purok</label>
           <select v-model="form.purok" class="w-full rounded border px-3 py-2">
             <option value="">Select Purok</option>
+            <option v-if="hasLegacyPurok" :value="form.purok">{{ form.purok }} (current — choose a new purok)</option>
             <option v-for="p in purokOptions" :key="p" :value="p">{{ p }}</option>
           </select>
         </div>

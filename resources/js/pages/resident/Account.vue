@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, useForm, usePage, Link } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { PUROK_OPTIONS } from '@/purokOptions'
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { dashboard } from '@/routes';
@@ -31,6 +32,13 @@ const form = useForm({
   occupation: user?.occupation || '',
   purok: user?.purok || '',
   photo: null as File | null,
+})
+
+const purokOptions = PUROK_OPTIONS
+
+const hasLegacyPurok = computed(() => {
+  const p = form.purok
+  return typeof p === 'string' && p.length > 0 && !PUROK_OPTIONS.includes(p)
 })
 
 const isDragging = ref(false)
@@ -127,7 +135,11 @@ const submit = () => {
         </div>
         <div class="sm:col-span-2">
           <label class="mb-1 block text-sm">Purok</label>
-          <input v-model="form.purok" class="w-full rounded border px-3 py-2" />
+          <select v-model="form.purok" class="w-full rounded border px-3 py-2">
+            <option value="">Select Purok</option>
+            <option v-if="hasLegacyPurok" :value="form.purok">{{ form.purok }} (current — choose a new purok)</option>
+            <option v-for="p in purokOptions" :key="p" :value="p">{{ p }}</option>
+          </select>
         </div>
         <div class="sm:col-span-2">
           <label class="mb-1 block text-sm">Profile photo</label>

@@ -23,7 +23,7 @@ it('stores google given_name and family_name for new oauth user', function () {
     Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
 
     $this->get(route('oauth.callback', ['provider' => 'google']))
-        ->assertRedirect();
+        ->assertRedirect(route('registration.verify-location.show', absolute: false));
 
     $row = User::query()->where('email', 'google-names@example.com')->first();
     expect($row)->not->toBeNull()
@@ -64,7 +64,7 @@ it('backfills name parts for existing resident on oauth when split fields are em
     Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
 
     $this->get(route('oauth.callback', ['provider' => 'google']))
-        ->assertRedirect();
+        ->assertRedirect(route('resident.onboarding.show', absolute: false));
 
     $user->refresh();
     expect($user->first_name)->toBe('Maria')

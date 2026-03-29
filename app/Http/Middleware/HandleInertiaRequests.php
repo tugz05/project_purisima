@@ -65,6 +65,7 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
+                'open_certificate_sheet' => $request->session()->get('open_certificate_sheet'),
             ],
         ];
     }

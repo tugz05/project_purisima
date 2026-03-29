@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Search, Eye, Filter, Clock, CheckCircle, XCircle, AlertCircle, UserPlus, FileText } from 'lucide-vue-next';
 import StaffLayout from '@/layouts/staff/Layout.vue';
+import staff from '@/routes/staff';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { useFormHandlers } from '@/composables/useFormHandlers';
 import { useUtils } from '@/composables/useUtils';
@@ -24,11 +25,12 @@ interface Transaction {
     fee_paid: boolean;
     submitted_at: string;
     created_at: string;
+    resident_input_data?: Record<string, unknown>;
     resident: {
         id: number;
         name: string;
         email: string;
-    };
+    } | null;
 }
 
 interface Props {
@@ -155,24 +157,24 @@ const getStatusColor = (status: string) => {
 
     <StaffLayout :breadcrumbs="breadcrumbs">
         <div class="bg-gradient-to-br from-gray-50 to-blue-50/30 min-h-full w-full">
-            <div class="mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 md:py-6 max-w-none">
+            <div class="mx-auto w-full max-w-none space-y-6 px-4 py-4 sm:px-6 lg:px-8 md:py-6">
                 <!-- Enhanced Header with Gradient -->
-                <div class="relative overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-xl mb-6 rounded-2xl">
+                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-xl">
                     <div class="absolute inset-0 bg-black/10"></div>
                     <div class="absolute inset-0">
                         <div class="absolute top-0 left-0 w-72 h-72 bg-white/10 rounded-full -translate-x-36 -translate-y-36"></div>
                         <div class="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-48 translate-y-48"></div>
                     </div>
                     <div class="relative px-4 sm:px-6 lg:px-8 py-8">
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-                            <div class="text-white">
-                                <div class="flex items-center gap-4 mb-4">
-                                    <div class="p-3 bg-white/20 rounded-2xl backdrop-blur-sm">
+                        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
+                            <div class="flex flex-1 flex-col gap-6 text-white">
+                                <div class="flex items-center gap-4">
+                                    <div class="rounded-2xl bg-white/20 p-3 backdrop-blur-sm">
                                         <FileText class="h-8 w-8" />
                                     </div>
-                                    <div>
+                                    <div class="flex flex-col gap-1">
                                         <h1 class="text-4xl font-bold">Transactions</h1>
-                                        <p class="text-blue-100 text-lg mt-1">Manage document requests and processing</p>
+                                        <p class="text-lg text-blue-100">Manage document requests and processing</p>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-6 text-sm text-blue-100">
@@ -194,21 +196,30 @@ const getStatusColor = (status: string) => {
                                     </div>
                                 </div>
                             </div>
+                            <Button
+                                as-child
+                                variant="secondary"
+                                class="shrink-0 bg-white/15 text-white border-white/30 hover:bg-white/25"
+                            >
+                                <Link :href="staff.certificates.manual.url()">
+                                    <UserPlus class="h-4 w-4 mr-2" />
+                                    Walk-in certificate
+                                </Link>
+                            </Button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Filters Section -->
-                <div class="mb-6">
-                    <Card class="shadow-lg border-gray-200">
-                        <CardHeader class="pb-4">
-                            <CardTitle class="flex items-center gap-2 text-lg">
-                                <Filter class="h-5 w-5" />
-                                Filters
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card class="border-gray-200 shadow-lg">
+                    <CardHeader class="gap-2 border-b border-gray-100">
+                        <CardTitle class="flex items-center gap-2 text-lg">
+                            <Filter class="h-5 w-5" />
+                            Filters
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                                 <!-- Search -->
                                 <div class="space-y-2">
                                     <label class="text-sm font-medium text-gray-700">Search</label>
@@ -264,13 +275,12 @@ const getStatusColor = (status: string) => {
                                         Clear Filters
                                     </Button>
                                 </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Transactions Table -->
-                <Card class="shadow-lg border-gray-200">
+                <Card class="border-gray-200 shadow-lg">
                     <CardHeader>
                         <CardTitle class="flex items-center justify-between">
                             <span>Transactions ({{ props.transactions.total }})</span>
@@ -299,8 +309,16 @@ const getStatusColor = (status: string) => {
                                         </TableCell>
                                         <TableCell class="py-4 px-4">
                                             <div>
-                                                <div class="font-medium text-gray-900">{{ transaction.resident.name }}</div>
-                                                <div class="text-sm text-gray-500">{{ transaction.resident.email }}</div>
+                                                <div class="font-medium text-gray-900">
+                                                    {{ transaction.resident?.name
+                                                        ?? (transaction.resident_input_data?.__manual_requestor as { full_name?: string } | undefined)?.full_name
+                                                        ?? 'Walk-in' }}
+                                                </div>
+                                                <div class="text-sm text-gray-500">
+                                                    {{ transaction.resident?.email
+                                                        ?? (transaction.resident_input_data?.__manual_requestor as { email?: string } | undefined)?.email
+                                                        ?? '—' }}
+                                                </div>
                                             </div>
                                         </TableCell>
                                         <TableCell class="py-4 px-4">

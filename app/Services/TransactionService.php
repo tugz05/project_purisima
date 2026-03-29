@@ -6,6 +6,7 @@ use App\Models\DocumentType;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class TransactionService
@@ -17,12 +18,16 @@ class TransactionService
     /**
      * Create a new transaction
      */
-    public function create(array $data, User $resident): Transaction
+    public function create(array $data, ?User $resident = null): Transaction
     {
         return DB::transaction(function () use ($data, $resident) {
             $submittedDocuments = [];
 
-            if (isset($data['submitted_document_upload_ids']) && is_array($data['submitted_document_upload_ids'])) {
+            if (
+                $resident !== null
+                && isset($data['submitted_document_upload_ids'])
+                && is_array($data['submitted_document_upload_ids'])
+            ) {
                 foreach ($data['submitted_document_upload_ids'] as $documentType => $ids) {
                     if (! is_array($ids)) {
                         continue;
@@ -86,7 +91,7 @@ class TransactionService
             }
 
             $transaction = Transaction::create([
-                'resident_id' => $resident->id,
+                'resident_id' => $resident?->id,
                 'document_type_id' => $documentType->id,
                 'type' => $data['type'] ?? $documentType->code,
                 'title' => $data['title'],
@@ -97,6 +102,49 @@ class TransactionService
             ]);
 
             return $transaction;
+        });
+    }
+
+    /**
+     * Create a walk-in / fully manual transaction (no linked resident account) and assign it in progress.
+     */
+    public function createManualEntryByStaff(array $data, User $staff): Transaction
+    {
+        $note = isset($data['staff_notes']) ? trim((string) $data['staff_notes']) : '';
+        $prefix = 'Walk-in / manual request (no linked resident account).';
+        $staffNotes = $note !== '' ? $prefix."\n\n".$note : $prefix;
+
+        $rf = $data['required_fields'] ?? [];
+        if (! is_array($rf)) {
+            $rf = [];
+        }
+
+        $manualRequestor = array_filter([
+            'full_name' => trim((string) ($data['manual_full_name'] ?? '')),
+            'email' => trim((string) ($data['manual_email'] ?? '')),
+            'phone' => trim((string) ($data['manual_phone'] ?? '')),
+            'purok' => trim((string) ($data['manual_purok'] ?? '')),
+            'address' => trim((string) ($data['manual_address'] ?? '')),
+        ], fn (string $v): bool => $v !== '');
+
+        $mergedInput = array_merge($rf, ['__manual_requestor' => $manualRequestor]);
+
+        $payload = Arr::except($data, [
+            'staff_notes',
+            'manual_full_name',
+            'manual_email',
+            'manual_phone',
+            'manual_purok',
+            'manual_address',
+        ]);
+        $payload['required_fields'] = $mergedInput;
+
+        return DB::transaction(function () use ($payload, $staff, $staffNotes) {
+            $transaction = $this->create($payload, null);
+
+            return $this->updateStatus($transaction, 'in_progress', $staff, [
+                'staff_notes' => $staffNotes,
+            ]);
         });
     }
 
@@ -154,11 +202,14 @@ class TransactionService
             }
 
             if (isset($data['document_content']) && trim($data['document_content']) !== '') {
-                $updateData['generated_document_data'] = [
+                $existing = $transaction->generated_document_data;
+                $existing = is_array($existing) ? $existing : [];
+                $updateData['generated_document_data'] = array_merge($existing, [
                     'content' => $data['document_content'],
                     'generated_at' => now()->toIso8601String(),
                     'generated_by' => $staff?->id,
-                ];
+                ]);
+                $updateData['document_generated_at'] = now();
             }
 
             \Log::info('TransactionService: Final updateData before save', [
@@ -237,6 +288,7 @@ class TransactionService
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('transaction_id', 'like', "%{$searchTerm}%")
                     ->orWhere('title', 'like', "%{$searchTerm}%")
+                    ->orWhere('resident_input_data', 'like', "%{$searchTerm}%")
                     ->orWhereHas('resident', function ($residentQuery) use ($searchTerm) {
                         $residentQuery->where('first_name', 'like', "%{$searchTerm}%")
                             ->orWhere('last_name', 'like', "%{$searchTerm}%")
@@ -251,12 +303,12 @@ class TransactionService
 
         // Sorting functionality
         $sortField = $filters['sort'] ?? 'created_at';
-        $sortDirection = $filters['direction'] ?? 'desc';
+        $sortDirection = strtolower((string) ($filters['direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
         // Handle special sorting cases
         if ($sortField === 'resident') {
-            $query->join('users as residents', 'transactions.resident_id', '=', 'residents.id')
-                ->orderBy('residents.first_name', $sortDirection)
+            $query->leftJoin('users as residents', 'transactions.resident_id', '=', 'residents.id')
+                ->orderByRaw('COALESCE(residents.first_name, residents.name, transactions.title) '.$sortDirection)
                 ->select('transactions.*');
         } else {
             $query->orderBy($sortField, $sortDirection);

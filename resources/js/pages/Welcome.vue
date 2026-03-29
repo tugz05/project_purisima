@@ -439,6 +439,17 @@ const closeAnnouncementView = () => {
         </button>
       </nav>
 
+      <!-- Mobile: always-visible dashboard CTA when signed in (no need to open the menu) -->
+      <Link
+        v-if="isAuthed"
+        :href="dashboard().url"
+        class="relative flex w-full items-center justify-center gap-2 border-t border-sky-300/80 bg-gradient-to-r from-sky-700 via-sky-600 to-cyan-600 px-4 py-3.5 text-[15px] font-extrabold uppercase tracking-wide text-white shadow-[0_6px_20px_rgba(2,132,199,0.45)] ring-1 ring-white/25 transition hover:brightness-110 hover:shadow-[0_8px_28px_rgba(2,132,199,0.55)] focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300/90 lg:hidden"
+      >
+        <Sparkles class="h-5 w-5 shrink-0 text-amber-200" aria-hidden="true" />
+        Go to Dashboard
+        <ArrowRight class="h-5 w-5 shrink-0 opacity-90" aria-hidden="true" />
+      </Link>
+
       <!-- Mobile panel -->
       <transition name="slide-fade">
         <div v-if="mobileOpen" id="mobile-nav" class="border-t border-[#E0F2FE] bg-white lg:hidden">
@@ -448,7 +459,19 @@ const closeAnnouncementView = () => {
             <a href="#pillars" class="block rounded px-2 py-2 hover:bg-[#F0F9FF]">Pillars</a>
             <a href="#faq" class="block rounded px-2 py-2 hover:bg-[#F0F9FF]">FAQ</a>
             <a href="#contact" class="block rounded px-2 py-2 hover:bg-[#F0F9FF]">Contact</a>
-            <Link :href="isAuthed ? dashboard().url : login().url" class="mt-2 inline-flex w-full items-center justify-center rounded-md bg-[#0EA5E9] px-4 py-2 font-semibold text-white">{{ isAuthed ? 'Go to Dashboard' : 'Report Incident' }}</Link>
+            <Link
+              :href="isAuthed ? dashboard().url : login().url"
+              class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-[15px] font-extrabold text-white shadow-lg transition focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-2"
+              :class="
+                isAuthed
+                  ? 'bg-gradient-to-r from-sky-700 via-sky-600 to-cyan-600 shadow-sky-600/40 ring-2 ring-amber-200/80 focus-visible:ring-amber-300'
+                  : 'bg-[#0EA5E9] py-2.5 text-sm font-semibold shadow-none ring-0'
+              "
+            >
+              <Sparkles v-if="isAuthed" class="h-5 w-5 shrink-0 text-amber-200" aria-hidden="true" />
+              {{ isAuthed ? 'Go to Dashboard' : 'Report Incident' }}
+              <ArrowRight v-if="isAuthed" class="h-5 w-5 shrink-0 opacity-90" aria-hidden="true" />
+            </Link>
           </div>
         </div>
       </transition>
@@ -489,9 +512,16 @@ const closeAnnouncementView = () => {
             <p class="mb-8 max-w-xl text-[14px] text-white/90 md:text-[15px]">
               Coordinate responders, inform the community, and manage incidents across web and mobile using a secure, data‑driven workflow.
             </p>
-            <div class="flex flex-wrap items-center gap-3">
-              <Link :href="isAuthed ? dashboard().url : login().url" class="group relative inline-flex items-center gap-2 overflow-hidden rounded-md bg-white px-5 py-2 text-sm font-semibold text-[#075985] shadow transition focus:outline-none focus:ring-2 focus:ring-white/70">
-                <Send class="h-4 w-4" /> Start now
+            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <Link
+                :href="isAuthed ? dashboard().url : login().url"
+                class="group relative inline-flex min-h-[3rem] w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-white px-5 py-3.5 text-base font-extrabold text-[#075985] shadow-lg ring-2 ring-white/60 transition focus:outline-none focus:ring-4 focus:ring-amber-300/80 sm:min-h-0 sm:w-auto sm:rounded-md sm:py-2 sm:text-sm sm:font-semibold sm:shadow sm:ring-0 sm:focus:ring-2 sm:focus:ring-white/70"
+                :class="isAuthed ? 'sm:ring-2 sm:ring-amber-200/70' : ''"
+              >
+                <Sparkles v-if="isAuthed" class="h-5 w-5 shrink-0 text-sky-600 sm:h-4 sm:w-4" aria-hidden="true" />
+                <Send v-else class="h-5 w-5 shrink-0 sm:h-4 sm:w-4" aria-hidden="true" />
+                {{ isAuthed ? 'Go to Dashboard' : 'Start now' }}
+                <ArrowRight v-if="isAuthed" class="h-5 w-5 shrink-0 text-sky-600 opacity-80 sm:hidden" aria-hidden="true" />
                 <span class="pointer-events-none absolute inset-0 translate-x-[-120%] bg-[#7dd3fc]/40 transition-transform duration-500 group-hover:translate-x-[0%]" />
               </Link>
               <a href="#pillars" class="rounded-md border border-white/40 px-5 py-2 text-sm text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/60">Learn more</a>
@@ -1239,8 +1269,17 @@ const closeAnnouncementView = () => {
             <div data-reveal class="reveal rounded-lg border border-white/80 bg-white/88 p-5 backdrop-blur-sm">
               <h3 class="mb-1 font-medium">Report an Incident</h3>
               <p class="mb-3 text-[13px] text-[#475569]">Submit photos/videos, location, and description. Receive tracking ID.</p>
-              <Link :href="isAuthed ? dashboard().url : login().url" class="inline-flex items-center gap-2 rounded-md bg-[#0EA5E9] px-3 py-2 text-sm font-semibold text-white hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[#7dd3fc]">
-                Start
+              <Link
+                :href="isAuthed ? dashboard().url : login().url"
+                class="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[#7dd3fc] md:w-auto md:rounded-md md:px-3 md:py-2"
+                :class="
+                  isAuthed
+                    ? 'bg-gradient-to-r from-sky-700 to-cyan-600 text-[15px] font-extrabold shadow-lg shadow-sky-700/30 ring-2 ring-amber-200/70 md:text-sm md:font-semibold md:shadow-none md:ring-0'
+                    : 'bg-[#0EA5E9]'
+                "
+              >
+                <Sparkles v-if="isAuthed" class="h-4 w-4 shrink-0 text-amber-200 md:hidden" aria-hidden="true" />
+                {{ isAuthed ? 'Go to Dashboard' : 'Start' }}
               </Link>
             </div>
             <div data-reveal class="reveal rounded-lg border border-white/80 bg-white/88 p-5 backdrop-blur-sm">

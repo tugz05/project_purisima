@@ -24,6 +24,7 @@ class User extends Authenticatable
         'purok', 'barangay', 'municipality', 'province', 'country',
         'profile_completed_at',
         'latitude', 'longitude', 'location_shared', 'location_updated_at',
+        'registration_geo_verified_at',
     ];
 
     /**
@@ -50,6 +51,7 @@ class User extends Authenticatable
             'longitude' => 'decimal:8',
             'location_shared' => 'boolean',
             'location_updated_at' => 'datetime',
+            'registration_geo_verified_at' => 'datetime',
         ];
     }
 

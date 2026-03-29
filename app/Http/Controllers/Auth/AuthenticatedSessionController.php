@@ -35,7 +35,10 @@ class AuthenticatedSessionController extends Controller
 
         $user = $request->user();
 
-        // Redirect to onboarding if resident profile is not completed
+        if ($user->role === 'resident' && $user->registration_geo_verified_at === null) {
+            return redirect()->route('registration.verify-location.show');
+        }
+
         if ($user->role === 'resident' && empty($user->profile_completed_at)) {
             return redirect()->route('resident.onboarding.show');
         }

@@ -19,7 +19,7 @@ it('stores google avatar for new oauth user', function () {
     Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
 
     $this->get(route('oauth.callback', ['provider' => 'google']))
-        ->assertRedirect();
+        ->assertRedirect(route('registration.verify-location.show', absolute: false));
 
     expect(User::query()->where('email', 'newoauth@example.com')->value('photo_url'))
         ->toBe('https://lh3.googleusercontent.com/a/test');
@@ -46,7 +46,7 @@ it('does not replace storage photo with google avatar', function () {
     Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
 
     $this->get(route('oauth.callback', ['provider' => 'google']))
-        ->assertRedirect();
+        ->assertRedirect(route('resident.onboarding.show', absolute: false));
 
     expect(User::query()->where('email', 'keep@example.com')->value('photo_url'))
         ->toBe('/storage/photos/local.jpg');

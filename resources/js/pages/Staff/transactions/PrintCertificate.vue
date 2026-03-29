@@ -1,25 +1,68 @@
 <script setup lang="ts">
+import { Head } from '@inertiajs/vue3';
 import { ref, onMounted, computed } from 'vue';
+import QRCode from 'qrcode';
 
 interface Props {
-    transaction: any;
-    resident: any;
+    /** Present for transaction-based print; omitted for walk-in manual certificate print. */
+    transaction?: Record<string, unknown> | null;
+    resident?: Record<string, unknown> | null;
     documentTypeName: string;
+    /**
+     * Which printable shell to use (matches ManualCertificateWizardService / walk-in wizard).
+     * When null, layout is inferred from document type name (legacy).
+     */
+    printLayout?: 'clearance' | 'standard' | null;
     content: string;
     currentDate: string;
     currentDateFormatted: string;
-    officerOfTheDay?: string;
+    officerOfTheDay?: string | null;
+    /** Public verification URL for QR (saved transaction print). */
+    verificationUrl?: string | null;
+    /** Fallback URL encoded in QR for draft walk-in print (explains verification). */
+    previewQrUrl?: string | null;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+    transaction: null,
+    resident: null,
+    printLayout: null,
+    officerOfTheDay: undefined,
+    verificationUrl: null,
+    previewQrUrl: null,
+});
+
+const qrCodeDataUrl = ref<string | null>(null);
+
+const qrTargetUrl = computed((): string => {
+    const v = typeof props.verificationUrl === 'string' ? props.verificationUrl.trim() : '';
+    if (v !== '') {
+        return v;
+    }
+    const p = typeof props.previewQrUrl === 'string' ? props.previewQrUrl.trim() : '';
+
+    return p;
+});
+
+const qrIsVerification = computed((): boolean => {
+    const v = typeof props.verificationUrl === 'string' ? props.verificationUrl.trim() : '';
+
+    return v !== '';
+});
 
 const sealImagesLoaded = ref({
     municipality: false,
     barangay: false
 });
 
-// Check if this is a Barangay Clearance
+// Barangay clearance layout vs standard certificate (see ManualCertificateWizardService)
 const isBarangayClearance = computed(() => {
+    if (props.printLayout === 'clearance') {
+        return true;
+    }
+    if (props.printLayout === 'standard') {
+        return false;
+    }
     const docName = props.documentTypeName?.toLowerCase() || '';
     return docName.includes('barangay clearance') || docName === 'barangay clearance';
 });
@@ -74,15 +117,34 @@ const checkImageLoad = () => {
     barangayImg.src = '/images/barangay-purisima-seal.png';
 };
 
-onMounted(() => {
+onMounted(async () => {
     checkImageLoad();
+    const url = qrTargetUrl.value;
+    if (url !== '') {
+        try {
+            qrCodeDataUrl.value = await QRCode.toDataURL(url, {
+                width: 120,
+                margin: 2,
+                color: { dark: '#000000', light: '#ffffff' },
+            });
+        } catch {
+            qrCodeDataUrl.value = null;
+        }
+    }
     setTimeout(() => {
         window.print();
-    }, 500);
+    }, 900);
 });
 </script>
 
 <template>
+    <Head title="Print certificate" />
+
+    <p class="print-browser-hint">
+        Printing: in your browser’s print dialog, disable <strong>Headers and footers</strong> to remove the date, title, and URL at the edges of the
+        page (Chrome: More settings → uncheck Headers and footers).
+    </p>
+
     <!-- BARANGAY CLEARANCE DESIGN -->
     <div v-if="isBarangayClearance" class="clearance-container">
         <!-- Watermark -->
@@ -265,13 +327,12 @@ onMounted(() => {
             <div v-html="content"></div>
         </div>
 
-        <!-- SIGNATURES -->
-        <div class="signatures-section">
-            <div class="signatures-container">
-                <!-- Left: Officer of the Day (if present) -->
+        <!-- SIGNATURES, QR, FOOTER (right-aligned) -->
+        <div class="signatures-section-standard">
+            <div class="signatures-rail">
                 <div
                     v-if="props.officerOfTheDay"
-                    class="signature-block signature-left"
+                    class="signature-block-standard"
                 >
                     <div class="signature-name">
                         {{ props.officerOfTheDay.toUpperCase() }}
@@ -280,8 +341,7 @@ onMounted(() => {
                     <div class="signature-subtitle">Officer of the Day</div>
                 </div>
 
-                <!-- Right: Punong Barangay -->
-                <div class="signature-block signature-right">
+                <div class="signature-block-standard">
                     <div class="signature-name">EMMANUEL P. ISIANG</div>
                     <div class="signature-title">Punong Barangay</div>
                     <div class="signature-subtitle">
@@ -291,12 +351,18 @@ onMounted(() => {
                         For and by the authority of the Punong Barangay
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- FOOTER -->
-        <div class="footer">
-            <div class="footer-text">Not valid without official seal</div>
+                <div v-if="qrCodeDataUrl" class="certificate-qr-wrap">
+                    <img :src="qrCodeDataUrl" alt="" class="certificate-qr-img" width="120" height="120" />
+                    <p class="certificate-qr-caption">
+                        {{ qrIsVerification ? 'Scan to verify authenticity' : 'Draft — scan for verification info' }}
+                    </p>
+                </div>
+
+                <div class="footer-standard">
+                    <div class="footer-text-standard">Not valid without official seal</div>
+                </div>
+            </div>
         </div>
     </div>
 </template>
@@ -310,7 +376,7 @@ onMounted(() => {
     width: 8.5in;
     min-height: 11in;
     margin: 0 auto;
-    padding: 0.6in 0.9in;
+    padding: 0.5in 0.9in 0.6in 0.9in;
     background: #ffffff;
     font-family: 'Times New Roman', serif;
     color: #000;
@@ -480,33 +546,26 @@ onMounted(() => {
     font-weight: bold;
 }
 
-.signatures-section {
+.signatures-section-standard {
     position: relative;
     z-index: 1;
     margin-top: 50px;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
 }
 
-.signatures-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 60px;
-}
-
-.signature-block {
+.signatures-rail {
     display: flex;
     flex-direction: column;
-    flex: 1;
-    max-width: 280px;
+    align-items: flex-end;
+    gap: 22px;
+    width: 100%;
 }
 
-.signature-left {
-    text-align: left;
-}
-
-.signature-right {
+.signature-block-standard {
+    display: flex;
+    flex-direction: column;
     text-align: right;
+    max-width: 320px;
 }
 
 .signature-name {
@@ -540,17 +599,34 @@ onMounted(() => {
     text-decoration: underline;
 }
 
-.footer {
-    position: relative;
-    z-index: 1;
-    margin-top: 40px;
-    padding-top: 15px;
+.certificate-qr-wrap {
+    text-align: right;
 }
 
-.footer-text {
+.certificate-qr-img {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.certificate-qr-caption {
+    margin: 6px 0 0;
+    font-size: 8px;
+    font-style: normal;
+    color: #333;
+    text-align: right;
+}
+
+.footer-standard {
+    width: 100%;
+    text-align: right;
+    padding-top: 4px;
+}
+
+.footer-text-standard {
     font-size: 9px;
     font-style: italic;
     color: #333;
+    text-align: right;
 }
 
 /* ============================================
@@ -824,31 +900,39 @@ onMounted(() => {
     }
 
     @page {
-        size: A4 portrait;
+        size: letter portrait;
         margin: 0;
     }
 
-    body {
-        margin: 0;
-        padding: 0;
-        background: #fff;
+    .print-browser-hint {
+        display: none !important;
     }
 
     .certificate-container,
     .clearance-container {
         width: 100%;
         margin: 0;
-        padding: 0.6in 0.9in;
+        padding: 0.5in 0.82in 0.5in 0.82in;
         box-shadow: none;
         page-break-after: avoid;
+        overflow: visible !important;
     }
 
     .clearance-container {
         padding: 0;
     }
 
+    .certificate-container .header {
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+
+    .certificate-container .header-row {
+        margin-bottom: 6px;
+    }
+
     .clearance-header {
-        padding: 0.4in 0.5in 0.3in 0.5in;
+        padding: 0.35in 0.5in 0.28in 0.5in;
     }
 
     .clearance-sidebar {
@@ -862,9 +946,12 @@ onMounted(() => {
 
     .header,
     .body-content,
-    .signatures-section,
+    .signatures-section-standard,
+    .signatures-rail,
+    .certificate-qr-wrap,
     .clearance-header,
     .clearance-content-wrapper {
+        break-inside: avoid;
         page-break-inside: avoid;
     }
 }
@@ -875,6 +962,30 @@ onMounted(() => {
     .clearance-container {
         margin: 20px auto;
         box-shadow: 0 0 20px rgba(0, 0, 0, 0.12);
+    }
+
+    .print-browser-hint {
+        max-width: 8.5in;
+        margin: 12px auto 0;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid #fcd34d;
+        background: #fffbeb;
+        font-size: 12px;
+        line-height: 1.45;
+        color: #78350f;
+    }
+}
+</style>
+
+<style>
+/* Must be unscoped: affects root document when printing */
+@media print {
+    html,
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
     }
 }
 </style>

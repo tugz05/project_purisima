@@ -105,7 +105,7 @@ const getFullName = (resident: Resident): string => {
 
 const getAddress = (resident: Resident): string => {
     const parts = [];
-    if (resident.purok) parts.push(`Purok ${resident.purok}`);
+    if (resident.purok) parts.push(resident.purok);
     if (resident.barangay) parts.push(resident.barangay);
     if (resident.municipality) parts.push(resident.municipality);
     if (resident.province) parts.push(resident.province);
@@ -228,7 +228,7 @@ const closeProfileModal = () => {
                                         <SelectContent>
                                             <SelectItem value="all">All Puroks</SelectItem>
                                             <SelectItem v-for="purok in puroks" :key="purok" :value="purok">
-                                                Purok {{ purok }}
+                                                {{ purok }}
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>

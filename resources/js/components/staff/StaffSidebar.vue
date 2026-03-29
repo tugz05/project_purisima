@@ -6,7 +6,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, Sid
 import { type AppPageProps, type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
-import { LayoutGrid, FileText, Users, Settings, FileType, UserCheck, Megaphone, CreditCard, AlertTriangle } from 'lucide-vue-next';
+import { LayoutGrid, FileText, FileCheck, Users, Settings, FileType, UserCheck, Megaphone, CreditCard, AlertTriangle } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
 import staff from '@/routes/staff';
 
@@ -26,6 +26,11 @@ const mainNavItems = computed((): NavItem[] => {
             href: '/staff/transactions',
             icon: FileText,
             badge: pendingTx > 0 ? pendingTx : undefined,
+        },
+        {
+            title: 'Walk-in certificate',
+            href: staff.certificates.manual.url(),
+            icon: FileCheck,
         },
         {
             title: 'Payments',

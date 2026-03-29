@@ -17,7 +17,7 @@ it('passes profile draft from stored resident fields', function () {
         'sex' => 'female',
         'civil_status' => 'single',
         'occupation' => 'Teacher',
-        'purok' => 'Purok 2',
+        'purok' => 'Purok Calamansi',
     ]);
 
     $this->actingAs($user)
@@ -32,7 +32,7 @@ it('passes profile draft from stored resident fields', function () {
             ->where('profileDraft.sex', 'female')
             ->where('profileDraft.civil_status', 'single')
             ->where('profileDraft.occupation', 'Teacher')
-            ->where('profileDraft.purok', 'Purok 2'));
+            ->where('profileDraft.purok', 'Purok Calamansi'));
 });
 
 it('derives profile draft name parts from stored name when split fields are empty', function () {

@@ -30,6 +30,7 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
             'role' => 'resident',
+            'registration_geo_verified_at' => now(),
         ];
     }
 

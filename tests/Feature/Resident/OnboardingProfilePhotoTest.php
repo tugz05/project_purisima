@@ -19,7 +19,7 @@ it('requires a profile photo when the resident has no existing photo_url', funct
         ->post('/resident/onboarding', [
             'first_name' => 'Juan',
             'last_name' => 'Dela Cruz',
-            'purok' => 'Purok 1',
+            'purok' => 'Purok Calamansi',
         ])
         ->assertSessionHasErrors('photo');
 });
@@ -35,7 +35,7 @@ it('allows onboarding without upload when the resident already has a photo_url',
         ->post('/resident/onboarding', [
             'first_name' => 'Juan',
             'last_name' => 'Dela Cruz',
-            'purok' => 'Purok 1',
+            'purok' => 'Purok Calamansi',
         ])
         ->assertRedirect(route('resident.dashboard', absolute: false));
 
@@ -57,7 +57,7 @@ it('allows onboarding with a new photo when none existed', function () {
         ->post('/resident/onboarding', [
             'first_name' => 'Juan',
             'last_name' => 'Dela Cruz',
-            'purok' => 'Purok 1',
+            'purok' => 'Purok Calamansi',
             'photo' => $file,
         ])
         ->assertRedirect(route('resident.dashboard', absolute: false));

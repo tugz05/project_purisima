@@ -4,15 +4,17 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StaffTransactionUpdateRequest;
-use App\Models\Transaction;
 use App\Models\CertificateTemplate;
-use App\Services\TransactionService;
-use App\Services\CertificateTemplateService;
-use App\Services\NotificationService;
+use App\Models\Transaction;
 use App\Services\AIDocumentGeneratorService;
+use App\Services\CertificateTemplateService;
+use App\Services\CertificateVerificationService;
+use App\Services\ManualCertificateWizardService;
+use App\Services\NotificationService;
+use App\Services\TransactionService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -26,7 +28,9 @@ class TransactionController extends Controller
         private TransactionService $transactionService,
         private NotificationService $notificationService,
         private CertificateTemplateService $templateService,
-        private AIDocumentGeneratorService $aiService
+        private AIDocumentGeneratorService $aiService,
+        private ManualCertificateWizardService $manualCertificateWizardService,
+        private CertificateVerificationService $certificateVerificationService
     ) {}
 
     public function index(Request $request): Response
@@ -129,7 +133,7 @@ class TransactionController extends Controller
 
             return redirect()->back()
                 ->withInput()
-                ->withErrors(['error' => 'Failed to update transaction: ' . $e->getMessage()]);
+                ->withErrors(['error' => 'Failed to update transaction: '.$e->getMessage()]);
         }
     }
 
@@ -161,44 +165,14 @@ class TransactionController extends Controller
                 : null;
         }
 
-        if (!$template) {
+        if (! $template) {
             return response()->json([
-                'error' => 'No template found for this document type'
+                'error' => 'No template found for this document type',
             ], 404);
         }
 
-        // Get resident data
-        $resident = $transaction->resident;
-        $nameParts = explode(' ', $resident->name ?? '');
-        $firstName = $nameParts[0] ?? '';
-        $lastName = end($nameParts) ?? '';
-
-        $residentData = [
-            'name' => $resident->name ?? '',
-            'first_name' => $resident->first_name ?? $firstName,
-            'middle_name' => $resident->middle_name ?? '',
-            'last_name' => $resident->last_name ?? $lastName,
-            'email' => $resident->email ?? '',
-            'phone' => $resident->phone ?? '',
-            'address' => $resident->address ?? '',
-            'purok' => $resident->purok ?? '',
-            'barangay' => $resident->barangay ?? 'Barangay Purisima',
-            'municipality' => $resident->municipality ?? 'Tago',
-            'province' => $resident->province ?? 'Surigao del Sur',
-            'date' => now()->format('F d, Y'),
-            'date_issued' => now()->format('F d, Y'),
-            'time' => now()->format('h:i A'),
-            'year' => now()->year,
-            'month' => now()->format('F'),
-            'day' => now()->day,
-            'punong_barangay' => 'EMMANUEL P. ISIANG',
-            'officer_of_day' => 'Officer of the Day',
-        ];
-
-        // Merge with resident input data if available
-        if ($transaction->resident_input_data && is_array($transaction->resident_input_data)) {
-            $residentData = array_merge($residentData, $transaction->resident_input_data);
-        }
+        $transaction->loadMissing('resident');
+        $residentData = $transaction->resolveCertificateResidentData();
 
         // Process template
         $processedContent = $this->templateService->processTemplate($template, $residentData);
@@ -219,9 +193,9 @@ class TransactionController extends Controller
             $transaction->refresh();
             $transaction->load(['resident', 'documentType']);
 
-            if (!$transaction->documentType) {
+            if (! $transaction->documentType) {
                 return response()->json([
-                    'error' => 'Document type not found for this transaction.'
+                    'error' => 'Document type not found for this transaction.',
                 ], 404);
             }
 
@@ -237,12 +211,12 @@ class TransactionController extends Controller
             Log::error('AI Generation Failed', [
                 'transaction_id' => $transaction->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
-                'error' => 'AI generation failed: ' . $e->getMessage(),
-                'details' => config('app.debug') ? $e->getTraceAsString() : null
+                'error' => 'AI generation failed: '.$e->getMessage(),
+                'details' => config('app.debug') ? $e->getTraceAsString() : null,
             ], 500);
         }
     }
@@ -256,7 +230,7 @@ class TransactionController extends Controller
         $transaction->refresh();
         $transaction->load(['resident', 'documentType', 'staff']);
 
-        if (!$transaction->documentType) {
+        if (! $transaction->documentType) {
             abort(404, 'Document type not found for this transaction.');
         }
 
@@ -273,14 +247,22 @@ class TransactionController extends Controller
         $currentDateFormatted = now()->format('jS \d\a\y \o\f F, Y');
         $officerOfTheDay = $transaction->officer_of_the_day;
 
+        $printLayout = $this->manualCertificateWizardService->resolvePrintLayout($transaction->documentType);
+
+        $token = $this->certificateVerificationService->ensureVerificationToken($transaction);
+        $verificationUrl = url(route('certificate.verify', ['token' => $token], false));
+
         return Inertia::render('Staff/transactions/PrintCertificate', [
             'transaction' => $transaction,
             'resident' => $resident,
             'documentTypeName' => $documentTypeName,
+            'printLayout' => $printLayout,
             'content' => $content,
             'currentDate' => $currentDate,
             'currentDateFormatted' => $currentDateFormatted,
             'officerOfTheDay' => $officerOfTheDay ?? null,
+            'verificationUrl' => $verificationUrl,
+            'previewQrUrl' => null,
         ]);
     }
 
@@ -290,14 +272,14 @@ class TransactionController extends Controller
     private function createTransactionNotification(Transaction $transaction, string $status): void
     {
         // Ensure relationships are loaded
-        if (!$transaction->relationLoaded('documentType')) {
+        if (! $transaction->relationLoaded('documentType')) {
             $transaction->load('documentType');
         }
-        if (!$transaction->relationLoaded('resident')) {
+        if (! $transaction->relationLoaded('resident')) {
             $transaction->load('resident');
         }
 
-        $notificationType = match($status) {
+        $notificationType = match ($status) {
             'in_progress' => 'transaction_updated',
             'completed' => 'transaction_completed',
             'cancelled' => 'transaction_cancelled',
@@ -305,7 +287,7 @@ class TransactionController extends Controller
             default => 'transaction_updated',
         };
 
-        $priority = match($status) {
+        $priority = match ($status) {
             'completed' => 'normal',
             'cancelled', 'rejected' => 'high',
             default => 'normal',
@@ -313,7 +295,8 @@ class TransactionController extends Controller
 
         // Get safe values with null checks
         $documentTypeName = $transaction->documentType?->name ?? 'Unknown Document Type';
-        $residentName = $transaction->resident?->name ?? 'Unknown Resident';
+        $residentName = $transaction->resident?->name
+            ?? data_get($transaction->resident_input_data, '__manual_requestor.full_name', 'Walk-in requestor');
 
         // Notify all staff members about the transaction update
         $this->notificationService->createNotificationForAllStaff(

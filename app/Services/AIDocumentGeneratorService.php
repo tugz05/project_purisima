@@ -25,15 +25,22 @@ class AIDocumentGeneratorService
      */
     /**
      * @param  array<int, array{key: string, label: string, type: string, required: bool, placeholder: ?string, options: array<int, string>}>  $inputFieldDefinitions
+     * @param  string|null  $referenceBodyHtml  Optional editor/starter HTML; same use as walk-in manual certificate flow.
      */
-    public function generateDocumentContent(array $documentType, array $residentData, array $requestData = [], array $requiredDocuments = [], array $inputFieldDefinitions = []): string
-    {
+    public function generateDocumentContent(
+        array $documentType,
+        array $residentData,
+        array $requestData = [],
+        array $requiredDocuments = [],
+        array $inputFieldDefinitions = [],
+        ?string $referenceBodyHtml = null,
+    ): string {
         // Validate API key
         if (empty($this->apiKey)) {
             throw new \Exception('OpenAI API key is not configured. Please set OPENAI_API_KEY in your .env file.');
         }
 
-        $prompt = $this->buildPrompt($documentType, $residentData, $requestData, $requiredDocuments, $inputFieldDefinitions);
+        $prompt = $this->buildPrompt($documentType, $residentData, $requestData, $requiredDocuments, $inputFieldDefinitions, $referenceBodyHtml);
 
         Log::info('Generating content with OpenAI AI', [
             'document_type' => $documentType['name'] ?? 'Unknown',
@@ -111,8 +118,14 @@ class AIDocumentGeneratorService
     /**
      * @param  array<int, array{key: string, label: string, type: string, required: bool, placeholder: ?string, options: array<int, string>}>  $inputFieldDefinitions
      */
-    private function buildPrompt(array $documentType, array $residentData, array $requestData = [], array $requiredDocuments = [], array $inputFieldDefinitions = []): string
-    {
+    private function buildPrompt(
+        array $documentType,
+        array $residentData,
+        array $requestData = [],
+        array $requiredDocuments = [],
+        array $inputFieldDefinitions = [],
+        ?string $referenceBodyHtml = null,
+    ): string {
         $documentName = $documentType['name'];
         $description = $documentType['description'] ?? '';
         $currentDate = now()->format('F d, Y');
@@ -147,12 +160,60 @@ class AIDocumentGeneratorService
         $definedKeys = [];
         if ($inputFieldDefinitions !== []) {
             $definedKeys = array_flip(array_column($inputFieldDefinitions, 'key'));
-            $prompt .= "\nRESIDENT-PROVIDED REQUEST FIELDS (MANDATORY: incorporate every non-empty value below into the certificate body using formal Philippine government language; treat labels as the official meaning of each fact—do not output raw field keys):\n";
-            foreach ($inputFieldDefinitions as $def) {
-                $k = $def['key'];
-                $value = $requestData[$k] ?? '';
-                if ($value !== null && $value !== '' && (! is_string($value) || trim($value) !== '')) {
-                    $prompt .= '- '.$def['label'].': '.$value."\n";
+
+            $requiredDefs = array_values(array_filter(
+                $inputFieldDefinitions,
+                fn (array $d): bool => ($d['required'] ?? false) === true
+            ));
+            $optionalDefs = array_values(array_filter(
+                $inputFieldDefinitions,
+                fn (array $d): bool => ($d['required'] ?? false) !== true
+            ));
+
+            $hasNonEmpty = static function (mixed $value): bool {
+                if ($value === null) {
+                    return false;
+                }
+                if (is_string($value)) {
+                    return trim($value) !== '';
+                }
+
+                return true;
+            };
+
+            if ($requiredDefs !== []) {
+                $prompt .= "\nREQUIRED DYNAMIC FIELDS (FROM THE OFFICIAL FORM — TREAT AS A CHECKLIST):\n";
+                $prompt .= "- Each bullet below is a field the barangay marks as required for this document type.\n";
+                $prompt .= "- For every line that shows an actual value (not \"(no value submitted)\"), you MUST weave that fact into the certificate body in formal Philippine barangay language.\n";
+                $prompt .= "- Emphasize those facts in the output: wrap names, ID numbers, dates, purposes, and other substantive values in <strong>...</strong> HTML tags.\n";
+                $prompt .= "- Do not output raw field keys; use the label’s meaning in prose.\n";
+                $prompt .= "- If the value is \"(no value submitted)\", do not invent that detail.\n\n";
+                foreach ($requiredDefs as $def) {
+                    $k = $def['key'];
+                    $raw = $requestData[$k] ?? '';
+                    $valueText = $hasNonEmpty($raw)
+                        ? (is_string($raw) ? trim($raw) : (string) $raw)
+                        : '(no value submitted)';
+                    $type = $def['type'] ?? 'text';
+                    $typeNote = $type !== '' && $type !== 'text' ? " [input type: {$type}]" : '';
+                    $prompt .= '- '.$def['label'].$typeNote.': '.$valueText."\n";
+                }
+            }
+
+            if ($optionalDefs !== []) {
+                $optionalLines = [];
+                foreach ($optionalDefs as $def) {
+                    $k = $def['key'];
+                    $raw = $requestData[$k] ?? '';
+                    if (! $hasNonEmpty($raw)) {
+                        continue;
+                    }
+                    $valueText = is_string($raw) ? trim($raw) : (string) $raw;
+                    $optionalLines[] = '- '.$def['label'].': '.$valueText;
+                }
+                if ($optionalLines !== []) {
+                    $prompt .= "\nOPTIONAL DYNAMIC FIELDS (VALUES PROVIDED — INCORPORATE NATURALLY WHERE RELEVANT):\n";
+                    $prompt .= implode("\n", $optionalLines)."\n";
                 }
             }
         }
@@ -187,6 +248,18 @@ class AIDocumentGeneratorService
             }
         }
 
+        if ($referenceBodyHtml !== null && trim(strip_tags($referenceBodyHtml)) !== '') {
+            $prompt .= "\nOPTIONAL REFERENCE (starter or editor draft — align wording and facts when sensible, but follow the 3-paragraph structure below):\n";
+            $prompt .= strip_tags($referenceBodyHtml, '<p><br><strong><b><em><i><u><ul><ol><li>');
+        }
+
+        $requiredDynamicLabels = [];
+        foreach ($inputFieldDefinitions as $def) {
+            if (($def['required'] ?? false) === true) {
+                $requiredDynamicLabels[] = $def['label'];
+            }
+        }
+
         $day = now()->format('jS');
         $month = now()->format('F');
         $year = now()->format('Y');
@@ -196,8 +269,11 @@ class AIDocumentGeneratorService
 
         $prompt .= "PARAGRAPH 1: Start with 'THIS IS TO CERTIFY that' followed by the certification statement. ";
         $prompt .= "Include the resident's name: ".($residentData['name'] ?? 'N/A').'. ';
+        if ($requiredDynamicLabels !== []) {
+            $prompt .= 'You MUST reflect each REQUIRED DYNAMIC FIELD from the checklist above that has a real value (not "no value submitted"), using formal language and <strong> for the factual values. Required field labels for this document type: '.implode('; ', $requiredDynamicLabels).'. ';
+        }
         if (! empty($requestData) || $inputFieldDefinitions !== []) {
-            $prompt .= 'Include relevant details from the labeled request fields and any additional request data when applicable. ';
+            $prompt .= 'Also incorporate any other submitted request data and optional fields where appropriate. ';
         }
         $prompt .= 'Include address: ';
         if (! empty($purok)) {
@@ -228,7 +304,7 @@ class AIDocumentGeneratorService
 
         $prompt .= "OUTPUT FORMAT:\n";
         $prompt .= "- Use HTML paragraph tags (<p>) for each paragraph\n";
-        $prompt .= "- Use <strong> tags for names, dates, addresses, and important details\n";
+        $prompt .= "- Use <strong> tags for names, dates, addresses, and important details — including every substantive value from REQUIRED DYNAMIC FIELDS that was provided\n";
         $prompt .= "- Do NOT include headers, titles, signatures, or any structural elements\n";
         $prompt .= "- Do NOT include HTML head, body, style, or document structure tags\n";
         $prompt .= "- Generate EXACTLY 3 paragraphs only\n";
@@ -263,30 +339,13 @@ class AIDocumentGeneratorService
             'description' => $transaction->documentType->description,
         ];
 
-        // Get resident data
-        $resident = $transaction->resident;
-        $nameParts = explode(' ', $resident->name ?? '');
-        $firstName = $nameParts[0] ?? '';
-        $lastName = end($nameParts) ?? '';
+        $residentData = $transaction->resolveCertificateResidentData();
+        $residentData['punong_barangay'] = $residentData['punong_barangay'] ?? 'EMMANUEL P. ISIANG';
+        $residentData['officer_of_the_day'] = $transaction->officer_of_the_day ?? null;
 
-        $residentData = [
-            'name' => $resident->name ?? '',
-            'first_name' => $resident->first_name ?? $firstName,
-            'middle_name' => $resident->middle_name ?? '',
-            'last_name' => $resident->last_name ?? $lastName,
-            'email' => $resident->email ?? '',
-            'phone' => $resident->phone ?? '',
-            'address' => $resident->address ?? '',
-            'purok' => $resident->purok ?? '',
-            'barangay' => $resident->barangay ?? 'Barangay Purisima',
-            'municipality' => $resident->municipality ?? 'Tago',
-            'province' => $resident->province ?? 'Surigao del Sur',
-            'punong_barangay' => 'EMMANUEL P. ISIANG',
-            'officer_of_the_day' => $transaction->officer_of_the_day ?? null,
-        ];
-
-        // Get required fields data
+        // Get required fields data (exclude manual requestor blob; details are in residentData)
         $requestData = $transaction->resident_input_data ?? [];
+        unset($requestData['__manual_requestor']);
 
         // Include officer of the day in request data if it exists
         if (! empty($transaction->officer_of_the_day)) {
@@ -327,6 +386,12 @@ class AIDocumentGeneratorService
         // Remove any remaining structural divs that might contain headers
         $content = preg_replace('/<div[^>]*>[\s]*Republic of the Philippines.*?<\/div>/is', '', $content);
         $content = preg_replace('/<div[^>]*>[\s]*BARANGAY PURISIMA.*?<\/div>/is', '', $content);
+
+        $content = preg_replace(
+            '/<p[^>]*>\s*(?:<[^>]+>\s*)*TO\s+WHOM\s+IT\s+MAY\s+CONCERN:?\s*(?:<\/[^>]+>\s*)*<\/p>/i',
+            '',
+            $content
+        ) ?? $content;
 
         // Trim whitespace
         $content = trim($content);

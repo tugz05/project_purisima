@@ -32,6 +32,13 @@ export function useBreadcrumbs() {
         ])
     );
 
+    const staffManualCertificateBreadcrumbs = computed(() =>
+        createBreadcrumbs([
+            { title: 'Dashboard', href: DASHBOARD_URL },
+            { title: 'Walk-in certificate', href: staff.certificates.manual.url() },
+        ])
+    );
+
     const staffTransactionShowBreadcrumbs = computed(() => (transactionId: string) =>
         createBreadcrumbs([
             { title: 'Dashboard', href: DASHBOARD_URL },
@@ -168,6 +175,7 @@ export function useBreadcrumbs() {
         // Staff
         staffDashboardBreadcrumbs,
         staffTransactionsBreadcrumbs,
+        staffManualCertificateBreadcrumbs,
         staffTransactionShowBreadcrumbs,
         staffDocumentTypesBreadcrumbs,
         staffBarangayOfficialsBreadcrumbs,

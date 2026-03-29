@@ -28,6 +28,7 @@ export type AppPageProps<T extends Record<string, unknown> = Record<string, unkn
     flash?: {
         success?: string | null;
         error?: string | null;
+        open_certificate_sheet?: boolean | null;
     };
 };
 

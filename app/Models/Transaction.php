@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Arr;
 
 class Transaction extends Model
 {
@@ -97,11 +98,11 @@ class Transaction extends Model
         if ($this->document_type_id) {
             return $this->documentType;
         }
-        
+
         if ($this->type) {
             return DocumentType::where('code', $this->type)->first();
         }
-        
+
         return null;
     }
 
@@ -153,7 +154,7 @@ class Transaction extends Model
      */
     public function getFormattedPaymentAmountAttribute(): string
     {
-        return '₱' . number_format((float) $this->amount_paid, 2);
+        return '₱'.number_format((float) $this->amount_paid, 2);
     }
 
     /**
@@ -171,17 +172,87 @@ class Transaction extends Model
         };
     }
 
+    /**
+     * Flat resident / requestor data for certificates, templates, and AI (account or walk-in manual).
+     *
+     * @return array<string, mixed>
+     */
+    public function resolveCertificateResidentData(): array
+    {
+        $input = is_array($this->resident_input_data) ? $this->resident_input_data : [];
+        $manual = is_array($input['__manual_requestor'] ?? null) ? $input['__manual_requestor'] : [];
+
+        $resident = $this->relationLoaded('resident') ? $this->resident : $this->resident()->first();
+
+        if ($resident !== null) {
+            $nameParts = preg_split('/\s+/', trim((string) ($resident->name ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $firstName = $nameParts[0] ?? '';
+            $lastName = count($nameParts) > 1 ? $nameParts[array_key_last($nameParts)] : '';
+
+            $data = [
+                'name' => $resident->name ?? '',
+                'first_name' => $resident->first_name ?? $firstName,
+                'middle_name' => $resident->middle_name ?? '',
+                'last_name' => $resident->last_name ?? $lastName,
+                'email' => $resident->email ?? '',
+                'phone' => $resident->phone ?? '',
+                'address' => $resident->address ?? '',
+                'purok' => $resident->purok ?? '',
+                'barangay' => $resident->barangay ?? 'Barangay Purisima',
+                'municipality' => $resident->municipality ?? 'Tago',
+                'province' => $resident->province ?? 'Surigao del Sur',
+            ];
+        } else {
+            $fullName = trim((string) ($manual['full_name'] ?? ''));
+            $nameParts = preg_split('/\s+/', $fullName, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $firstName = $nameParts[0] ?? '';
+            $lastName = count($nameParts) > 1 ? $nameParts[array_key_last($nameParts)] : '';
+
+            $data = [
+                'name' => $fullName,
+                'first_name' => $firstName,
+                'middle_name' => '',
+                'last_name' => $lastName,
+                'email' => (string) ($manual['email'] ?? ''),
+                'phone' => (string) ($manual['phone'] ?? ''),
+                'address' => (string) ($manual['address'] ?? ''),
+                'purok' => (string) ($manual['purok'] ?? ''),
+                'barangay' => 'Barangay Purisima',
+                'municipality' => 'Tago',
+                'province' => 'Surigao del Sur',
+            ];
+        }
+
+        $data['date'] = now()->format('F d, Y');
+        $data['date_issued'] = now()->format('F d, Y');
+        $data['time'] = now()->format('h:i A');
+        $data['year'] = now()->year;
+        $data['month'] = now()->format('F');
+        $data['day'] = now()->day;
+        $data['punong_barangay'] = 'EMMANUEL P. ISIANG';
+        $data['officer_of_day'] = 'Officer of the Day';
+
+        $extras = [];
+        foreach (Arr::except($input, ['__manual_requestor']) as $key => $value) {
+            if (is_scalar($value) || $value === null) {
+                $extras[$key] = $value;
+            }
+        }
+
+        return array_merge($data, $extras);
+    }
+
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($transaction) {
             if (empty($transaction->transaction_id)) {
-                $transaction->transaction_id = 'TXN-' . strtoupper(uniqid());
+                $transaction->transaction_id = 'TXN-'.strtoupper(uniqid());
             }
-            
+
             // Auto-populate document_type_id from type code if not set
-            if (empty($transaction->document_type_id) && !empty($transaction->type)) {
+            if (empty($transaction->document_type_id) && ! empty($transaction->type)) {
                 $documentType = DocumentType::where('code', $transaction->type)->first();
                 if ($documentType) {
                     $transaction->document_type_id = $documentType->id;
@@ -191,7 +262,7 @@ class Transaction extends Model
 
         static::updating(function ($transaction) {
             // Auto-populate document_type_id from type code if not set
-            if (empty($transaction->document_type_id) && !empty($transaction->type)) {
+            if (empty($transaction->document_type_id) && ! empty($transaction->type)) {
                 $documentType = DocumentType::where('code', $transaction->type)->first();
                 if ($documentType) {
                     $transaction->document_type_id = $documentType->id;

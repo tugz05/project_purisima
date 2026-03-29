@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +44,7 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import RichTextEditor from '@/components/RichTextEditor.vue';
 import StaffLayout from '@/layouts/staff/Layout.vue';
+import type { AppPageProps } from '@/types';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { useUtils } from '@/composables/useUtils';
 import { Link } from '@inertiajs/vue3';
@@ -91,7 +92,7 @@ interface Transaction {
         generated_at?: string;
         generated_by?: number;
     };
-    resident_input_data?: Record<string, string>;
+    resident_input_data?: Record<string, unknown>;
     document_type?: {
         id: number;
         name: string;
@@ -112,7 +113,7 @@ interface Transaction {
         phone: string;
         address?: string;
         purok?: string;
-    };
+    } | null;
     staff: {
         id: number;
         name: string;
@@ -136,6 +137,16 @@ interface Props {
 
 const props = defineProps<Props>();
 
+const page = usePage<AppPageProps>();
+
+const manualRequestor = computed((): Record<string, string> | null => {
+    const raw = props.transaction.resident_input_data?.__manual_requestor;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        return raw as Record<string, string>;
+    }
+    return null;
+});
+
 const requestFieldTypeLabel = (type?: string): string => {
     const map: Record<string, string> = {
         text: 'Short text',
@@ -151,7 +162,9 @@ const requestFieldTypeLabel = (type?: string): string => {
 /** All configured request fields for this document type, with resident answers (or empty). */
 const staffRequestFieldRows = computed(() => {
     const defs = props.transaction.document_type?.input_fields ?? [];
-    const answers = props.transaction.resident_input_data ?? {};
+    const rawAnswers = props.transaction.resident_input_data ?? {};
+    const answers: Record<string, unknown> = { ...rawAnswers };
+    delete answers.__manual_requestor;
     if (defs.length > 0) {
         return defs.map((d) => {
             const raw = answers[d.key];
@@ -166,13 +179,15 @@ const staffRequestFieldRows = computed(() => {
             };
         });
     }
-    return Object.entries(answers).map(([key, val]) => ({
-        key,
-        label: key.replace(/_/g, ' '),
-        required: false,
-        typeLabel: 'Text',
-        value: val === null || val === undefined ? '' : String(val),
-    }));
+    return Object.entries(answers)
+        .filter(([, val]) => val === null || val === undefined || typeof val !== 'object')
+        .map(([key, val]) => ({
+            key,
+            label: key.replace(/_/g, ' '),
+            required: false,
+            typeLabel: 'Text',
+            value: val === null || val === undefined ? '' : String(val),
+        }));
 });
 
 // Composables
@@ -218,6 +233,7 @@ const openCertificateSheet = () => {
     certificateSheetOpen.value = true;
 };
 const isGeneratingAI = ref(false);
+const isLoadingCertificateTemplate = ref(false);
 
 // Zoom and pan state
 const zoomLevel = ref(100);
@@ -228,27 +244,37 @@ const isFullscreen = ref(false);
 const imageRef = ref<HTMLImageElement | null>(null);
 
 // Methods
-const loadTemplateContent = async () => {
+/** Loads the default (or selected) certificate template into the certificate editor. Works for linked residents and walk-in manual requests. */
+const loadCertificateTemplate = async () => {
+    isLoadingCertificateTemplate.value = true;
     try {
         const response = await fetch(`/staff/transactions/${props.transaction.id}/load-template`, {
             method: 'POST',
             headers: {
+                Accept: 'application/json',
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-Requested-With': 'XMLHttpRequest',
             },
         });
 
         if (response.ok) {
             const data = await response.json();
-            form.document_content = data.content;
-            toast.success(`Template "${data.template_name}" loaded successfully`);
+            if (data.content) {
+                certificateForm.document_content = data.content;
+                toast.success(`Template "${data.template_name}" loaded into the editor`);
+            } else {
+                toast.error('Template returned no content');
+            }
         } else {
-            const error = await response.json();
-            toast.error(error.error || 'Failed to load template');
+            const error = await response.json().catch(() => ({}));
+            toast.error((error as { error?: string }).error || 'Failed to load template');
         }
     } catch (error) {
         console.error('Error loading template:', error);
         toast.error('Failed to load template');
+    } finally {
+        isLoadingCertificateTemplate.value = false;
     }
 };
 
@@ -594,6 +620,17 @@ const printCertificate = () => {
 // Keyboard event listener setup
 onMounted(() => {
     document.addEventListener('keydown', handleKeydown);
+
+    const openSheet = page.props.flash?.open_certificate_sheet;
+    if (
+        openSheet &&
+        (props.transaction.status === 'in_progress' || props.transaction.status === 'completed')
+    ) {
+        openCertificateSheet();
+        toast.info('Next: load the default template and/or generate with AI, then save and print.', {
+            duration: 8000,
+        });
+    }
 });
 
 onUnmounted(() => {
@@ -606,10 +643,10 @@ onUnmounted(() => {
 
     <StaffLayout :breadcrumbs="breadcrumbs">
         <div class="bg-gradient-to-br from-gray-50 to-blue-50/30 min-h-full w-full">
-            <div class="mx-auto w-full px-2 sm:px-4 lg:px-6 py-2 md:py-4 max-w-full">
+            <div class="mx-auto w-full max-w-full px-4 py-4 sm:px-6 lg:px-8 md:py-6">
                 <!-- Header Section -->
-                <div class="mb-3 md:mb-4">
-                    <div class="flex items-center gap-2 mb-2">
+                <div class="mb-4 space-y-3">
+                    <div class="flex items-center gap-2">
                         <Link href="/staff/transactions">
                             <Button variant="outline" size="sm" class="flex items-center gap-2">
                                 <ArrowLeft class="h-4 w-4" />
@@ -628,8 +665,8 @@ onUnmounted(() => {
                 <!-- Quick Actions Bar -->
                 <div class="mb-4">
                     <Card class="shadow-lg border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                        <CardContent class="p-4">
-                            <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                        <CardContent class="p-4 sm:p-5">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="flex items-center gap-3">
                                     <Badge :class="getStatusColor(props.transaction.status)" class="px-3 py-1 text-sm font-bold">
                                         {{ props.transaction.status.replace('_', ' ').toUpperCase() }}
@@ -867,19 +904,19 @@ onUnmounted(() => {
                             </CardContent>
                         </Card>
 
-                        <!-- Resident Information -->
+                        <!-- Resident / requestor information -->
                         <Card class="shadow-lg border-gray-200">
                             <CardHeader class="pb-3">
                                 <CardTitle class="flex items-center gap-2 text-lg">
                                     <User class="h-4 w-4" />
-                                    Resident Information
+                                    {{ props.transaction.resident ? 'Resident information' : 'Requestor (walk-in)' }}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent class="space-y-3">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div v-if="props.transaction.resident" class="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div>
                                         <Label class="text-sm font-medium text-gray-700">Name</Label>
-                                        <p class="text-sm text-gray-900 font-medium">{{ props.transaction.resident.name }}</p>
+                                        <p class="text-sm font-medium text-gray-900">{{ props.transaction.resident.name }}</p>
                                     </div>
                                     <div>
                                         <Label class="text-sm font-medium text-gray-700">Email</Label>
@@ -890,6 +927,29 @@ onUnmounted(() => {
                                         <p class="text-sm text-gray-900">{{ props.transaction.resident.phone }}</p>
                                     </div>
                                 </div>
+                                <div v-else-if="manualRequestor" class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div>
+                                        <Label class="text-sm font-medium text-gray-700">Full name</Label>
+                                        <p class="text-sm font-medium text-gray-900">{{ manualRequestor.full_name || '—' }}</p>
+                                    </div>
+                                    <div v-if="manualRequestor.email">
+                                        <Label class="text-sm font-medium text-gray-700">Email</Label>
+                                        <p class="text-sm text-gray-900">{{ manualRequestor.email }}</p>
+                                    </div>
+                                    <div v-if="manualRequestor.phone">
+                                        <Label class="text-sm font-medium text-gray-700">Phone</Label>
+                                        <p class="text-sm text-gray-900">{{ manualRequestor.phone }}</p>
+                                    </div>
+                                    <div v-if="manualRequestor.purok">
+                                        <Label class="text-sm font-medium text-gray-700">Purok</Label>
+                                        <p class="text-sm text-gray-900">{{ manualRequestor.purok }}</p>
+                                    </div>
+                                    <div v-if="manualRequestor.address" class="md:col-span-2">
+                                        <Label class="text-sm font-medium text-gray-700">Address</Label>
+                                        <p class="text-sm text-gray-900">{{ manualRequestor.address }}</p>
+                                    </div>
+                                </div>
+                                <p v-else class="text-sm text-gray-500 italic">No linked account or walk-in details on file.</p>
                             </CardContent>
                         </Card>
                     </div>
@@ -1194,26 +1254,46 @@ onUnmounted(() => {
                 <div class="flex-1 overflow-y-auto">
                     <div class="p-6 space-y-6">
                         <!-- Quick Actions Bar -->
-                        <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
-                            <div class="flex items-center gap-2">
-                                <div class="p-1.5 bg-blue-100 rounded-lg">
-                                    <Sparkles class="h-4 w-4 text-blue-700" />
+                        <div class="flex flex-col gap-4 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:p-5">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <div class="p-1.5 bg-blue-100 rounded-lg shrink-0">
+                                        <Sparkles class="h-4 w-4 text-blue-700" />
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold text-gray-900">Certificate generation</p>
+                                        <p class="text-xs text-gray-600">
+                                            Uses this transaction’s data (including walk-in requestor details and form answers). Load a template first, or go straight to AI.
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p class="text-sm font-semibold text-gray-900">AI Generation</p>
-                                    <p class="text-xs text-gray-600">Generate certificate content using AI with all transaction data</p>
+                                <div class="flex flex-col sm:flex-row flex-wrap gap-2 shrink-0">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="default"
+                                        class="border-teal-300 text-teal-800 hover:bg-teal-50 font-medium shadow-sm"
+                                        :disabled="isLoadingCertificateTemplate || isGeneratingAI"
+                                        @click="loadCertificateTemplate"
+                                    >
+                                        <FileText class="h-4 w-4 mr-2" />
+                                        {{
+                                            isLoadingCertificateTemplate ? 'Loading template…' : 'Load default template'
+                                        }}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="default"
+                                        class="border-blue-300 text-blue-700 hover:bg-blue-100 hover:text-blue-800 font-medium shadow-sm"
+                                        :disabled="isGeneratingAI || isLoadingCertificateTemplate"
+                                        @click="generateWithAI"
+                                    >
+                                        <Sparkles class="h-4 w-4 mr-2" />
+                                        {{ isGeneratingAI ? 'Generating…' : 'Generate using AI' }}
+                                    </Button>
                                 </div>
                             </div>
-                            <Button
-                                @click="generateWithAI"
-                                variant="outline"
-                                size="default"
-                                class="border-blue-300 text-blue-700 hover:bg-blue-100 hover:text-blue-800 font-medium shadow-sm"
-                                :disabled="isGeneratingAI"
-                            >
-                                <Sparkles class="h-4 w-4 mr-2" />
-                                {{ isGeneratingAI ? 'Generating...' : 'Generate using AI' }}
-                            </Button>
                         </div>
 
                         <!-- Two Column Layout -->
@@ -1222,20 +1302,20 @@ onUnmounted(() => {
                             <div class="lg:col-span-2 space-y-4">
                                 <!-- Document Content Section -->
                                 <Card class="shadow-sm border-gray-200">
-                                    <CardHeader class="pb-3 border-b border-gray-100">
+                                    <CardHeader class="border-b border-gray-100 gap-2">
                                         <div class="flex items-center justify-between">
-                                            <div>
+                                            <div class="flex flex-col gap-1">
                                                 <CardTitle class="text-lg font-semibold text-gray-900 flex items-center gap-2">
                                                     <FileText class="h-5 w-5 text-teal-600" />
                                                     Document Content
                                                 </CardTitle>
-                                                <CardDescription class="text-sm text-gray-600 mt-1">
+                                                <CardDescription class="text-sm text-gray-600">
                                                     Compose and format your certificate or permit content
                                                 </CardDescription>
                                             </div>
                                         </div>
                                     </CardHeader>
-                                    <CardContent class="pt-6">
+                                    <CardContent>
                                         <div class="space-y-3">
                                             <div class="border-2 border-gray-200 rounded-lg overflow-hidden bg-white shadow-inner">
                                                 <RichTextEditor
@@ -1263,42 +1343,65 @@ onUnmounted(() => {
                             <div class="lg:col-span-1 space-y-4">
                                 <!-- Resident Information Card -->
                                 <Card class="shadow-sm border-gray-200 bg-gradient-to-br from-gray-50 to-white">
-                                    <CardHeader class="pb-3 border-b border-gray-100">
+                                    <CardHeader class="border-b border-gray-100 gap-2">
                                         <CardTitle class="text-base font-semibold text-gray-900 flex items-center gap-2">
                                             <User class="h-4 w-4 text-blue-600" />
-                                            Resident Details
+                                            {{ props.transaction.resident ? 'Resident details' : 'Requestor (walk-in)' }}
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent class="pt-4 space-y-4">
-                                        <div class="space-y-3">
-                                            <div>
-                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Full Name</Label>
-                                                <p class="text-sm font-semibold text-gray-900 mt-1">{{ props.transaction.resident?.name || 'N/A' }}</p>
+                                    <CardContent class="space-y-4">
+                                        <div v-if="props.transaction.resident" class="flex flex-col gap-3">
+                                            <div class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Full Name</Label>
+                                                <p class="text-sm font-semibold text-gray-900">{{ props.transaction.resident.name || 'N/A' }}</p>
                                             </div>
-                                            <div>
-                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Address</Label>
-                                                <p class="text-sm text-gray-700 mt-1 leading-relaxed">{{ props.transaction.resident?.address || 'N/A' }}</p>
+                                            <div class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Address</Label>
+                                                <p class="text-sm leading-relaxed text-gray-700">{{ props.transaction.resident.address || 'N/A' }}</p>
                                             </div>
-                                            <div>
-                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Purok</Label>
-                                                <p class="text-sm text-gray-700 mt-1">{{ props.transaction.resident?.purok || 'N/A' }}</p>
+                                            <div class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Purok</Label>
+                                                <p class="text-sm text-gray-700">{{ props.transaction.resident.purok || 'N/A' }}</p>
                                             </div>
-                                            <div v-if="props.transaction.resident?.email">
-                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</Label>
-                                                <p class="text-sm text-gray-700 mt-1">{{ props.transaction.resident.email }}</p>
+                                            <div v-if="props.transaction.resident.email" class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Email</Label>
+                                                <p class="text-sm text-gray-700">{{ props.transaction.resident.email }}</p>
                                             </div>
-                                            <div v-if="props.transaction.resident?.phone">
-                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</Label>
-                                                <p class="text-sm text-gray-700 mt-1">{{ props.transaction.resident.phone }}</p>
+                                            <div v-if="props.transaction.resident.phone" class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Phone</Label>
+                                                <p class="text-sm text-gray-700">{{ props.transaction.resident.phone }}</p>
                                             </div>
                                         </div>
+                                        <div v-else-if="manualRequestor" class="flex flex-col gap-3">
+                                            <div class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Full name</Label>
+                                                <p class="text-sm font-semibold text-gray-900">{{ manualRequestor.full_name || '—' }}</p>
+                                            </div>
+                                            <div v-if="manualRequestor.address" class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Address</Label>
+                                                <p class="text-sm leading-relaxed text-gray-700">{{ manualRequestor.address }}</p>
+                                            </div>
+                                            <div v-if="manualRequestor.purok" class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Purok</Label>
+                                                <p class="text-sm text-gray-700">{{ manualRequestor.purok }}</p>
+                                            </div>
+                                            <div v-if="manualRequestor.email" class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Email</Label>
+                                                <p class="text-sm text-gray-700">{{ manualRequestor.email }}</p>
+                                            </div>
+                                            <div v-if="manualRequestor.phone" class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Phone</Label>
+                                                <p class="text-sm text-gray-700">{{ manualRequestor.phone }}</p>
+                                            </div>
+                                        </div>
+                                        <p v-else class="text-sm italic text-gray-500">No requestor details.</p>
 
                                         <!-- Required request fields (same data as Documents card, compact) -->
-                                        <div v-if="staffRequestFieldRows.length > 0" class="mt-4 pt-4 border-t border-gray-200">
-                                            <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block">
+                                        <div v-if="staffRequestFieldRows.length > 0" class="flex flex-col gap-2 border-t border-gray-200 pt-4">
+                                            <Label class="block text-xs font-medium uppercase tracking-wide text-gray-500">
                                                 Required request fields
                                             </Label>
-                                            <p class="text-[11px] text-gray-400 mb-2">Configured questions and answers</p>
+                                            <p class="text-[11px] text-gray-400">Configured questions and answers</p>
                                             <div class="space-y-2">
                                                 <div
                                                     v-for="row in staffRequestFieldRows"
@@ -1325,21 +1428,21 @@ onUnmounted(() => {
 
                                 <!-- Document Type Info -->
                                 <Card class="shadow-sm border-gray-200 bg-gradient-to-br from-teal-50 to-emerald-50">
-                                    <CardHeader class="pb-3 border-b border-teal-100">
+                                    <CardHeader class="border-b border-teal-100 gap-2">
                                         <CardTitle class="text-base font-semibold text-gray-900 flex items-center gap-2">
                                             <FileText class="h-4 w-4 text-teal-700" />
                                             Document Type
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent class="pt-4">
-                                        <div class="space-y-2">
-                                            <div>
-                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Type</Label>
-                                                <p class="text-sm font-semibold text-gray-900 mt-1">{{ props.transaction.document_type?.name || 'N/A' }}</p>
+                                    <CardContent>
+                                        <div class="flex flex-col gap-3">
+                                            <div class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Type</Label>
+                                                <p class="text-sm font-semibold text-gray-900">{{ props.transaction.document_type?.name || 'N/A' }}</p>
                                             </div>
-                                            <div v-if="props.transaction.document_type?.code">
-                                                <Label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Code</Label>
-                                                <Badge variant="outline" class="mt-1 text-xs">{{ props.transaction.document_type.code }}</Badge>
+                                            <div v-if="props.transaction.document_type?.code" class="flex flex-col gap-1">
+                                                <Label class="text-xs font-medium uppercase tracking-wide text-gray-500">Code</Label>
+                                                <Badge variant="outline" class="w-fit text-xs">{{ props.transaction.document_type.code }}</Badge>
                                             </div>
                                         </div>
                                     </CardContent>
@@ -1347,8 +1450,8 @@ onUnmounted(() => {
 
                                 <!-- Officer of the Day -->
                                 <Card class="shadow-lg border-2 border-amber-300 bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-50">
-                                    <CardHeader class="pb-3 border-b-2 border-amber-200 bg-gradient-to-r from-amber-100 to-yellow-100">
-                                        <CardTitle class="text-base font-bold text-amber-900 flex items-center gap-2">
+                                    <CardHeader class="gap-2 border-b-2 border-amber-200 bg-gradient-to-r from-amber-100 to-yellow-100">
+                                        <CardTitle class="flex items-center gap-2 text-base font-bold text-amber-900">
                                             <div class="p-1.5 bg-amber-200 rounded-lg">
                                                 <User class="h-4 w-4 text-amber-800" />
                                             </div>
@@ -1358,25 +1461,28 @@ onUnmounted(() => {
                                             </Badge>
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent class="pt-4">
-                                        <div class="space-y-3">
+                                    <CardContent>
+                                        <div class="flex flex-col gap-4">
                                             <!-- Important Notice -->
-                                            <div class="bg-amber-100 border-l-4 border-amber-500 p-3 rounded-r-lg">
+                                            <div class="rounded-r-lg border-l-4 border-amber-500 bg-amber-100 p-3">
                                                 <div class="flex items-start gap-2">
-                                                    <AlertCircle class="h-4 w-4 text-amber-700 flex-shrink-0 mt-0.5" />
-                                                    <div class="flex-1">
-                                                        <p class="text-xs font-bold text-amber-900 uppercase tracking-wide">Non-Standard Field</p>
-                                                        <p class="text-xs text-amber-800 mt-1">
+                                                    <AlertCircle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                                                    <div class="flex flex-1 flex-col gap-1">
+                                                        <p class="text-xs font-bold uppercase tracking-wide text-amber-900">Non-Standard Field</p>
+                                                        <p class="text-xs text-amber-800">
                                                             This field is only used when the Punong Barangay is absent. Leave empty for standard certificates.
                                                         </p>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div>
-                                                <Label for="certificate_officer_of_the_day" class="text-sm font-bold text-amber-900 mb-2 block flex items-center gap-2">
+                                            <div class="flex flex-col gap-2">
+                                                <Label
+                                                    for="certificate_officer_of_the_day"
+                                                    class="flex flex-wrap items-center gap-2 text-sm font-bold text-amber-900"
+                                                >
                                                     <span>Officer of the Day</span>
-                                                    <Badge variant="outline" class="bg-amber-200 text-amber-900 border-amber-300 text-xs px-1.5 py-0">
+                                                    <Badge variant="outline" class="border-amber-300 bg-amber-200 px-1.5 py-0 text-xs text-amber-900">
                                                         Optional
                                                     </Badge>
                                                 </Label>
@@ -1385,21 +1491,25 @@ onUnmounted(() => {
                                                     type="text"
                                                     v-model="certificateForm.officer_of_the_day"
                                                     placeholder="e.g., CHARLITA G. MONTENEGRO, RSW"
-                                                    class="w-full border-2 border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-400 text-sm font-medium bg-white shadow-sm h-9 rounded-md px-3 py-1 outline-none transition-[color,box-shadow]"
+                                                    class="h-9 w-full rounded-md border-2 border-amber-300 bg-white px-3 py-1 text-sm font-medium shadow-sm outline-none transition-[color,box-shadow] focus:border-amber-500 focus:ring-2 focus:ring-amber-400"
                                                 />
-                                                <p class="flex items-start gap-2 text-xs text-amber-700 mt-2 font-medium">
-                                                    <AlertTriangle class="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                                                <p class="flex items-start gap-2 text-xs font-medium text-amber-700">
+                                                    <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                                                     <span>
                                                         <strong>Important:</strong> This name will appear on the printed certificate as "Officer of the Day" if provided. Leave empty if Punong Barangay will sign.
                                                     </span>
                                                 </p>
                                             </div>
-                                            <div class="pt-3 border-t-2 border-amber-200">
-                                                <Label class="text-xs font-bold text-amber-900 uppercase tracking-wide mb-2 block">Standard Signatory</Label>
-                                                <div class="bg-white rounded-lg p-2.5 border border-amber-200">
-                                                    <p class="text-sm font-bold text-gray-900">EMMANUEL P. ISIANG</p>
-                                                    <p class="text-xs text-gray-700 mt-0.5">Punong Barangay</p>
-                                                    <p class="text-xs text-gray-600 mt-0.5">President – <span class="text-red-600 underline">Liga ng mga Barangay</span></p>
+                                            <div class="flex flex-col gap-2 border-t-2 border-amber-200 pt-4">
+                                                <Label class="block text-xs font-bold uppercase tracking-wide text-amber-900">Standard Signatory</Label>
+                                                <div class="rounded-lg border border-amber-200 bg-white p-3">
+                                                    <div class="flex flex-col gap-0.5">
+                                                        <p class="text-sm font-bold text-gray-900">EMMANUEL P. ISIANG</p>
+                                                        <p class="text-xs text-gray-700">Punong Barangay</p>
+                                                        <p class="text-xs text-gray-600">
+                                                            President – <span class="text-red-600 underline">Liga ng mga Barangay</span>
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

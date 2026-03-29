@@ -58,6 +58,12 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
+Route::get('/verify/certificate/about', [\App\Http\Controllers\CertificateVerificationController::class, 'about'])
+    ->name('certificate.verify.about');
+
+Route::get('/verify/certificate/{token}', [\App\Http\Controllers\CertificateVerificationController::class, 'show'])
+    ->name('certificate.verify');
+
 // Quick route to create test users (remove after testing)
 Route::get('/create-users', function () {
     $staff = \App\Models\User::firstOrCreate(
@@ -78,10 +84,14 @@ Route::get('/create-users', function () {
         ]
     );
 
+    $resident->forceFill([
+        'registration_geo_verified_at' => now(),
+    ])->save();
+
     return response()->json([
         'staff' => $staff,
         'resident' => $resident,
-        'message' => 'Test users created! Use resident@test.com / password to test',
+        'message' => 'Test users created. Resident routes require registration geo verification; timestamp set for test resident.',
     ]);
 });
 
@@ -202,9 +212,9 @@ Route::get('dashboard', function () {
         'resident' => redirect()->route('resident.dashboard'),
         default => Inertia::render('Dashboard'),
     };
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware(['auth', 'verified', 'registration.geo'])->name('dashboard');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'registration.geo'])->group(function () {
     Route::post('uploads/pending', [\App\Http\Controllers\PendingFileUploadController::class, 'store'])->name('uploads.pending.store');
     Route::delete('uploads/pending/{pendingFileUpload}', [\App\Http\Controllers\PendingFileUploadController::class, 'destroy'])->name('uploads.pending.destroy');
 });
@@ -230,6 +240,14 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
     Route::get('dashboard', function () {
         return Inertia::render('Staff/Dashboard');
     })->name('dashboard');
+
+    // Walk-in certificate (no transaction record): dynamic fields → template / AI → print
+    Route::get('certificates/manual/schema', [\App\Http\Controllers\Staff\ManualCertificateController::class, 'schema'])->name('certificates.manual.schema');
+    Route::post('certificates/manual/load-template', [\App\Http\Controllers\Staff\ManualCertificateController::class, 'loadTemplate'])->name('certificates.manual.load-template');
+    Route::post('certificates/manual/generate-ai', [\App\Http\Controllers\Staff\ManualCertificateController::class, 'generateAi'])->name('certificates.manual.generate-ai');
+    Route::post('certificates/manual/print', [\App\Http\Controllers\Staff\ManualCertificateController::class, 'print'])->name('certificates.manual.print');
+    Route::post('certificates/manual/finalize', [\App\Http\Controllers\Staff\ManualCertificateController::class, 'finalize'])->name('certificates.manual.finalize');
+    Route::get('certificates/manual', [\App\Http\Controllers\Staff\ManualCertificateController::class, 'index'])->name('certificates.manual');
 
     // Transaction management routes
     Route::get('transactions', [\App\Http\Controllers\Staff\TransactionController::class, 'index'])->name('transactions.index');
@@ -318,7 +336,7 @@ Route::middleware(['auth', 'role:enforcer'])->prefix('enforcer')->name('enforcer
 });
 
 // Onboarding and account routes (excluded from profile completion check)
-Route::middleware(['auth', 'role:resident'])->prefix('resident')->name('resident.')->group(function () {
+Route::middleware(['auth', 'role:resident', 'registration.geo'])->prefix('resident')->name('resident.')->group(function () {
     Route::get('onboarding', [OnboardingController::class, 'show'])->name('onboarding.show');
     Route::post('onboarding', [OnboardingController::class, 'store'])->name('onboarding.store');
 
@@ -327,7 +345,7 @@ Route::middleware(['auth', 'role:resident'])->prefix('resident')->name('resident
 });
 
 // All other resident routes (require profile completion)
-Route::middleware(['auth', 'role:resident', 'profile.completed'])->prefix('resident')->name('resident.')->group(function () {
+Route::middleware(['auth', 'role:resident', 'registration.geo', 'profile.completed'])->prefix('resident')->name('resident.')->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('resident/Dashboard');
     })->name('dashboard');

@@ -3,7 +3,8 @@ import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileCo
 import { edit } from '@/routes/profile';
 import { send } from '@/routes/verification';
 import { Form, Head, Link, usePage, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { PUROK_OPTIONS } from '@/purokOptions';
 
 import DeleteUser from '@/components/DeleteUser.vue';
 import HeadingSmall from '@/components/HeadingSmall.vue';
@@ -84,6 +85,13 @@ const submitResidentForm = () => {
         onProgress: (e) => { uploadProgress.value = e?.percentage ?? null },
     });
 };
+
+const purokOptions = PUROK_OPTIONS;
+
+const hasLegacyPurok = computed(() => {
+    const p = residentForm.purok;
+    return typeof p === 'string' && p.length > 0 && !PUROK_OPTIONS.includes(p);
+});
 </script>
 
 <template>
@@ -199,13 +207,18 @@ const submitResidentForm = () => {
 
                         <div class="sm:col-span-2">
                             <Label for="purok">Purok</Label>
-                            <Input
+                            <select
                                 id="purok"
                                 v-model="residentForm.purok"
-                                class="mt-1 block w-full"
-                                placeholder="Purok"
+                                class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                                 required
-                            />
+                            >
+                                <option value="">Select Purok</option>
+                                <option v-if="hasLegacyPurok" :value="residentForm.purok">
+                                    {{ residentForm.purok }} (current — choose a new purok)
+                                </option>
+                                <option v-for="p in purokOptions" :key="p" :value="p">{{ p }}</option>
+                            </select>
                             <InputError class="mt-2" :message="residentForm.errors.purok" />
                         </div>
 
