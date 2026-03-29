@@ -77,6 +77,11 @@ const hasLegacyPurok = computed(() => {
   return typeof p === 'string' && p.length > 0 && !PUROK_OPTIONS.includes(p)
 })
 
+/** Matches server rule max:5120 (kilobytes) in ResidentProfileRequest. */
+const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024
+const MAX_PROFILE_PHOTO_LABEL = '5 MB'
+const photoTooLargeMessage = `The photo must be ${MAX_PROFILE_PHOTO_LABEL} or smaller.`
+
 const isDragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploadProgress = ref<number | null>(null)
@@ -122,12 +127,29 @@ const showProfilePreview = computed(() => activePreviewSrc.value.length > 0);
 const isPreviewFromUpload = computed(() => form.photo !== null);
 
 const onFileSelected = (file: File | null) => {
-  form.photo = file
+  form.clearErrors('photo')
   items.value = []
   uploadProgress.value = null
-  if (file) {
-    items.value.push({ name: file.name, sizeKb: Math.round(file.size / 1024), progress: 0, uploaded: false })
+
+  if (!file) {
+    form.photo = null
+    if (fileInput.value) {
+      fileInput.value.value = ''
+    }
+    return
   }
+
+  if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+    form.photo = null
+    form.setError('photo', photoTooLargeMessage)
+    if (fileInput.value) {
+      fileInput.value.value = ''
+    }
+    return
+  }
+
+  form.photo = file
+  items.value.push({ name: file.name, sizeKb: Math.round(file.size / 1024), progress: 0, uploaded: false })
 }
 
 const onInputChange = (e: Event) => {
@@ -141,7 +163,7 @@ const onDrop = (e: DragEvent) => {
   isDragging.value = false
   if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
     const f = e.dataTransfer.files[0]
-    if (f && ['image/jpeg','image/png'].includes(f.type)) {
+    if (f && ['image/jpeg', 'image/png'].includes(f.type)) {
       onFileSelected(f)
     }
   }
@@ -166,11 +188,19 @@ const clearUploadedPhoto = (): void => {
 const submit = () => {
   form.post('/resident/onboarding', {
     forceFormData: true,
+    preserveScroll: true,
     onProgress: (event) => {
       uploadProgress.value = event?.percentage ?? null
       if (items.value.length) {
         items.value[0].progress = uploadProgress.value ?? 0
         items.value[0].uploaded = (uploadProgress.value ?? 0) >= 100
+      }
+    },
+    onError: () => {
+      uploadProgress.value = null
+      if (items.value.length) {
+        items.value[0].progress = 0
+        items.value[0].uploaded = false
       }
     },
   })
@@ -246,7 +276,7 @@ const submit = () => {
             Your account already has a profile picture (for example from Google). You can keep it or upload a new one to replace it.
           </p>
           <p v-else class="mb-3 text-sm text-slate-600">
-            Upload a clear photo (JPG or PNG, max 2MB). Required unless you sign in with a provider that supplies a photo.
+            Upload a clear photo (JPG or PNG, max {{ MAX_PROFILE_PHOTO_LABEL }}). Required unless you sign in with a provider that supplies a photo.
           </p>
           <div
             v-if="showProfilePreview"
@@ -288,7 +318,7 @@ const submit = () => {
               </button>
             </div>
           </div>
-          <label class="mb-1 block text-xs text-slate-500">Upload (JPG/PNG, max 2MB) — optional if you already have a photo above</label>
+          <label class="mb-1 block text-xs text-slate-500">Upload (JPG/PNG, max {{ MAX_PROFILE_PHOTO_LABEL }}) — optional if you already have a photo above</label>
           <div
             class="flex cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed px-6 py-8 text-center"
             :class="isDragging ? 'border-[#0EA5E9] bg-[#F0F9FF]' : 'border-slate-200'"
@@ -299,8 +329,14 @@ const submit = () => {
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="mb-2 h-8 w-8 text-[#0EA5E9]"><path d="M12 16a1 1 0 0 1-1-1V7.41L8.7 9.7a1 1 0 1 1-1.4-1.42l4-4a1 1 0 0 1 1.4 0l4 4a1 1 0 1 1-1.4 1.42L13 7.41V15a1 1 0 0 1-1 1Z"/><path d="M5 15a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-2a1 1 0 1 0-2 0v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-2a1 1 0 0 0-1-1Z"/></svg>
             <div class="text-sm text-slate-600"><span class="text-[#0EA5E9]">Browse</span> file or drag & drop</div>
-            <div class="text-xs text-slate-500">PNG or JPG up to 2MB</div>
-            <input ref="fileInput" type="file" accept="image/png,image/jpeg" class="hidden" @change="onInputChange" />
+            <div class="text-xs text-slate-500">PNG or JPG up to {{ MAX_PROFILE_PHOTO_LABEL }}</div>
+            <input
+              ref="fileInput"
+              type="file"
+              accept="image/png,image/jpeg"
+              class="hidden"
+              @change="onInputChange"
+            />
           </div>
           <p v-if="form.errors.photo" class="mt-2 text-sm text-red-600">{{ form.errors.photo }}</p>
           <div v-if="items.length" class="mt-4 space-y-2">

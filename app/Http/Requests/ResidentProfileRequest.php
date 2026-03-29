@@ -25,7 +25,19 @@ class ResidentProfileRequest extends FormRequest
             'civil_status' => ['nullable', 'in:single,married,widowed,separated,other'],
             'occupation' => ['nullable', 'string', 'max:150'],
             'purok' => ['required', 'string', 'max:100'],
-            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'photo.image' => 'The profile photo must be a valid image file.',
+            'photo.mimes' => 'The profile photo must be a JPG or PNG file.',
+            'photo.max' => 'The profile photo must not be larger than 5 MB.',
         ];
     }
 
