@@ -5,7 +5,9 @@ import { toast } from 'vue-sonner'
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { PUROK_OPTIONS } from '@/purokOptions';
-import { photoStore } from '@/routes/resident/onboarding';
+
+/** resident.onboarding.photo.store — use literal URL so builds survive Wayfinder regenerating onboarding/index.ts without photoStore. */
+const ONBOARDING_PHOTO_STORE_URL = '/resident/onboarding/photo';
 
 type ProfileDraft = {
   first_name?: string
@@ -153,7 +155,7 @@ const onFileSelected = (file: File | null) => {
   uploadProgress.value = 0
   photoUploading.value = true
 
-  router.post(photoStore.url(), { photo: file }, {
+  router.post(ONBOARDING_PHOTO_STORE_URL, { photo: file }, {
     forceFormData: true,
     preserveScroll: true,
     onProgress: (progress) => {
