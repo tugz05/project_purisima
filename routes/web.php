@@ -339,6 +339,7 @@ Route::middleware(['auth', 'role:enforcer'])->prefix('enforcer')->name('enforcer
 Route::middleware(['auth', 'role:resident', 'registration.geo'])->prefix('resident')->name('resident.')->group(function () {
     Route::get('onboarding', [OnboardingController::class, 'show'])->name('onboarding.show');
     Route::post('onboarding', [OnboardingController::class, 'store'])->name('onboarding.store');
+    Route::post('onboarding/photo', [OnboardingController::class, 'storePhoto'])->name('onboarding.photo.store');
 
     Route::get('account', [AccountController::class, 'edit'])->name('account.edit');
     Route::post('account', [AccountController::class, 'update'])->name('account.update');

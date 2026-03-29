@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Resident;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\OnboardingPhotoRequest;
 use App\Http\Requests\ResidentProfileRequest;
 use App\Models\User;
 use App\Services\ResidentProfileService;
@@ -35,6 +36,15 @@ class OnboardingController extends Controller
         $service->complete($request->user(), $request->validated());
 
         return redirect()->route('resident.dashboard');
+    }
+
+    public function storePhoto(OnboardingPhotoRequest $request, ResidentProfileService $service): RedirectResponse
+    {
+        $service->storeProfilePhoto($request->user(), $request->file('photo'));
+
+        return redirect()
+            ->route('resident.onboarding.show')
+            ->with('success', 'Profile photo uploaded.');
     }
 
     /**

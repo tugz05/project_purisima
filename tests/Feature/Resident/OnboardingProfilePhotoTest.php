@@ -44,6 +44,23 @@ it('allows onboarding without upload when the resident already has a photo_url',
     expect($user->photo_url)->toBe('https://lh3.googleusercontent.com/a/example');
 });
 
+it('stores profile photo immediately via onboarding photo endpoint', function () {
+    $user = User::factory()->create([
+        'role' => 'resident',
+        'profile_completed_at' => null,
+        'photo_url' => null,
+    ]);
+
+    $file = UploadedFile::fake()->image('immediate.jpg', 100, 100);
+
+    $this->actingAs($user)
+        ->post(route('resident.onboarding.photo.store'), ['photo' => $file])
+        ->assertRedirect(route('resident.onboarding.show', absolute: false));
+
+    $user->refresh();
+    expect($user->photo_url)->toStartWith('/storage/photos/');
+});
+
 it('allows onboarding with a new photo when none existed', function () {
     $user = User::factory()->create([
         'role' => 'resident',

@@ -25,13 +25,14 @@ class EnsureProfileCompleted
                 $allowedRoutes = [
                     'resident.onboarding.show',
                     'resident.onboarding.store',
+                    'resident.onboarding.photo.store',
                     'resident.account.edit',
                     'resident.account.update',
                 ];
 
                 $routeName = $request->route()?->getName();
 
-                if (!in_array($routeName, $allowedRoutes)) {
+                if (! in_array($routeName, $allowedRoutes)) {
                     return redirect()->route('resident.onboarding.show')
                         ->with('error', 'Please complete your profile first to access this feature.');
                 }

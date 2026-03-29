@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
+import { ref, computed, onUnmounted } from 'vue'
+import { toast } from 'vue-sonner'
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { PUROK_OPTIONS } from '@/purokOptions';
+import { photoStore } from '@/routes/resident/onboarding';
 
 type ProfileDraft = {
   first_name?: string
@@ -67,7 +69,6 @@ const form = useForm({
   civil_status: d?.civil_status ?? '',
   occupation: d?.occupation ?? '',
   purok: d?.purok ?? '',
-  photo: null as File | null,
 })
 
 const purokOptions = PUROK_OPTIONS
@@ -85,62 +86,60 @@ const photoTooLargeMessage = `The photo must be ${MAX_PROFILE_PHOTO_LABEL} or sm
 const isDragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploadProgress = ref<number | null>(null)
+const photoUploading = ref(false)
+const uploadPreviewBlob = ref<string | null>(null)
 
 type FileItem = { name: string; sizeKb: number; progress: number; uploaded: boolean }
 const items = ref<FileItem[]>([])
 
-const chooseFile = () => fileInput.value?.click()
+const chooseFile = () => {
+  if (photoUploading.value) {
+    return
+  }
+  fileInput.value?.click()
+}
 
-const newPhotoPreviewUrl = ref<string | null>(null)
-
-const revokePreview = () => {
-  if (newPhotoPreviewUrl.value) {
-    URL.revokeObjectURL(newPhotoPreviewUrl.value)
-    newPhotoPreviewUrl.value = null
+const revokeUploadPreview = () => {
+  if (uploadPreviewBlob.value) {
+    URL.revokeObjectURL(uploadPreviewBlob.value)
+    uploadPreviewBlob.value = null
   }
 }
 
-watch(
-  () => form.photo,
-  (file) => {
-    revokePreview()
-    if (file) {
-      newPhotoPreviewUrl.value = URL.createObjectURL(file)
-    }
-  },
-)
-
 onUnmounted(() => {
-  revokePreview()
+  revokeUploadPreview()
 })
 
-/** Single preview: new file takes priority, otherwise account / Google avatar from DB. */
+/** Local blob while uploading, then saved URL from the server after redirect. */
 const activePreviewSrc = computed((): string => {
-  if (newPhotoPreviewUrl.value) {
-    return newPhotoPreviewUrl.value;
+  if (uploadPreviewBlob.value) {
+    return uploadPreviewBlob.value
   }
-  return resolvedExistingPhotoUrl.value ?? '';
-});
+  return resolvedExistingPhotoUrl.value ?? ''
+})
 
-const showProfilePreview = computed(() => activePreviewSrc.value.length > 0);
-
-const isPreviewFromUpload = computed(() => form.photo !== null);
+const showProfilePreview = computed(() => activePreviewSrc.value.length > 0)
 
 const onFileSelected = (file: File | null) => {
   form.clearErrors('photo')
-  items.value = []
-  uploadProgress.value = null
 
   if (!file) {
-    form.photo = null
-    if (fileInput.value) {
-      fileInput.value.value = ''
+    if (!photoUploading.value) {
+      revokeUploadPreview()
+      items.value = []
+      uploadProgress.value = null
+      if (fileInput.value) {
+        fileInput.value.value = ''
+      }
     }
     return
   }
 
+  if (photoUploading.value) {
+    return
+  }
+
   if (file.size > MAX_PROFILE_PHOTO_BYTES) {
-    form.photo = null
     form.setError('photo', photoTooLargeMessage)
     if (fileInput.value) {
       fileInput.value.value = ''
@@ -148,8 +147,50 @@ const onFileSelected = (file: File | null) => {
     return
   }
 
-  form.photo = file
-  items.value.push({ name: file.name, sizeKb: Math.round(file.size / 1024), progress: 0, uploaded: false })
+  revokeUploadPreview()
+  uploadPreviewBlob.value = URL.createObjectURL(file)
+  items.value = [{ name: file.name, sizeKb: Math.round(file.size / 1024), progress: 0, uploaded: false }]
+  uploadProgress.value = 0
+  photoUploading.value = true
+
+  router.post(photoStore.url(), { photo: file }, {
+    forceFormData: true,
+    preserveScroll: true,
+    onProgress: (progress) => {
+      const pct = progress?.percentage ?? null
+      uploadProgress.value = pct
+      if (items.value.length) {
+        items.value[0].progress = pct ?? 0
+        items.value[0].uploaded = (pct ?? 0) >= 100
+      }
+    },
+    onSuccess: () => {
+      toast.success('Profile photo saved.')
+      revokeUploadPreview()
+      items.value = []
+      uploadProgress.value = null
+      if (fileInput.value) {
+        fileInput.value.value = ''
+      }
+    },
+    onError: (errors) => {
+      const raw = errors.photo
+      const msg = Array.isArray(raw) ? raw[0] : raw
+      form.setError(
+        'photo',
+        typeof msg === 'string' ? msg : 'Could not upload photo. Please try again.',
+      )
+      revokeUploadPreview()
+      items.value = []
+      uploadProgress.value = null
+      if (fileInput.value) {
+        fileInput.value.value = ''
+      }
+    },
+    onFinish: () => {
+      photoUploading.value = false
+    },
+  })
 }
 
 const onInputChange = (e: Event) => {
@@ -165,6 +206,8 @@ const onDrop = (e: DragEvent) => {
     const f = e.dataTransfer.files[0]
     if (f && ['image/jpeg', 'image/png'].includes(f.type)) {
       onFileSelected(f)
+    } else if (f) {
+      form.setError('photo', 'Please use a JPG or PNG image.')
     }
   }
 }
@@ -178,31 +221,9 @@ const onDragLeave = (e: DragEvent) => {
   isDragging.value = false
 }
 
-const clearUploadedPhoto = (): void => {
-  onFileSelected(null)
-  if (fileInput.value) {
-    fileInput.value.value = ''
-  }
-}
-
 const submit = () => {
   form.post('/resident/onboarding', {
-    forceFormData: true,
     preserveScroll: true,
-    onProgress: (event) => {
-      uploadProgress.value = event?.percentage ?? null
-      if (items.value.length) {
-        items.value[0].progress = uploadProgress.value ?? 0
-        items.value[0].uploaded = (uploadProgress.value ?? 0) >= 100
-      }
-    },
-    onError: () => {
-      uploadProgress.value = null
-      if (items.value.length) {
-        items.value[0].progress = 0
-        items.value[0].uploaded = false
-      }
-    },
   })
 }
 </script>
@@ -273,10 +294,10 @@ const submit = () => {
         <div class="sm:col-span-2">
           <label class="mb-1 block text-sm font-medium text-[#334155]">Profile photo</label>
           <p v-if="hasExistingAvatar" class="mb-3 text-sm text-slate-600">
-            Your account already has a profile picture (for example from Google). You can keep it or upload a new one to replace it.
+            Your account already has a profile picture (for example from Google). You can keep it or choose a new file below — it uploads immediately and replaces the current one.
           </p>
           <p v-else class="mb-3 text-sm text-slate-600">
-            Upload a clear photo (JPG or PNG, max {{ MAX_PROFILE_PHOTO_LABEL }}). Required unless you sign in with a provider that supplies a photo.
+            Upload a clear photo (JPG or PNG, max {{ MAX_PROFILE_PHOTO_LABEL }}). It saves as soon as you select a file. A photo is required unless you sign in with a provider that supplies one.
           </p>
           <div
             v-if="showProfilePreview"
@@ -284,15 +305,15 @@ const submit = () => {
           >
             <img
               :src="activePreviewSrc"
-              :alt="isPreviewFromUpload ? 'New photo preview' : 'Profile photo from your account'"
+              :alt="photoUploading || uploadPreviewBlob ? 'Photo upload preview' : 'Profile photo from your account'"
               class="mx-auto h-24 w-24 shrink-0 rounded-full object-cover ring-2 ring-emerald-500/25 sm:mx-0"
               loading="eager"
               decoding="async"
               referrerpolicy="no-referrer"
             />
             <div class="min-w-0 flex-1 text-center sm:text-left">
-              <p v-if="isPreviewFromUpload" class="text-sm font-medium text-emerald-950">
-                New photo selected — it will replace your current picture when you save.
+              <p v-if="photoUploading || uploadPreviewBlob" class="text-sm font-medium text-emerald-950">
+                Uploading your photo…
               </p>
               <template v-else>
                 <p class="text-sm font-medium text-emerald-950">Profile photo preview</p>
@@ -300,28 +321,17 @@ const submit = () => {
                   This picture is already on your account (for example from Google sign-in). It will stay unless you upload a different photo below.
                 </p>
               </template>
-              <button
-                v-if="isPreviewFromUpload && hasExistingAvatar"
-                type="button"
-                class="mt-2 text-sm font-medium text-emerald-800 underline decoration-emerald-600/60 underline-offset-2 hover:text-emerald-950"
-                @click="clearUploadedPhoto"
-              >
-                Use account photo instead
-              </button>
-              <button
-                v-else-if="isPreviewFromUpload"
-                type="button"
-                class="mt-2 text-sm font-medium text-emerald-800 underline decoration-emerald-600/60 underline-offset-2 hover:text-emerald-950"
-                @click="clearUploadedPhoto"
-              >
-                Remove selected file
-              </button>
             </div>
           </div>
-          <label class="mb-1 block text-xs text-slate-500">Upload (JPG/PNG, max {{ MAX_PROFILE_PHOTO_LABEL }}) — optional if you already have a photo above</label>
+          <label class="mb-1 block text-xs text-slate-500">
+            Choose a file (JPG/PNG, max {{ MAX_PROFILE_PHOTO_LABEL }}) — it uploads right away; optional if you already have a photo above
+          </label>
           <div
-            class="flex cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed px-6 py-8 text-center"
-            :class="isDragging ? 'border-[#0EA5E9] bg-[#F0F9FF]' : 'border-slate-200'"
+            class="flex flex-col items-center justify-center rounded border-2 border-dashed px-6 py-8 text-center"
+            :class="[
+              isDragging ? 'border-[#0EA5E9] bg-[#F0F9FF]' : 'border-slate-200',
+              photoUploading ? 'pointer-events-none cursor-wait opacity-60' : 'cursor-pointer',
+            ]"
             @click="chooseFile"
             @dragover="onDragOver"
             @dragleave="onDragLeave"

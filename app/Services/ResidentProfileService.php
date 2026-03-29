@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 
 class ResidentProfileService
@@ -15,8 +16,8 @@ class ResidentProfileService
     {
         // Only allow known fields
         $allowed = [
-            'first_name','middle_name','last_name','suffix','phone','birth_date','sex','civil_status','occupation',
-            'purok','barangay','municipality','province','country',
+            'first_name', 'middle_name', 'last_name', 'suffix', 'phone', 'birth_date', 'sex', 'civil_status', 'occupation',
+            'purok', 'barangay', 'municipality', 'province', 'country',
         ];
 
         $payload = Arr::only($data, $allowed);
@@ -49,13 +50,25 @@ class ResidentProfileService
     }
 
     /**
+     * Store a profile photo during onboarding (immediate upload) without completing the profile.
+     */
+    public function storeProfilePhoto(User $user, UploadedFile $file): User
+    {
+        $path = $file->store('photos', 'public');
+        $user->photo_url = '/storage/'.$path;
+        $user->save();
+
+        return $user;
+    }
+
+    /**
      * Update resident account details. Photo optional.
      */
     public function update(User $user, array $data): User
     {
         $allowed = [
-            'first_name','middle_name','last_name','suffix','phone','birth_date','sex','civil_status','occupation',
-            'purok','barangay','municipality','province','country',
+            'first_name', 'middle_name', 'last_name', 'suffix', 'phone', 'birth_date', 'sex', 'civil_status', 'occupation',
+            'purok', 'barangay', 'municipality', 'province', 'country',
         ];
 
         $payload = Arr::only($data, $allowed);
@@ -76,5 +89,3 @@ class ResidentProfileService
         return $user;
     }
 }
-
-
