@@ -395,9 +395,9 @@ onMounted(async () => {
 }
 
 .watermark-image {
-    max-width: 550px;
-    width: 75%;
-    opacity: 0.06;
+    max-width: 720px;
+    width: 90%;
+    opacity: 0.07;
     object-fit: contain;
 }
 
@@ -658,9 +658,9 @@ onMounted(async () => {
 }
 
 .clearance-watermark-image {
-    max-width: 200px;
-    width: 30%;
-    opacity: 0.08;
+    max-width: 620px;
+    width: 85%;
+    opacity: 0.07;
     object-fit: contain;
 }
 

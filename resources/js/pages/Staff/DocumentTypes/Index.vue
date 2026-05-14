@@ -24,6 +24,8 @@ import {
     FileType,
     Tag,
     Lightbulb,
+    LayoutTemplate,
+    ScrollText,
 } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import StaffLayout from '@/layouts/staff/Layout.vue';
@@ -58,6 +60,7 @@ interface DocumentType {
     category?: string;
     sort_order: number;
     notes?: string;
+    template_type?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -118,7 +121,6 @@ const createForm = useForm({
     fee_amount: 0,
     required_documents: [] as string[],
     required_fields: [] as DynamicInputFieldForm[],
-    processing_steps: [] as string[],
     processing_days: 1,
     is_active: true,
     requires_payment: true,
@@ -126,11 +128,11 @@ const createForm = useForm({
     category: null,
     sort_order: 0,
     notes: '',
+    template_type: null as string | null,
 });
 
 // Required documents management
 const newRequiredDoc = ref('');
-const newProcessingStep = ref('');
 
 const dynamicFieldTypes: DynamicFieldType[] = ['text', 'textarea', 'number', 'date', 'email', 'select'];
 
@@ -301,17 +303,6 @@ const removeCreateDynamicField = (index: number) => {
     createForm.required_fields.splice(index, 1);
 };
 
-const addProcessingStep = () => {
-    if (newProcessingStep.value.trim()) {
-        createForm.processing_steps.push(newProcessingStep.value.trim());
-        newProcessingStep.value = '';
-    }
-};
-
-const removeProcessingStep = (index: number) => {
-    createForm.processing_steps.splice(index, 1);
-};
-
 // Edit form helpers
 const addEditRequiredDoc = () => {
     const value = newRequiredDoc.value.trim();
@@ -390,25 +381,6 @@ const removeEditDynamicField = (index: number) => {
         const updated = [...editForm.value.required_fields];
         updated.splice(index, 1);
         editForm.value.required_fields = updated;
-    }
-};
-
-const addEditProcessingStep = () => {
-    if (newProcessingStep.value.trim() && editForm.value) {
-        // Ensure processing_steps is an array
-        if (!Array.isArray(editForm.value.processing_steps)) {
-            editForm.value.processing_steps = [];
-        }
-        editForm.value.processing_steps = [...editForm.value.processing_steps, newProcessingStep.value.trim()];
-        newProcessingStep.value = '';
-    }
-};
-
-const removeEditProcessingStep = (index: number) => {
-    if (editForm.value && Array.isArray(editForm.value.processing_steps)) {
-        const updated = [...editForm.value.processing_steps];
-        updated.splice(index, 1);
-        editForm.value.processing_steps = updated;
     }
 };
 
@@ -518,12 +490,6 @@ const openEditSheet = (documentType: DocumentType) => {
     const requiredDocs = parseArrayField(documentType.required_documents);
     const requiredFieldsRaw = parseArrayField(documentType.required_fields);
     const requiredFields = requiredFieldsRaw.map((item, idx) => normalizeIncomingDynamicField(item, idx));
-    const processingSteps = parseArrayField(documentType.processing_steps);
-    
-    // If no processing steps exist, use defaults
-    const finalProcessingSteps = processingSteps.length > 0 
-        ? processingSteps 
-        : getDefaultProcessingSteps();
 
     // Convert 1/0 from database to proper booleans
     const isActive = toBoolean(documentType.is_active);
@@ -539,7 +505,6 @@ const openEditSheet = (documentType: DocumentType) => {
         fee_amount: Number(documentType.fee_amount) || 0,
         required_documents: requiredDocs,
         required_fields: requiredFields,
-        processing_steps: finalProcessingSteps,
         processing_days: Number(documentType.processing_days) || 1,
         is_active: Boolean(isActive),
         requires_payment: Boolean(requiresPayment),
@@ -547,6 +512,7 @@ const openEditSheet = (documentType: DocumentType) => {
         category: documentType.category || null,
         sort_order: Number(documentType.sort_order) || 0, // Hidden field
         notes: documentType.notes || '',
+        template_type: documentType.template_type ?? null,
     });
 
     // Set checkbox refs BEFORE opening sheet - this ensures they have correct values when rendered
@@ -556,36 +522,24 @@ const openEditSheet = (documentType: DocumentType) => {
     
     // Clear input fields
     newRequiredDoc.value = '';
-    newProcessingStep.value = '';
 
     // Open sheet AFTER refs are set
     editSheetOpen.value = true;
-};
-
-// Default processing steps for all document types
-const getDefaultProcessingSteps = (): string[] => {
-    return [
-        'Submit required documents',
-        'Verification and review',
-        'Approval process',
-        'Document issuance'
-    ];
 };
 
 const resetCreateForm = () => {
     createForm.reset();
     createForm.required_documents = [];
     createForm.required_fields = [];
-    createForm.processing_steps = getDefaultProcessingSteps(); // Set default steps
     createForm.is_active = true;
     createForm.requires_payment = true;
     createForm.requires_approval = false;
     createForm.processing_days = 1;
     createForm.fee_amount = 0;
-    createForm.sort_order = 0; // Hidden field, auto-set
-    createForm.code = ''; // Hidden field, auto-generated
+    createForm.sort_order = 0;
+    createForm.code = '';
+    createForm.template_type = null;
     newRequiredDoc.value = '';
-    newProcessingStep.value = '';
 };
 
 const submitCreate = () => {
@@ -593,15 +547,11 @@ const submitCreate = () => {
     if (!Array.isArray(createForm.required_documents)) {
         createForm.required_documents = [];
     }
-    if (!Array.isArray(createForm.processing_steps)) {
-        createForm.processing_steps = [];
-    }
 
     // Filter out empty strings
     createForm.required_documents = createForm.required_documents.filter((doc: any) => doc && String(doc).trim() !== '');
     const requiredFieldsSnapshot = JSON.parse(JSON.stringify(createForm.required_fields)) as DynamicInputFieldForm[];
     createForm.required_fields = finalizeRequiredFieldsForSubmit(createForm.required_fields as DynamicInputFieldForm[]);
-    createForm.processing_steps = createForm.processing_steps.filter((step: any) => step && String(step).trim() !== '');
 
     // Convert null category to empty string for backend
     if (createForm.category === null) {
@@ -634,15 +584,11 @@ const submitEdit = () => {
         if (!Array.isArray(editForm.value.required_documents)) {
             editForm.value.required_documents = [];
         }
-        if (!Array.isArray(editForm.value.processing_steps)) {
-            editForm.value.processing_steps = [];
-        }
 
         // Filter out empty strings
         editForm.value.required_documents = editForm.value.required_documents.filter((doc: any) => doc && String(doc).trim() !== '');
         const editFieldsSnapshot = JSON.parse(JSON.stringify(editForm.value.required_fields)) as DynamicInputFieldForm[];
         editForm.value.required_fields = finalizeRequiredFieldsForSubmit(editForm.value.required_fields as DynamicInputFieldForm[]);
-        editForm.value.processing_steps = editForm.value.processing_steps.filter((step: any) => step && String(step).trim() !== '');
 
         // Convert null category to empty string for backend
         if (editForm.value.category === null) {
@@ -1195,36 +1141,62 @@ const categoryOptions = [
                         </div>
                     </div>
 
-                    <!-- Processing Steps -->
-                    <div class="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-xl p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                            <Clock class="h-5 w-5 text-orange-600" />
-                            Processing Steps
+                    <!-- Document Template -->
+                    <div class="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-2">
+                            <LayoutTemplate class="h-5 w-5 text-violet-600" />
+                            Document Template
                         </h3>
-                        <p class="text-xs text-gray-600 mb-4">Default processing steps are pre-filled. You can modify them if needed.</p>
+                        <p class="text-sm text-gray-600 mb-5">Choose the template layout that will be used when generating this document.</p>
 
-                        <div class="space-y-4">
-                            <div class="flex gap-2">
-                                <Input
-                                    v-model="newProcessingStep"
-                                    placeholder="Add custom processing step (optional)"
-                                    class="flex-1 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
-                                    @keyup.enter="addProcessingStep"
-                                />
-                                <Button type="button" @click="addProcessingStep" variant="outline" size="sm">
-                                    <Plus class="h-4 w-4" />
-                                </Button>
-                            </div>
-
-                            <div v-if="Array.isArray(createForm.processing_steps) && createForm.processing_steps.length > 0" class="space-y-2">
-                                <div v-for="(step, index) in createForm.processing_steps" :key="`create-step-${index}`" class="flex items-center gap-2 p-2 bg-white rounded border border-gray-200">
-                                    <span class="flex-1 text-sm">{{ index + 1 }}. {{ typeof step === 'string' ? step : JSON.stringify(step) }}</span>
-                                    <Button type="button" @click="removeProcessingStep(index)" variant="ghost" size="sm" class="h-6 w-6 p-0 text-red-600">
-                                        <X class="h-4 w-4" />
-                                    </Button>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Certification Template -->
+                            <button
+                                type="button"
+                                @click="createForm.template_type = 'certification'"
+                                :class="[
+                                    'relative flex flex-col items-start gap-3 rounded-xl border-2 p-5 text-left transition-all duration-150',
+                                    createForm.template_type === 'certification'
+                                        ? 'border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-300'
+                                        : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/40'
+                                ]"
+                            >
+                                <div :class="['flex h-12 w-12 items-center justify-center rounded-xl', createForm.template_type === 'certification' ? 'bg-violet-600' : 'bg-gray-100']">
+                                    <ScrollText :class="['h-6 w-6', createForm.template_type === 'certification' ? 'text-white' : 'text-gray-500']" />
                                 </div>
-                            </div>
+                                <div>
+                                    <p class="font-semibold text-gray-900">Certification Template</p>
+                                    <p class="mt-0.5 text-xs text-gray-500 leading-relaxed">Formal certificate layout with official seal and letterhead. Ideal for certificates of residency, good moral, employment, etc.</p>
+                                </div>
+                                <div v-if="createForm.template_type === 'certification'" class="absolute top-3 right-3 h-5 w-5 rounded-full bg-violet-600 flex items-center justify-center">
+                                    <CheckCircle class="h-4 w-4 text-white" />
+                                </div>
+                            </button>
+
+                            <!-- Clearance Template -->
+                            <button
+                                type="button"
+                                @click="createForm.template_type = 'clearance'"
+                                :class="[
+                                    'relative flex flex-col items-start gap-3 rounded-xl border-2 p-5 text-left transition-all duration-150',
+                                    createForm.template_type === 'clearance'
+                                        ? 'border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-300'
+                                        : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/40'
+                                ]"
+                            >
+                                <div :class="['flex h-12 w-12 items-center justify-center rounded-xl', createForm.template_type === 'clearance' ? 'bg-violet-600' : 'bg-gray-100']">
+                                    <FileText :class="['h-6 w-6', createForm.template_type === 'clearance' ? 'text-white' : 'text-gray-500']" />
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-gray-900">Clearance Template</p>
+                                    <p class="mt-0.5 text-xs text-gray-500 leading-relaxed">Standard clearance layout with endorsement block. Suited for barangay clearance, business permit clearance, etc.</p>
+                                </div>
+                                <div v-if="createForm.template_type === 'clearance'" class="absolute top-3 right-3 h-5 w-5 rounded-full bg-violet-600 flex items-center justify-center">
+                                    <CheckCircle class="h-4 w-4 text-white" />
+                                </div>
+                            </button>
                         </div>
+                        <p v-if="createForm.errors.template_type" class="text-red-500 text-xs mt-2">{{ createForm.errors.template_type }}</p>
                     </div>
 
                     <!-- Notes -->
@@ -1563,39 +1535,62 @@ const categoryOptions = [
                         </div>
                     </div>
 
-                    <!-- Processing Steps -->
-                    <div class="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-xl p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                            <Clock class="h-5 w-5 text-orange-600" />
-                            Processing Steps
+                    <!-- Document Template -->
+                    <div class="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-2">
+                            <LayoutTemplate class="h-5 w-5 text-violet-600" />
+                            Document Template
                         </h3>
-                        <p class="text-xs text-gray-600 mb-4">Default processing steps are pre-filled. You can modify them if needed.</p>
+                        <p class="text-sm text-gray-600 mb-5">Choose the template layout that will be used when generating this document.</p>
 
-                        <div class="space-y-4">
-                            <div class="flex gap-2">
-                                <Input
-                                    v-model="newProcessingStep"
-                                    placeholder="Add custom processing step (optional)"
-                                    class="flex-1 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
-                                    @keyup.enter="addEditProcessingStep"
-                                />
-                                <Button type="button" @click="addEditProcessingStep" variant="outline" size="sm">
-                                    <Plus class="h-4 w-4" />
-                                </Button>
-                            </div>
-
-                            <div v-if="editForm && Array.isArray(editForm.processing_steps) && editForm.processing_steps.length > 0" class="space-y-2">
-                                <div v-for="(step, index) in editForm.processing_steps" :key="`edit-step-${index}`" class="flex items-center gap-2 p-2 bg-white rounded border border-gray-200">
-                                    <span class="flex-1 text-sm">{{ index + 1 }}. {{ typeof step === 'string' ? step : JSON.stringify(step) }}</span>
-                                    <Button type="button" @click="removeEditProcessingStep(index)" variant="ghost" size="sm" class="h-6 w-6 p-0 text-red-600">
-                                        <X class="h-4 w-4" />
-                                    </Button>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Certification Template -->
+                            <button
+                                type="button"
+                                @click="editForm.template_type = 'certification'"
+                                :class="[
+                                    'relative flex flex-col items-start gap-3 rounded-xl border-2 p-5 text-left transition-all duration-150',
+                                    editForm.template_type === 'certification'
+                                        ? 'border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-300'
+                                        : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/40'
+                                ]"
+                            >
+                                <div :class="['flex h-12 w-12 items-center justify-center rounded-xl', editForm.template_type === 'certification' ? 'bg-violet-600' : 'bg-gray-100']">
+                                    <ScrollText :class="['h-6 w-6', editForm.template_type === 'certification' ? 'text-white' : 'text-gray-500']" />
                                 </div>
-                            </div>
-                            <div v-else-if="editForm && (!Array.isArray(editForm.processing_steps) || editForm.processing_steps.length === 0)" class="text-sm text-gray-500 italic">
-                                No processing steps added yet
-                            </div>
+                                <div>
+                                    <p class="font-semibold text-gray-900">Certification Template</p>
+                                    <p class="mt-0.5 text-xs text-gray-500 leading-relaxed">Formal certificate layout with official seal and letterhead. Ideal for certificates of residency, good moral, employment, etc.</p>
+                                </div>
+                                <div v-if="editForm.template_type === 'certification'" class="absolute top-3 right-3 h-5 w-5 rounded-full bg-violet-600 flex items-center justify-center">
+                                    <CheckCircle class="h-4 w-4 text-white" />
+                                </div>
+                            </button>
+
+                            <!-- Clearance Template -->
+                            <button
+                                type="button"
+                                @click="editForm.template_type = 'clearance'"
+                                :class="[
+                                    'relative flex flex-col items-start gap-3 rounded-xl border-2 p-5 text-left transition-all duration-150',
+                                    editForm.template_type === 'clearance'
+                                        ? 'border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-300'
+                                        : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/40'
+                                ]"
+                            >
+                                <div :class="['flex h-12 w-12 items-center justify-center rounded-xl', editForm.template_type === 'clearance' ? 'bg-violet-600' : 'bg-gray-100']">
+                                    <FileText :class="['h-6 w-6', editForm.template_type === 'clearance' ? 'text-white' : 'text-gray-500']" />
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-gray-900">Clearance Template</p>
+                                    <p class="mt-0.5 text-xs text-gray-500 leading-relaxed">Standard clearance layout with endorsement block. Suited for barangay clearance, business permit clearance, etc.</p>
+                                </div>
+                                <div v-if="editForm.template_type === 'clearance'" class="absolute top-3 right-3 h-5 w-5 rounded-full bg-violet-600 flex items-center justify-center">
+                                    <CheckCircle class="h-4 w-4 text-white" />
+                                </div>
+                            </button>
                         </div>
+                        <p v-if="editForm.errors.template_type" class="text-red-500 text-xs mt-2">{{ editForm.errors.template_type }}</p>
                     </div>
 
                     <!-- Notes -->

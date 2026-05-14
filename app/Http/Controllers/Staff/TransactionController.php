@@ -149,11 +149,22 @@ class TransactionController extends Controller
             ->with('success', 'Transaction assigned to you successfully.');
     }
 
+    private function paymentRequired(Transaction $transaction): bool
+    {
+        return $transaction->requiresPayment() && ! $transaction->isPaymentCompleted();
+    }
+
     /**
      * Load template content and process with resident data
      */
     public function loadTemplate(Transaction $transaction, Request $request): JsonResponse
     {
+        if ($this->paymentRequired($transaction)) {
+            return response()->json([
+                'error' => 'Payment must be completed before generating the certificate.',
+            ], 403);
+        }
+
         $templateId = $request->get('template_id');
 
         if ($templateId) {
@@ -188,6 +199,12 @@ class TransactionController extends Controller
      */
     public function generateWithAI(Transaction $transaction, Request $request): JsonResponse
     {
+        if ($this->paymentRequired($transaction)) {
+            return response()->json([
+                'error' => 'Payment must be completed before generating the certificate.',
+            ], 403);
+        }
+
         try {
             // Refresh transaction to get latest data including officer_of_the_day
             $transaction->refresh();
@@ -226,6 +243,10 @@ class TransactionController extends Controller
      */
     public function printCertificate(Transaction $transaction): Response
     {
+        if ($this->paymentRequired($transaction)) {
+            abort(403, 'Payment must be completed before printing the certificate.');
+        }
+
         // Refresh the transaction to get the latest data
         $transaction->refresh();
         $transaction->load(['resident', 'documentType', 'staff']);

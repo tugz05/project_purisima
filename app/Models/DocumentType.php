@@ -24,6 +24,7 @@ class DocumentType extends Model
         'category',
         'sort_order',
         'notes',
+        'template_type',
     ];
 
     protected $casts = [

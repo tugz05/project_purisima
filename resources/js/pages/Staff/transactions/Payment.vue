@@ -289,8 +289,8 @@ const formatCurrency = (amount: any) => {
 
                                     <div>
                                         <Label class="text-sm font-medium text-gray-500 mb-2 block">Resident</Label>
-                                        <p class="text-lg font-semibold">{{ transaction.resident.name }}</p>
-                                        <p class="text-sm text-gray-600 mt-1">{{ transaction.resident.email }}</p>
+                                        <p class="text-lg font-semibold">{{ transaction.resident?.name ?? '—' }}</p>
+                                        <p class="text-sm text-gray-600 mt-1">{{ transaction.resident?.email ?? '—' }}</p>
                                     </div>
 
                                     <div>

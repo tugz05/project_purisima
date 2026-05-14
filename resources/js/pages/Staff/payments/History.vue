@@ -478,8 +478,8 @@ const documentLabel = (row: PaymentRow) => row.document_type?.name ?? row.title;
                                         </TableCell>
                                         <TableCell class="px-4 py-4 align-top whitespace-normal min-w-[11rem] max-w-[15rem]">
                                             <div class="flex flex-col gap-1.5">
-                                                <div class="font-medium leading-snug text-gray-900">{{ row.resident.name }}</div>
-                                                <div class="text-xs leading-normal text-gray-500 break-all">{{ row.resident.email }}</div>
+                                                <div class="font-medium leading-snug text-gray-900">{{ row.resident?.name ?? '—' }}</div>
+                                                <div class="text-xs leading-normal text-gray-500 break-all">{{ row.resident?.email ?? '—' }}</div>
                                             </div>
                                         </TableCell>
                                         <TableCell class="px-4 py-4 align-middle text-sm leading-relaxed text-gray-800 whitespace-normal">

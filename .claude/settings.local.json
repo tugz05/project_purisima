@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan *)",
+      "Bash(npx tsc *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\laragon\\\\www\\\\project_purisima\" -Force)",
+      "Bash(Select-Object Name)",
+      "Bash(npm run *)"
+    ]
+  }
+}

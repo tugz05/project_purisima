@@ -39,6 +39,7 @@ import {
     AlertTriangle,
     HelpCircle,
     ClipboardList,
+    Lock,
     type LucideIcon,
 } from 'lucide-vue-next';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -543,6 +544,13 @@ const canProcessPayment = () => {
     return props.transaction.payment_status === 'pending' || props.transaction.payment_status === 'failed';
 };
 
+// Certificate generation is allowed only when payment is not required OR payment is already paid
+const canGenerateCertificate = computed(() => {
+    const activeStatus = props.transaction.status === 'in_progress' || props.transaction.status === 'completed';
+    if (!activeStatus) return false;
+    return Number(props.transaction.fee_amount) === 0 || props.transaction.payment_status === 'paid';
+});
+
 
 const generateWithAI = async () => {
     isGeneratingAI.value = true;
@@ -693,16 +701,40 @@ onUnmounted(() => {
                                         <User class="h-4 w-4 mr-2" />
                                         Reassign to Me
                                     </Button>
-                                    <div class="flex gap-2">
-                                        <Button
-                                            v-if="props.transaction.status === 'in_progress' || props.transaction.status === 'completed'"
-                                            @click="openCertificateSheet"
-                                            size="sm"
-                                            class="bg-teal-600 hover:bg-teal-700 text-white font-medium"
-                                        >
-                                            <FileCheck class="h-4 w-4 mr-2" />
-                                            Generate Certificate
-                                        </Button>
+                                    <div class="flex gap-2 flex-wrap">
+                                        <!-- Generate Certificate: visible when in_progress/completed, gated by payment -->
+                                        <template v-if="props.transaction.status === 'in_progress' || props.transaction.status === 'completed'">
+                                            <TooltipProvider v-if="!canGenerateCertificate" :delay-duration="100">
+                                                <Tooltip>
+                                                    <TooltipTrigger as-child>
+                                                        <span class="inline-flex cursor-not-allowed">
+                                                            <Button
+                                                                size="sm"
+                                                                disabled
+                                                                class="bg-teal-600 text-white font-medium opacity-50 pointer-events-none"
+                                                            >
+                                                                <Lock class="h-4 w-4 mr-2" />
+                                                                Generate Certificate
+                                                            </Button>
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="bottom" class="max-w-[220px] text-center">
+                                                        Payment must be completed before generating the certificate.
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                            <Button
+                                                v-else
+                                                @click="openCertificateSheet"
+                                                size="sm"
+                                                class="bg-teal-600 hover:bg-teal-700 text-white font-medium"
+                                            >
+                                                <FileCheck class="h-4 w-4 mr-2" />
+                                                Generate Certificate
+                                            </Button>
+                                        </template>
+
+                                        <!-- Process Payment -->
                                         <Link
                                             v-if="canProcessPayment()"
                                             :href="`/staff/transactions/${props.transaction.id}/payment`"
@@ -716,15 +748,38 @@ onUnmounted(() => {
                                                 Process Payment
                                             </Button>
                                         </Link>
-                                        <Button
-                                            v-if="(props.transaction.status === 'in_progress' || props.transaction.status === 'completed') && props.transaction.generated_document_data?.content"
-                                            @click="printCertificate"
-                                            size="sm"
-                                            class="bg-green-600 hover:bg-green-700 text-white font-medium"
-                                        >
-                                            <Printer class="h-4 w-4 mr-2" />
-                                            Print Certificate
-                                        </Button>
+
+                                        <!-- Print Certificate: also gated by payment -->
+                                        <template v-if="(props.transaction.status === 'in_progress' || props.transaction.status === 'completed') && props.transaction.generated_document_data?.content">
+                                            <TooltipProvider v-if="!canGenerateCertificate" :delay-duration="100">
+                                                <Tooltip>
+                                                    <TooltipTrigger as-child>
+                                                        <span class="inline-flex cursor-not-allowed">
+                                                            <Button
+                                                                size="sm"
+                                                                disabled
+                                                                class="bg-green-600 text-white font-medium opacity-50 pointer-events-none"
+                                                            >
+                                                                <Lock class="h-4 w-4 mr-2" />
+                                                                Print Certificate
+                                                            </Button>
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="bottom" class="max-w-[220px] text-center">
+                                                        Payment must be completed before printing the certificate.
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                            <Button
+                                                v-else
+                                                @click="printCertificate"
+                                                size="sm"
+                                                class="bg-green-600 hover:bg-green-700 text-white font-medium"
+                                            >
+                                                <Printer class="h-4 w-4 mr-2" />
+                                                Print Certificate
+                                            </Button>
+                                        </template>
                                     </div>
                                 </div>
                             </div>
