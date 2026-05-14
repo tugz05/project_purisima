@@ -5,6 +5,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
@@ -54,6 +55,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // Inertia visits must receive redirect + session errors, not a bare JSON 422 (breaks useForm error handling).
             if ($e instanceof ValidationException && $request->header('X-Inertia')) {
                 return $response;
+            }
+
+            if ($e instanceof AuthorizationException && $request->header('X-Inertia')) {
+                return redirect()->back()->with('error', $e->getMessage() ?: 'You are not authorized to perform this action.');
             }
 
             if ($e instanceof PostTooLargeException && $request->header('X-Inertia')) {
