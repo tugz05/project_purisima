@@ -17,7 +17,7 @@ interface ActiveReport {
     latitude: number;
     longitude: number;
     address: string;
-    calamity_type: string;
+    incident_type: string;
     severity: string;
     status: string;
     needs: string[];
@@ -111,8 +111,8 @@ const getStatusIconSvg = (status: string): string => {
     }
 };
 
-const formatCalamityType = (type: string): string => {
-    return type.split('_').map(word => 
+const formatIncidentType = (type: string): string => {
+    return type.split('_').map(word =>
         word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
 };
@@ -151,13 +151,13 @@ const createMarker = (report: ActiveReport): L.Marker => {
         .bindPopup(`
             <div style="min-width: 200px;">
                 <h3 style="font-weight: bold; margin-bottom: 8px; color: ${color};">${report.resident_name}</h3>
-                <p style="margin: 4px 0;"><strong>Type:</strong> ${formatCalamityType(report.calamity_type)}</p>
+                <p style="margin: 4px 0;"><strong>Type:</strong> ${formatIncidentType(report.incident_type)}</p>
                 <p style="margin: 4px 0;"><strong>Severity:</strong> <span style="color: ${color};">${report.severity.toUpperCase()}</span></p>
                 <p style="margin: 4px 0;"><strong>Status:</strong> ${report.status}</p>
                 <p style="margin: 4px 0;"><strong>People:</strong> ${report.number_of_people}</p>
                 ${report.needs && report.needs.length > 0 ? `<p style="margin: 4px 0;"><strong>Needs:</strong> ${report.needs.join(', ')}</p>` : ''}
                 ${report.address ? `<p style="margin: 4px 0; font-size: 12px; color: #666;">${report.address}</p>` : ''}
-                <a href="/staff/calamity/${report.id}" style="display: inline-block; margin-top: 8px; padding: 4px 12px; background: ${color}; color: white; text-decoration: none; border-radius: 4px; font-size: 12px;">View Details</a>
+                <a href="/staff/incidents/${report.id}" style="display: inline-block; margin-top: 8px; padding: 4px 12px; background: ${color}; color: white; text-decoration: none; border-radius: 4px; font-size: 12px;">View Details</a>
             </div>
         `);
 
@@ -423,7 +423,7 @@ let refreshInterval: number | null = null;
 
 onMounted(() => {
     initializeMap();
-    
+
     // Start auto-refresh for real-time location updates
     refreshInterval = window.setInterval(() => {
         refreshReports();
@@ -432,13 +432,13 @@ onMounted(() => {
 
 onUnmounted(() => {
     stopLocationTracking();
-    
+
     // Clear auto-refresh interval
     if (refreshInterval !== null) {
         clearInterval(refreshInterval);
         refreshInterval = null;
     }
-    
+
     if (map) {
         map.remove();
         map = null;
@@ -467,14 +467,14 @@ watch(() => [props.activeReports, props.residentLocations, props.staffLocations,
 </script>
 
 <template>
-    <Head title="Calamity Map" />
+    <Head title="Incident Map" />
 
     <StaffLayout>
         <div class="bg-gradient-to-br from-gray-50 to-blue-50/30 min-h-full w-full">
             <div class="mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 md:py-6 max-w-none">
                 <!-- Header -->
                 <div class="mb-6">
-                    <Link href="/staff/calamity">
+                    <Link href="/staff/incidents">
                         <Button variant="ghost" size="sm" class="mb-4">
                             <ArrowLeft class="h-4 w-4 mr-2" />
                             Back to Reports
@@ -491,7 +491,7 @@ watch(() => [props.activeReports, props.residentLocations, props.staffLocations,
                                             <MapPin class="h-8 w-8" />
                                         </div>
                                         <div>
-                                            <h1 class="text-4xl font-bold">Calamity Map</h1>
+                                            <h1 class="text-4xl font-bold">Incident Map</h1>
                                             <p class="text-red-100 text-lg mt-1">Track all active emergency reports</p>
                                         </div>
                                     </div>
@@ -523,9 +523,9 @@ watch(() => [props.activeReports, props.residentLocations, props.staffLocations,
                                     </div>
                                 </div>
                                 <div class="flex gap-3">
-                                    <Button 
+                                    <Button
                                         @click="isTracking ? stopLocationTracking() : startLocationTracking()"
-                                        variant="outline" 
+                                        variant="outline"
                                         class="bg-white/20 text-white border-white/30 hover:bg-white/30"
                                     >
                                         <Loader2 v-if="isTracking" class="h-4 w-4 mr-2 animate-spin" />
@@ -577,7 +577,7 @@ watch(() => [props.activeReports, props.residentLocations, props.staffLocations,
                                                 {{ report.severity }}
                                             </Badge>
                                         </div>
-                                        <p class="text-xs text-gray-600 mb-2 capitalize">{{ formatCalamityType(report.calamity_type) }}</p>
+                                        <p class="text-xs text-gray-600 mb-2 capitalize">{{ formatIncidentType(report.incident_type) }}</p>
                                         <div class="flex items-center gap-2 text-xs text-gray-500">
                                             <Users class="h-3 w-3" />
                                             <span>{{ report.number_of_people }} people</span>
@@ -592,7 +592,7 @@ watch(() => [props.activeReports, props.residentLocations, props.staffLocations,
                                                 {{ need }}
                                             </Badge>
                                         </div>
-                                        <Link :href="`/staff/calamity/${report.id}`" class="mt-2 inline-block">
+                                        <Link :href="`/staff/incidents/${report.id}`" class="mt-2 inline-block">
                                             <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-xs">
                                                 View Details
                                                 <ArrowRight class="h-3 w-3 shrink-0" />
@@ -627,4 +627,3 @@ watch(() => [props.activeReports, props.residentLocations, props.staffLocations,
     margin: 12px;
 }
 </style>
-

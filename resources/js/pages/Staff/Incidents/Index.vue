@@ -12,9 +12,9 @@ import StaffLayout from '@/layouts/staff/Layout.vue';
 import { useFormHandlers } from '@/composables/useFormHandlers';
 import { useUtils } from '@/composables/useUtils';
 
-interface CalamityReport {
+interface IncidentReport {
     id: number;
-    calamity_type: string;
+    incident_type: string;
     severity: string;
     status: string;
     description: string;
@@ -33,7 +33,7 @@ interface CalamityReport {
 
 interface Props {
     reports: {
-        data: CalamityReport[];
+        data: IncidentReport[];
         current_page: number;
         last_page: number;
         per_page: number;
@@ -44,7 +44,7 @@ interface Props {
     filters: {
         search?: string;
         status?: string;
-        calamity_type?: string;
+        incident_type?: string;
         severity?: string;
     };
     statistics: {
@@ -67,19 +67,19 @@ const { createFilterForm, createDebouncedSearch } = useFormHandlers();
 const searchQuery = ref(props.filters.search || '');
 const filterForm = createFilterForm(props.filters);
 
-createDebouncedSearch(searchQuery, filterForm, '/staff/calamity');
+createDebouncedSearch(searchQuery, filterForm, '/staff/incidents');
 
 const applyFilters = () => {
-    filterForm.get('/staff/calamity');
+    filterForm.get('/staff/incidents');
 };
 
 const clearSearch = () => {
     searchQuery.value = '';
     filterForm.search = '';
     filterForm.status = 'all';
-    filterForm.calamity_type = 'all';
+    filterForm.incident_type = 'all';
     filterForm.severity = 'all';
-    filterForm.get('/staff/calamity');
+    filterForm.get('/staff/incidents');
 };
 
 const getStatusIcon = (status: string) => {
@@ -132,20 +132,20 @@ const getSeverityColor = (severity: string) => {
 };
 
 const formatStatus = (status: string): string => {
-    return status.split('_').map(word => 
+    return status.split('_').map(word =>
         word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
 };
 
-const formatCalamityType = (type: string): string => {
-    return type.split('_').map(word => 
+const formatIncidentType = (type: string): string => {
+    return type.split('_').map(word =>
         word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
 };
 </script>
 
 <template>
-    <Head title="Calamity Reports" />
+    <Head title="Incident Reports" />
 
     <StaffLayout>
         <div class="bg-gradient-to-br from-gray-50 to-blue-50/30 min-h-full w-full">
@@ -165,7 +165,7 @@ const formatCalamityType = (type: string): string => {
                                         <AlertTriangle class="h-8 w-8" />
                                     </div>
                                     <div>
-                                        <h1 class="text-4xl font-bold">Calamity Reports</h1>
+                                        <h1 class="text-4xl font-bold">Incident Reports</h1>
                                         <p class="text-red-100 text-lg mt-1">Emergency response and assistance management</p>
                                     </div>
                                 </div>
@@ -188,7 +188,7 @@ const formatCalamityType = (type: string): string => {
                                     </div>
                                 </div>
                             </div>
-                            <Link href="/staff/calamity/map">
+                            <Link href="/staff/incidents/map">
                                 <Button class="bg-white text-red-600 hover:bg-red-50 shadow-lg">
                                     <Map class="h-4 w-4 mr-2" />
                                     View Map
@@ -238,19 +238,21 @@ const formatCalamityType = (type: string): string => {
                             </div>
 
                             <div class="space-y-2">
-                                <label class="text-sm font-medium text-gray-700">Calamity Type</label>
-                                <Select v-model="filterForm.calamity_type" @update:model-value="applyFilters">
+                                <label class="text-sm font-medium text-gray-700">Incident Type</label>
+                                <Select v-model="filterForm.incident_type" @update:model-value="applyFilters">
                                     <SelectTrigger class="h-10">
                                         <SelectValue placeholder="All Types" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All Types</SelectItem>
-                                        <SelectItem value="typhoon">Typhoon</SelectItem>
-                                        <SelectItem value="flood">Flood</SelectItem>
-                                        <SelectItem value="earthquake">Earthquake</SelectItem>
                                         <SelectItem value="fire">Fire</SelectItem>
+                                        <SelectItem value="flood">Flood</SelectItem>
+                                        <SelectItem value="typhoon">Typhoon</SelectItem>
+                                        <SelectItem value="earthquake">Earthquake</SelectItem>
                                         <SelectItem value="landslide">Landslide</SelectItem>
-                                        <SelectItem value="drought">Drought</SelectItem>
+                                        <SelectItem value="medical_emergency">Medical Emergency</SelectItem>
+                                        <SelectItem value="accident">Accident</SelectItem>
+                                        <SelectItem value="crime">Crime</SelectItem>
                                         <SelectItem value="other">Other</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -296,7 +298,7 @@ const formatCalamityType = (type: string): string => {
                                 <TableHeader>
                                     <TableRow class="bg-gray-50">
                                         <TableHead class="font-semibold text-gray-900 px-4 py-3">Resident</TableHead>
-                                        <TableHead class="font-semibold text-gray-900 px-4 py-3">Calamity Type</TableHead>
+                                        <TableHead class="font-semibold text-gray-900 px-4 py-3">Incident Type</TableHead>
                                         <TableHead class="font-semibold text-gray-900 px-4 py-3">Severity</TableHead>
                                         <TableHead class="font-semibold text-gray-900 px-4 py-3">Status</TableHead>
                                         <TableHead class="font-semibold text-gray-900 px-4 py-3">Needs</TableHead>
@@ -314,7 +316,7 @@ const formatCalamityType = (type: string): string => {
                                             </div>
                                         </TableCell>
                                         <TableCell class="px-4 py-4">
-                                            <p class="text-sm text-gray-900 capitalize">{{ formatCalamityType(report.calamity_type) }}</p>
+                                            <p class="text-sm text-gray-900 capitalize">{{ formatIncidentType(report.incident_type) }}</p>
                                         </TableCell>
                                         <TableCell class="px-4 py-4">
                                             <Badge :class="getSeverityColor(report.severity)" class="capitalize">
@@ -353,7 +355,7 @@ const formatCalamityType = (type: string): string => {
                                             <p class="text-sm text-gray-600">{{ formatDateShort(report.created_at) }}</p>
                                         </TableCell>
                                         <TableCell class="px-4 py-4 text-right">
-                                            <Link :href="`/staff/calamity/${report.id}`">
+                                            <Link :href="`/staff/incidents/${report.id}`">
                                                 <Button variant="ghost" size="sm" class="h-8">
                                                     <Eye class="h-4 w-4 mr-1" />
                                                     View
@@ -382,14 +384,14 @@ const formatCalamityType = (type: string): string => {
                             <div class="flex items-center gap-2">
                                 <Link
                                     v-if="props.reports.current_page > 1"
-                                    :href="`/staff/calamity?page=${props.reports.current_page - 1}&${new URLSearchParams(filterForm.data() as any).toString()}`"
+                                    :href="`/staff/incidents?page=${props.reports.current_page - 1}&${new URLSearchParams(filterForm.data() as any).toString()}`"
                                     preserve-state
                                 >
                                     <Button variant="outline" size="sm">Previous</Button>
                                 </Link>
                                 <Link
                                     v-if="props.reports.current_page < props.reports.last_page"
-                                    :href="`/staff/calamity?page=${props.reports.current_page + 1}&${new URLSearchParams(filterForm.data() as any).toString()}`"
+                                    :href="`/staff/incidents?page=${props.reports.current_page + 1}&${new URLSearchParams(filterForm.data() as any).toString()}`"
                                     preserve-state
                                 >
                                     <Button variant="outline" size="sm">Next</Button>
@@ -402,4 +404,3 @@ const formatCalamityType = (type: string): string => {
         </div>
     </StaffLayout>
 </template>
-

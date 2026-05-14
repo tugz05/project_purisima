@@ -3,32 +3,32 @@
 namespace App\Http\Controllers\Resident;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\CalamityReportRequest;
-use App\Models\CalamityReport;
-use App\Services\CalamityReportService;
+use App\Http\Requests\IncidentReportRequest;
+use App\Models\IncidentReport;
+use App\Services\IncidentReportService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class CalamityReportController extends Controller
+class IncidentReportController extends Controller
 {
     use AuthorizesRequests;
 
     public function __construct(
-        private CalamityReportService $calamityReportService
+        private IncidentReportService $incidentReportService
     ) {}
 
     /**
-     * Display a listing of the resident's calamity reports
+     * Display a listing of the resident's incident reports
      */
     public function index(Request $request): Response
     {
         $filters = $request->only(['status', 'sort', 'direction']);
-        $reports = $this->calamityReportService->getResidentReports($request->user(), $filters);
+        $reports = $this->incidentReportService->getResidentReports($request->user(), $filters);
 
-        return Inertia::render('resident/calamity/Index', [
+        return Inertia::render('resident/incidents/Index', [
             'reports' => [
                 'data' => $reports->items(),
                 'current_page' => $reports->currentPage(),
@@ -43,36 +43,36 @@ class CalamityReportController extends Controller
     }
 
     /**
-     * Store a newly created calamity report
+     * Store a newly created incident report
      */
-    public function store(CalamityReportRequest $request): RedirectResponse
+    public function store(IncidentReportRequest $request): RedirectResponse
     {
-        $report = $this->calamityReportService->create($request->validated(), $request->user());
+        $report = $this->incidentReportService->create($request->validated(), $request->user());
 
-        return redirect()->route('resident.calamity.index')
-            ->with('success', 'Calamity report submitted successfully. Help is on the way!');
+        return redirect()->route('resident.incidents.index')
+            ->with('success', 'Incident report submitted successfully. Help is on the way!');
     }
 
     /**
-     * Display the specified calamity report
+     * Display the specified incident report
      */
-    public function show(CalamityReport $calamityReport): Response
+    public function show(IncidentReport $incidentReport): Response
     {
-        $this->authorize('view', $calamityReport);
+        $this->authorize('view', $incidentReport);
 
-        $calamityReport->load(['staff']);
+        $incidentReport->load(['staff']);
 
-        return Inertia::render('resident/calamity/Show', [
-            'report' => $calamityReport,
+        return Inertia::render('resident/incidents/Show', [
+            'report' => $incidentReport,
         ]);
     }
 
     /**
      * Update location for an existing report
      */
-    public function updateLocation(Request $request, CalamityReport $calamityReport): RedirectResponse
+    public function updateLocation(Request $request, IncidentReport $incidentReport): RedirectResponse
     {
-        $this->authorize('update', $calamityReport);
+        $this->authorize('update', $incidentReport);
 
         $validated = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
@@ -80,7 +80,7 @@ class CalamityReportController extends Controller
             'address' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $this->calamityReportService->update($calamityReport, $validated);
+        $this->incidentReportService->update($incidentReport, $validated);
 
         return redirect()->back()
             ->with('success', 'Location updated successfully.');

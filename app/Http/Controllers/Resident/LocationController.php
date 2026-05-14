@@ -100,7 +100,7 @@ class LocationController extends Controller
             ];
         }
 
-        return Inertia::render('resident/calamity/Map', [
+        return Inertia::render('resident/incidents/Map', [
             'staffLocations' => $staffLocations,
             'residentLocations' => $residentLocations,
             'currentUserLocation' => $currentUserLocation,

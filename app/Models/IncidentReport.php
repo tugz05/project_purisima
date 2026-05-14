@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CalamityReport extends Model
+class IncidentReport extends Model
 {
     use HasFactory;
 
@@ -17,7 +17,7 @@ class CalamityReport extends Model
         'longitude',
         'address',
         'location_notes',
-        'calamity_type',
+        'incident_type',
         'severity',
         'description',
         'needs',

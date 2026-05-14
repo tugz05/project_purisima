@@ -5,7 +5,10 @@
       "Bash(npx tsc *)",
       "Bash(Get-ChildItem -Path \"C:\\\\laragon\\\\www\\\\project_purisima\" -Force)",
       "Bash(Select-Object Name)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(xargs grep -l \"calamity\\\\|Calamity\")",
+      "Bash(cp c:/laragon/www/project_purisima/.claude/worktrees/agent-ae3499229bcab399d/resources/js/pages/Staff/Incidents/*.vue c:/laragon/www/project_purisima/resources/js/pages/Staff/Incidents/)",
+      "Bash(cp c:/laragon/www/project_purisima/.claude/worktrees/agent-ae3499229bcab399d/resources/js/pages/resident/incidents/*.vue c:/laragon/www/project_purisima/resources/js/pages/resident/incidents/)"
     ]
   }
 }

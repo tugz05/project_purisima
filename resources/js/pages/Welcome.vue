@@ -591,7 +591,7 @@ const closeAnnouncementView = () => {
           <div class="absolute inset-0 bg-gradient-to-r from-[#0c4a6e]/[0.05] via-transparent to-[#c2410c]/[0.06]"></div>
         </div>
 
-      <!-- Primary Features: Calamity Reports & Location Tracking -->
+      <!-- Primary Features: Incident Reports & Location Tracking -->
       <section id="about" class="relative px-6 py-20 overflow-hidden bg-gradient-to-br from-red-50/60 via-orange-50/50 to-amber-50/55 backdrop-blur-[2px]">
         <!-- Animated background elements -->
         <div class="absolute inset-0 overflow-hidden pointer-events-none">
@@ -610,13 +610,13 @@ const closeAnnouncementView = () => {
               <h2 class="text-4xl md:text-5xl font-bold text-gray-900">Primary Features</h2>
             </div>
             <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-              Real-time calamity reporting and location tracking for faster emergency response
+              Real-time incident reporting and location tracking for faster emergency response
             </p>
           </div>
 
           <!-- Feature Cards -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-            <!-- Calamity Reports Feature -->
+            <!-- Incident Reports Feature -->
             <div data-reveal class="reveal group relative rounded-3xl border-2 border-red-100/80 bg-white/90 p-8 shadow-2xl backdrop-blur-md transition-all duration-500 hover:-translate-y-2 hover:border-red-300/90 transform overflow-hidden md:p-10">
               <!-- Background decoration -->
               <div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-red-100/30 to-orange-100/30 rounded-full -translate-y-32 translate-x-32"></div>
@@ -627,7 +627,7 @@ const closeAnnouncementView = () => {
                     <AlertTriangle class="h-10 w-10 text-white" />
                   </div>
                   <div>
-                    <h3 class="text-3xl font-bold text-gray-900 mb-1">Calamity Reports</h3>
+                    <h3 class="text-3xl font-bold text-gray-900 mb-1">Incident Reports</h3>
                     <p class="text-sm text-gray-500">Emergency incident reporting system</p>
                   </div>
                 </div>
@@ -671,7 +671,7 @@ const closeAnnouncementView = () => {
                 </div>
 
                 <Link 
-                  :href="isAuthed ? '/resident/calamity' : register().url" 
+                  :href="isAuthed ? '/resident/incidents' : register().url"
                   class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold rounded-xl hover:shadow-xl transition-all duration-300 group"
                 >
                   <AlertTriangle class="h-5 w-5 group-hover:animate-pulse" />
@@ -736,7 +736,7 @@ const closeAnnouncementView = () => {
                 </div>
 
                 <Link 
-                  :href="isAuthed ? '/resident/calamity/map' : register().url" 
+                  :href="isAuthed ? '/resident/incidents/map' : register().url"
                   class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-xl hover:shadow-xl transition-all duration-300 group"
                 >
                   <Navigation class="h-5 w-5 group-hover:animate-spin" />

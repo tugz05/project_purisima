@@ -5,7 +5,9 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
+use App\Models\IncidentReport;
 use App\Models\Transaction;
+use App\Policies\IncidentReportPolicy;
 use App\Policies\TransactionPolicy;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Transaction::class, TransactionPolicy::class);
+        Gate::policy(IncidentReport::class, IncidentReportPolicy::class);
 
         // Force HTTPS scheme when the app URL is https, so assets are generated securely behind ngrok
         $appUrl = config('app.url');

@@ -57,17 +57,17 @@ const mainNavItems = computed<NavItem[]>(() => {
             ],
         },
         {
-            title: 'Calamity Reports',
-            href: '/resident/calamity',
+            title: 'Incident Reports',
+            href: '/resident/incidents',
             icon: AlertTriangle,
             children: [
                 {
                     title: 'My Reports',
-                    href: '/resident/calamity',
+                    href: '/resident/incidents',
                 },
                 {
                     title: 'Location Map',
-                    href: '/resident/calamity/map',
+                    href: '/resident/incidents/map',
                 },
             ],
         },

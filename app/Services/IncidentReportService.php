@@ -2,26 +2,26 @@
 
 namespace App\Services;
 
-use App\Models\CalamityReport;
+use App\Models\IncidentReport;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
-class CalamityReportService
+class IncidentReportService
 {
     /**
-     * Create a new calamity report
+     * Create a new incident report
      */
-    public function create(array $data, User $resident): CalamityReport
+    public function create(array $data, User $resident): IncidentReport
     {
         return DB::transaction(function () use ($data, $resident) {
-            return CalamityReport::create([
+            return IncidentReport::create([
                 'resident_id' => $resident->id,
                 'latitude' => $data['latitude'] ?? null,
                 'longitude' => $data['longitude'] ?? null,
                 'address' => $data['address'] ?? null,
                 'location_notes' => $data['location_notes'] ?? null,
-                'calamity_type' => $data['calamity_type'] ?? 'other',
+                'incident_type' => $data['incident_type'] ?? 'other',
                 'severity' => $data['severity'] ?? 'medium',
                 'description' => $data['description'] ?? null,
                 'needs' => $data['needs'] ?? [],
@@ -39,9 +39,9 @@ class CalamityReportService
     }
 
     /**
-     * Update a calamity report
+     * Update an incident report
      */
-    public function update(CalamityReport $report, array $data, ?User $staff = null): CalamityReport
+    public function update(IncidentReport $report, array $data, ?User $staff = null): IncidentReport
     {
         return DB::transaction(function () use ($report, $data, $staff) {
             $updateData = [];
@@ -63,9 +63,9 @@ class CalamityReportService
                 $updateData['location_updated_at'] = now();
             }
 
-            // Calamity information
-            if (isset($data['calamity_type'])) {
-                $updateData['calamity_type'] = $data['calamity_type'];
+            // Incident information
+            if (isset($data['incident_type'])) {
+                $updateData['incident_type'] = $data['incident_type'];
             }
             if (isset($data['severity'])) {
                 $updateData['severity'] = $data['severity'];
@@ -106,7 +106,7 @@ class CalamityReportService
             }
             if (isset($data['status'])) {
                 $updateData['status'] = $data['status'];
-                
+
                 // Set timestamps based on status
                 if ($data['status'] === 'acknowledged' && !$report->acknowledged_at) {
                     $updateData['acknowledged_at'] = now();
@@ -136,14 +136,14 @@ class CalamityReportService
      */
     public function getStaffReports(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = CalamityReport::with(['resident', 'staff']);
+        $query = IncidentReport::with(['resident', 'staff']);
 
         if (isset($filters['status']) && $filters['status'] && $filters['status'] !== 'all') {
             $query->where('status', $filters['status']);
         }
 
-        if (isset($filters['calamity_type']) && $filters['calamity_type'] && $filters['calamity_type'] !== 'all') {
-            $query->where('calamity_type', $filters['calamity_type']);
+        if (isset($filters['incident_type']) && $filters['incident_type'] && $filters['incident_type'] !== 'all') {
+            $query->where('incident_type', $filters['incident_type']);
         }
 
         if (isset($filters['severity']) && $filters['severity'] && $filters['severity'] !== 'all') {
@@ -177,7 +177,7 @@ class CalamityReportService
      */
     public function getResidentReports(User $resident, array $filters = []): LengthAwarePaginator
     {
-        $query = CalamityReport::where('resident_id', $resident->id)
+        $query = IncidentReport::where('resident_id', $resident->id)
             ->with(['staff']);
 
         if (isset($filters['status']) && $filters['status'] && $filters['status'] !== 'all') {
@@ -196,7 +196,7 @@ class CalamityReportService
      */
     public function getActiveReportsForMap(): array
     {
-        return CalamityReport::where('location_shared', true)
+        return IncidentReport::where('location_shared', true)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->whereIn('status', ['pending', 'acknowledged', 'in_progress'])
@@ -209,7 +209,7 @@ class CalamityReportService
                     'latitude' => (float) $report->latitude,
                     'longitude' => (float) $report->longitude,
                     'address' => $report->address,
-                    'calamity_type' => $report->calamity_type,
+                    'incident_type' => $report->incident_type,
                     'severity' => $report->severity,
                     'status' => $report->status,
                     'needs' => $report->needs ?? [],
@@ -226,15 +226,14 @@ class CalamityReportService
     public function getStatistics(): array
     {
         return [
-            'total' => CalamityReport::count(),
-            'pending' => CalamityReport::where('status', 'pending')->count(),
-            'acknowledged' => CalamityReport::where('status', 'acknowledged')->count(),
-            'in_progress' => CalamityReport::where('status', 'in_progress')->count(),
-            'assisted' => CalamityReport::where('status', 'assisted')->count(),
-            'resolved' => CalamityReport::where('status', 'resolved')->count(),
-            'critical' => CalamityReport::where('severity', 'critical')->count(),
-            'high' => CalamityReport::where('severity', 'high')->count(),
+            'total' => IncidentReport::count(),
+            'pending' => IncidentReport::where('status', 'pending')->count(),
+            'acknowledged' => IncidentReport::where('status', 'acknowledged')->count(),
+            'in_progress' => IncidentReport::where('status', 'in_progress')->count(),
+            'assisted' => IncidentReport::where('status', 'assisted')->count(),
+            'resolved' => IncidentReport::where('status', 'resolved')->count(),
+            'critical' => IncidentReport::where('severity', 'critical')->count(),
+            'high' => IncidentReport::where('severity', 'high')->count(),
         ];
     }
 }
-

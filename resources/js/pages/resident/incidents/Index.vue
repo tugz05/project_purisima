@@ -16,9 +16,9 @@ import { useUtils } from '@/composables/useUtils';
 import { toast } from 'vue-sonner';
 import InputError from '@/components/InputError.vue';
 
-interface CalamityReport {
+interface IncidentReport {
     id: number;
-    calamity_type: string;
+    incident_type: string;
     severity: string;
     status: string;
     description: string;
@@ -34,7 +34,7 @@ interface CalamityReport {
 
 interface Props {
     reports: {
-        data: CalamityReport[];
+        data: IncidentReport[];
         current_page: number;
         last_page: number;
         per_page: number;
@@ -65,7 +65,7 @@ const form = useForm({
     longitude: null as number | null,
     address: '',
     location_notes: '',
-    calamity_type: 'other',
+    incident_type: 'other',
     severity: 'medium',
     description: '',
     needs: [] as string[],
@@ -103,7 +103,7 @@ const checkLocationPermission = async () => {
         try {
             const result = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
             locationPermissionStatus.value = result.state as 'prompt' | 'granted' | 'denied';
-            
+
             // Listen for permission changes
             result.onchange = () => {
                 locationPermissionStatus.value = result.state as 'prompt' | 'granted' | 'denied';
@@ -198,7 +198,7 @@ const submitReport = () => {
         return;
     }
 
-    form.post('/resident/calamity', {
+    form.post('/resident/incidents', {
         onSuccess: () => {
             toast.success('Emergency report submitted! Help is on the way.');
             closeModal();
@@ -245,25 +245,25 @@ const getStatusColor = (status: string) => {
 };
 
 const formatStatus = (status: string): string => {
-    return status.split('_').map(word => 
+    return status.split('_').map(word =>
         word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
 };
 
-const formatCalamityType = (type: string): string => {
-    return type.split('_').map(word => 
+const formatIncidentType = (type: string): string => {
+    return type.split('_').map(word =>
         word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
 };
 
 const applyFilters = () => {
-    filterForm.get('/resident/calamity');
+    filterForm.get('/resident/incidents');
 };
 
 // Check location permission on component mount
 onMounted(async () => {
     await checkLocationPermission();
-    
+
     // Show a helpful message if permission is denied
     if (locationPermissionStatus.value === 'denied') {
         // Don't show toast immediately, wait for user to open modal
@@ -287,8 +287,8 @@ onUnmounted(() => {
                 <div class="absolute inset-0 bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900">
                     <!-- Animated Ripple Circles -->
                     <div class="absolute inset-0 overflow-hidden">
-                        <div 
-                            v-for="i in 8" 
+                        <div
+                            v-for="i in 8"
                             :key="i"
                             class="ripple-circle absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-cyan-400/30"
                             :style="{
@@ -300,8 +300,8 @@ onUnmounted(() => {
                     </div>
                     <!-- Additional smaller ripples for depth -->
                     <div class="absolute inset-0 overflow-hidden">
-                        <div 
-                            v-for="i in 6" 
+                        <div
+                            v-for="i in 6"
                             :key="`small-${i}`"
                             class="ripple-circle-small absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/20"
                             :style="{
@@ -312,7 +312,7 @@ onUnmounted(() => {
                         ></div>
                     </div>
                 </div>
-                
+
                 <!-- Button Content -->
                 <div class="relative z-10 text-center w-full max-w-md">
                     <button
@@ -321,10 +321,10 @@ onUnmounted(() => {
                     >
                         <!-- Inner Glow -->
                         <div class="absolute inset-0 rounded-full bg-gradient-to-br from-cyan-400/20 to-blue-500/20 blur-xl group-hover:blur-2xl transition-all"></div>
-                        
+
                         <!-- Pulsing Ring Effect -->
                         <div class="absolute inset-0 rounded-full bg-cyan-400/20 animate-ping"></div>
-                        
+
                         <!-- Play Icon -->
                         <div class="relative flex flex-col items-center justify-center h-full z-10">
                             <div class="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 mb-3 sm:mb-4">
@@ -335,7 +335,7 @@ onUnmounted(() => {
                             <span class="text-cyan-600 font-bold text-lg sm:text-xl md:text-2xl lg:text-3xl">Get Help</span>
                         </div>
                     </button>
-                    
+
                     <p class="mt-6 sm:mt-8 text-white/90 text-base sm:text-lg md:text-xl font-medium">
                         Tap to report emergency
                     </p>
@@ -350,7 +350,7 @@ onUnmounted(() => {
                     <div class="max-w-6xl mx-auto">
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
                             <h2 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Your Reports</h2>
-                            <Link href="/resident/calamity/map">
+                            <Link href="/resident/incidents/map">
                                 <Button variant="outline" size="sm" class="w-full sm:w-auto">
                                     <MapPin class="h-4 w-4 mr-2" />
                                     View Map
@@ -370,7 +370,7 @@ onUnmounted(() => {
                                         <div class="flex-1 min-w-0">
                                             <h3 class="font-semibold text-base sm:text-lg text-gray-900 flex items-center gap-2">
                                                 <AlertTriangle class="h-4 w-4 sm:h-5 sm:w-5 text-red-600 flex-shrink-0" />
-                                                <span class="truncate">{{ formatCalamityType(report.calamity_type) }}</span>
+                                                <span class="truncate">{{ formatIncidentType(report.incident_type) }}</span>
                                             </h3>
                                             <p class="text-xs sm:text-sm text-gray-500 mt-1">
                                                 {{ formatDateShort(report.created_at) }}
@@ -408,7 +408,7 @@ onUnmounted(() => {
                                                 <span>{{ report.number_of_people }} people</span>
                                             </span>
                                         </div>
-                                        <Link :href="`/resident/calamity/${report.id}`" class="self-start sm:self-auto">
+                                        <Link :href="`/resident/incidents/${report.id}`" class="self-start sm:self-auto">
                                             <Button variant="outline" size="sm" class="w-full sm:w-auto">
                                                 <Eye class="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                                 View
@@ -435,14 +435,14 @@ onUnmounted(() => {
                             <div class="flex items-center gap-2">
                                 <Link
                                     v-if="props.reports.current_page > 1"
-                                    :href="`/resident/calamity?page=${props.reports.current_page - 1}&status=${filterForm.status}`"
+                                    :href="`/resident/incidents?page=${props.reports.current_page - 1}&status=${filterForm.status}`"
                                     preserve-state
                                 >
                                     <Button variant="outline" size="sm">Previous</Button>
                                 </Link>
                                 <Link
                                     v-if="props.reports.current_page < props.reports.last_page"
-                                    :href="`/resident/calamity?page=${props.reports.current_page + 1}&status=${filterForm.status}`"
+                                    :href="`/resident/incidents?page=${props.reports.current_page + 1}&status=${filterForm.status}`"
                                     preserve-state
                                 >
                                     <Button variant="outline" size="sm">Next</Button>
@@ -458,7 +458,7 @@ onUnmounted(() => {
                     <DialogHeader>
                         <DialogTitle class="text-xl sm:text-2xl font-bold text-red-600 flex items-center gap-2">
                             <AlertTriangle class="h-5 w-5 sm:h-6 sm:w-6" />
-                            Emergency Report
+                            Incident Report
                         </DialogTitle>
                         <DialogDescription class="text-sm sm:text-base">
                             Share your location and needs for immediate assistance
@@ -489,7 +489,7 @@ onUnmounted(() => {
                                     {{ locationLoading ? 'Getting...' : 'Get Location' }}
                                 </Button>
                             </div>
-                            
+
                             <!-- Permission Status Indicator -->
                             <div v-if="locationPermissionStatus === 'denied'" class="p-3 bg-amber-50 border border-amber-300 rounded-lg">
                                 <div class="flex items-start gap-2">
@@ -511,11 +511,11 @@ onUnmounted(() => {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div v-if="locationError && locationPermissionStatus !== 'denied'" class="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
                                 {{ locationError }}
                             </div>
-                            
+
                             <div v-if="form.latitude && form.longitude" class="p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700 flex items-center gap-2">
                                 <CheckCircle class="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                                 <span>Location captured: {{ form.latitude.toFixed(4) }}, {{ form.longitude.toFixed(4) }}</span>
@@ -533,23 +533,27 @@ onUnmounted(() => {
                             </div>
                         </div>
 
-                        <!-- Calamity Type & Severity -->
+                        <!-- Incident Type & Severity -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <div class="space-y-2">
-                                <Label for="calamity_type" class="text-xs sm:text-sm">Type *</Label>
-                                <Select v-model="form.calamity_type">
+                                <Label for="incident_type" class="text-xs sm:text-sm">Incident Type *</Label>
+                                <Select v-model="form.incident_type">
                                     <SelectTrigger class="text-sm">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="typhoon">Typhoon</SelectItem>
-                                        <SelectItem value="flood">Flood</SelectItem>
-                                        <SelectItem value="earthquake">Earthquake</SelectItem>
                                         <SelectItem value="fire">Fire</SelectItem>
+                                        <SelectItem value="flood">Flood</SelectItem>
+                                        <SelectItem value="typhoon">Typhoon</SelectItem>
+                                        <SelectItem value="earthquake">Earthquake</SelectItem>
+                                        <SelectItem value="landslide">Landslide</SelectItem>
+                                        <SelectItem value="medical_emergency">Medical Emergency</SelectItem>
+                                        <SelectItem value="accident">Accident</SelectItem>
+                                        <SelectItem value="crime">Crime</SelectItem>
                                         <SelectItem value="other">Other</SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <InputError :message="form.errors.calamity_type" />
+                                <InputError :message="form.errors.incident_type" />
                             </div>
 
                             <div class="space-y-2">

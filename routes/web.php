@@ -284,16 +284,16 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
     // Resident management routes
     Route::get('residents', [\App\Http\Controllers\Staff\ResidentController::class, 'index'])->name('residents.index');
 
-    // Calamity Report management routes
-    Route::get('calamity', [\App\Http\Controllers\Staff\CalamityReportController::class, 'index'])->name('calamity.index');
-    Route::get('calamity/map', [\App\Http\Controllers\Staff\CalamityReportController::class, 'map'])->name('calamity.map');
-    Route::get('calamity/active-reports', [\App\Http\Controllers\Staff\CalamityReportController::class, 'getActiveReports'])->name('calamity.active-reports');
+    // Incident Report management routes
+    Route::get('incidents', [\App\Http\Controllers\Staff\IncidentReportController::class, 'index'])->name('incidents.index');
+    Route::get('incidents/map', [\App\Http\Controllers\Staff\IncidentReportController::class, 'map'])->name('incidents.map');
+    Route::get('incidents/active-reports', [\App\Http\Controllers\Staff\IncidentReportController::class, 'getActiveReports'])->name('incidents.active-reports');
 
     // Location tracking routes
     Route::post('location/update', [\App\Http\Controllers\Staff\LocationController::class, 'update'])->name('location.update');
     Route::get('location/residents', [\App\Http\Controllers\Staff\LocationController::class, 'getResidentLocations'])->name('location.residents');
-    Route::get('calamity/{calamityReport}', [\App\Http\Controllers\Staff\CalamityReportController::class, 'show'])->name('calamity.show');
-    Route::put('calamity/{calamityReport}', [\App\Http\Controllers\Staff\CalamityReportController::class, 'update'])->name('calamity.update');
+    Route::get('incidents/{incidentReport}', [\App\Http\Controllers\Staff\IncidentReportController::class, 'show'])->name('incidents.show');
+    Route::put('incidents/{incidentReport}', [\App\Http\Controllers\Staff\IncidentReportController::class, 'update'])->name('incidents.update');
 
     Route::post('announcements/reorder', [\App\Http\Controllers\Staff\AnnouncementController::class, 'reorder'])->name('announcements.reorder');
 
@@ -356,11 +356,11 @@ Route::middleware(['auth', 'role:resident', 'registration.geo', 'profile.complet
     // Transaction routes
     Route::resource('transactions', \App\Http\Controllers\Resident\TransactionController::class);
 
-    // Calamity Report routes
+    // Incident Report routes
     // Map route must be defined BEFORE resource route to avoid route conflict
-    Route::get('calamity/map', [\App\Http\Controllers\Resident\LocationController::class, 'map'])->name('calamity.map');
-    Route::resource('calamity', \App\Http\Controllers\Resident\CalamityReportController::class)->except(['create', 'edit', 'destroy']);
-    Route::post('calamity/{calamityReport}/update-location', [\App\Http\Controllers\Resident\CalamityReportController::class, 'updateLocation'])->name('calamity.update-location');
+    Route::get('incidents/map', [\App\Http\Controllers\Resident\LocationController::class, 'map'])->name('incidents.map');
+    Route::resource('incidents', \App\Http\Controllers\Resident\IncidentReportController::class)->except(['create', 'edit', 'destroy']);
+    Route::post('incidents/{incidentReport}/update-location', [\App\Http\Controllers\Resident\IncidentReportController::class, 'updateLocation'])->name('incidents.update-location');
 
     // Location tracking routes
     Route::post('location/update', [\App\Http\Controllers\Resident\LocationController::class, 'update'])->name('location.update');

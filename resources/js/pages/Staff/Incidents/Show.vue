@@ -11,13 +11,13 @@ import StaffLayout from '@/layouts/staff/Layout.vue';
 import { useUtils } from '@/composables/useUtils';
 import { toast } from 'vue-sonner';
 
-interface CalamityReport {
+interface IncidentReport {
     id: number;
     latitude: number;
     longitude: number;
     address: string;
     location_notes: string;
-    calamity_type: string;
+    incident_type: string;
     severity: string;
     status: string;
     description: string;
@@ -47,7 +47,7 @@ interface CalamityReport {
 }
 
 interface Props {
-    report: CalamityReport;
+    report: IncidentReport;
 }
 
 const props = defineProps<Props>();
@@ -61,7 +61,7 @@ const form = useForm({
 });
 
 const submit = () => {
-    form.put(`/staff/calamity/${props.report.id}`, {
+    form.put(`/staff/incidents/${props.report.id}`, {
         onSuccess: () => {
             toast.success('Report updated successfully!');
         },
@@ -104,8 +104,8 @@ const getSeverityColor = (severity: string) => {
     }
 };
 
-const formatCalamityType = (type: string): string => {
-    return type.split('_').map(word => 
+const formatIncidentType = (type: string): string => {
+    return type.split('_').map(word =>
         word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
 };
@@ -119,14 +119,14 @@ const openMapLocation = () => {
 </script>
 
 <template>
-    <Head title="Calamity Report Details" />
+    <Head title="Incident Report Details" />
 
     <StaffLayout>
         <div class="bg-gradient-to-br from-gray-50 to-blue-50/30 min-h-full w-full">
             <div class="mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 md:py-6 max-w-6xl">
                 <!-- Header -->
                 <div class="mb-6">
-                    <Link href="/staff/calamity">
+                    <Link href="/staff/incidents">
                         <Button variant="ghost" size="sm" class="mb-4">
                             <ArrowLeft class="h-4 w-4 mr-2" />
                             Back to Reports
@@ -143,7 +143,7 @@ const openMapLocation = () => {
                                     </div>
                                     <div>
                                         <h1 class="text-3xl font-bold text-white">Report Details</h1>
-                                        <p class="text-red-100 text-lg mt-1">{{ props.report.resident.name }} - {{ formatCalamityType(props.report.calamity_type) }}</p>
+                                        <p class="text-red-100 text-lg mt-1">{{ props.report.resident.name }} - {{ formatIncidentType(props.report.incident_type) }}</p>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3">
@@ -220,19 +220,19 @@ const openMapLocation = () => {
                             </CardContent>
                         </Card>
 
-                        <!-- Calamity Information -->
+                        <!-- Incident Information -->
                         <Card class="shadow-lg border-gray-200">
                             <CardHeader>
                                 <CardTitle class="flex items-center gap-2">
                                     <AlertTriangle class="h-5 w-5 text-red-600" />
-                                    Calamity Information
+                                    Incident Information
                                 </CardTitle>
                             </CardHeader>
                             <CardContent class="space-y-4">
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
                                         <p class="text-sm font-medium text-gray-500 mb-1">Type</p>
-                                        <p class="text-base text-gray-900 capitalize">{{ formatCalamityType(props.report.calamity_type) }}</p>
+                                        <p class="text-base text-gray-900 capitalize">{{ formatIncidentType(props.report.incident_type) }}</p>
                                     </div>
                                     <div>
                                         <p class="text-sm font-medium text-gray-500 mb-1">Severity</p>
@@ -413,4 +413,3 @@ const openMapLocation = () => {
         </div>
     </StaffLayout>
 </template>
-

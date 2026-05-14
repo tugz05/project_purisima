@@ -58,8 +58,8 @@ const mainNavItems = computed((): NavItem[] => {
             icon: Users,
         },
         {
-            title: 'Calamity Reports',
-            href: '/staff/calamity',
+            title: 'Incident Reports',
+            href: '/staff/incidents',
             icon: AlertTriangle,
         },
         {

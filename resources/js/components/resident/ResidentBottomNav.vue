@@ -37,10 +37,10 @@ const navItems = [
         active: computed(() => page.url.startsWith('/resident/transactions')),
     },
     {
-        title: 'Calamity Reports',
-        href: '/resident/calamity',
+        title: 'Incident Reports',
+        href: '/resident/incidents',
         icon: AlertTriangle,
-        active: computed(() => page.url.startsWith('/resident/calamity')),
+        active: computed(() => page.url.startsWith('/resident/incidents')),
     },
     {
         title: 'Household',

@@ -4,7 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class CalamityReportRequest extends FormRequest
+class IncidentReportRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -24,7 +24,7 @@ class CalamityReportRequest extends FormRequest
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'address' => ['nullable', 'string', 'max:500'],
             'location_notes' => ['nullable', 'string', 'max:1000'],
-            'calamity_type' => ['required', 'string', 'in:typhoon,flood,earthquake,fire,landslide,drought,other'],
+            'incident_type' => ['required', 'string', 'in:fire,flood,typhoon,earthquake,landslide,medical_emergency,accident,crime,other'],
             'severity' => ['required', 'string', 'in:low,medium,high,critical'],
             'description' => ['nullable', 'string', 'max:2000'],
             'needs' => ['nullable', 'array'],

@@ -3,34 +3,34 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
-use App\Models\CalamityReport;
-use App\Services\CalamityReportService;
+use App\Models\IncidentReport;
+use App\Services\IncidentReportService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class CalamityReportController extends Controller
+class IncidentReportController extends Controller
 {
     use AuthorizesRequests;
 
     public function __construct(
-        private CalamityReportService $calamityReportService
+        private IncidentReportService $incidentReportService
     ) {}
 
     /**
-     * Display a listing of all calamity reports
+     * Display a listing of all incident reports
      */
     public function index(Request $request): Response
     {
-        $filters = $request->only(['status', 'calamity_type', 'severity', 'search', 'sort', 'direction']);
+        $filters = $request->only(['status', 'incident_type', 'severity', 'search', 'sort', 'direction']);
         $perPage = $request->get('per_page', 15);
 
-        $reports = $this->calamityReportService->getStaffReports($filters, $perPage);
-        $statistics = $this->calamityReportService->getStatistics();
+        $reports = $this->incidentReportService->getStaffReports($filters, $perPage);
+        $statistics = $this->incidentReportService->getStatistics();
 
-        return Inertia::render('Staff/Calamity/Index', [
+        return Inertia::render('Staff/Incidents/Index', [
             'reports' => [
                 'data' => $reports->items(),
                 'current_page' => $reports->currentPage(),
@@ -50,8 +50,8 @@ class CalamityReportController extends Controller
      */
     public function map(Request $request): Response
     {
-        $activeReports = $this->calamityReportService->getActiveReportsForMap();
-        $statistics = $this->calamityReportService->getStatistics();
+        $activeReports = $this->incidentReportService->getActiveReportsForMap();
+        $statistics = $this->incidentReportService->getStatistics();
 
         // Get resident locations (blue)
         $residentLocations = \App\Models\User::where('role', 'resident')
@@ -99,7 +99,7 @@ class CalamityReportController extends Controller
             ];
         }
 
-        return Inertia::render('Staff/Calamity/Map', [
+        return Inertia::render('Staff/Incidents/Map', [
             'activeReports' => $activeReports,
             'statistics' => $statistics,
             'residentLocations' => $residentLocations,
@@ -109,21 +109,21 @@ class CalamityReportController extends Controller
     }
 
     /**
-     * Display the specified calamity report
+     * Display the specified incident report
      */
-    public function show(CalamityReport $calamityReport): Response
+    public function show(IncidentReport $incidentReport): Response
     {
-        $calamityReport->load(['resident', 'staff']);
+        $incidentReport->load(['resident', 'staff']);
 
-        return Inertia::render('Staff/Calamity/Show', [
-            'report' => $calamityReport,
+        return Inertia::render('Staff/Incidents/Show', [
+            'report' => $incidentReport,
         ]);
     }
 
     /**
-     * Update the specified calamity report
+     * Update the specified incident report
      */
-    public function update(Request $request, CalamityReport $calamityReport): RedirectResponse
+    public function update(Request $request, IncidentReport $incidentReport): RedirectResponse
     {
         $validated = $request->validate([
             'status' => ['required', 'string', 'in:pending,acknowledged,in_progress,assisted,resolved'],
@@ -132,9 +132,9 @@ class CalamityReportController extends Controller
             'staff_id' => ['nullable', 'exists:users,id'],
         ]);
 
-        $this->calamityReportService->update($calamityReport, $validated, $request->user());
+        $this->incidentReportService->update($incidentReport, $validated, $request->user());
 
-        return redirect()->route('staff.calamity.show', $calamityReport)
+        return redirect()->route('staff.incidents.show', $incidentReport)
             ->with('success', 'Report updated successfully.');
     }
 
@@ -143,7 +143,7 @@ class CalamityReportController extends Controller
      */
     public function getActiveReports(): \Illuminate\Http\JsonResponse
     {
-        $reports = $this->calamityReportService->getActiveReportsForMap();
+        $reports = $this->incidentReportService->getActiveReportsForMap();
 
         return response()->json($reports);
     }

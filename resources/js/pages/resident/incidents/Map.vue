@@ -285,7 +285,7 @@ let refreshInterval: number | null = null;
 
 onMounted(() => {
     initializeMap();
-    
+
     // Start auto-refresh for real-time location updates
     refreshInterval = window.setInterval(() => {
         refreshLocations();
@@ -294,13 +294,13 @@ onMounted(() => {
 
 onUnmounted(() => {
     stopLocationTracking();
-    
+
     // Clear auto-refresh interval
     if (refreshInterval !== null) {
         clearInterval(refreshInterval);
         refreshInterval = null;
     }
-    
+
     if (map) {
         map.remove();
         map = null;
@@ -330,7 +330,7 @@ watch(() => [props.staffLocations, props.residentLocations, props.currentUserLoc
             <div class="mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 md:py-6 max-w-none">
                 <!-- Header -->
                 <div class="mb-6">
-                    <Link href="/resident/calamity">
+                    <Link href="/resident/incidents">
                         <Button variant="ghost" size="sm" class="mb-4">
                             <ArrowLeft class="h-4 w-4 mr-2" />
                             Back to Reports
@@ -367,9 +367,9 @@ watch(() => [props.staffLocations, props.residentLocations, props.currentUserLoc
                                     </div>
                                 </div>
                                 <div class="flex gap-3">
-                                    <Button 
+                                    <Button
                                         @click="isTracking ? stopLocationTracking() : startLocationTracking()"
-                                        variant="outline" 
+                                        variant="outline"
                                         class="bg-white/20 text-white border-white/30 hover:bg-white/30"
                                     >
                                         <Navigation class="h-4 w-4 mr-2" />
@@ -408,4 +408,3 @@ watch(() => [props.staffLocations, props.residentLocations, props.currentUserLoc
     margin: 12px;
 }
 </style>
-
