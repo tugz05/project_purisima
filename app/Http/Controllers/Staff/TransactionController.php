@@ -11,6 +11,7 @@ use App\Services\CertificateTemplateService;
 use App\Services\CertificateVerificationService;
 use App\Services\ManualCertificateWizardService;
 use App\Services\NotificationService;
+use App\Services\TemplateTwoAIService;
 use App\Services\TransactionService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +30,7 @@ class TransactionController extends Controller
         private NotificationService $notificationService,
         private CertificateTemplateService $templateService,
         private AIDocumentGeneratorService $aiService,
+        private TemplateTwoAIService $templateTwoAiService,
         private ManualCertificateWizardService $manualCertificateWizardService,
         private CertificateVerificationService $certificateVerificationService
     ) {}
@@ -216,7 +218,31 @@ class TransactionController extends Controller
                 ], 404);
             }
 
-            // Generate content using AI only - no fallback
+            // Template Two uses a background-image layout — generate structured field data
+            if ($transaction->documentType->template_type === 'template_two') {
+                $templateTwoData = $this->templateTwoAiService->generateContent($transaction);
+
+                // Save immediately (template_two doesn't use the rich-text editor flow)
+                $existing = is_array($transaction->generated_document_data) ? $transaction->generated_document_data : [];
+                $transaction->update([
+                    'generated_document_data' => array_merge($existing, [
+                        'template_two_data' => $templateTwoData,
+                        'generated_at' => now()->toIso8601String(),
+                        'generated_by' => $request->user()?->id,
+                    ]),
+                    'document_generated_at' => now(),
+                ]);
+
+                return response()->json([
+                    'content' => '',
+                    'template_two_data' => $templateTwoData,
+                    'is_template_two' => true,
+                    'generated_by' => 'AI (OpenAI)',
+                    'success' => true,
+                ]);
+            }
+
+            // Standard flow: generate HTML prose content
             $content = $this->aiService->generateCertificateContent($transaction);
 
             return response()->json([
@@ -255,13 +281,20 @@ class TransactionController extends Controller
             abort(404, 'Document type not found for this transaction.');
         }
 
-        $content = $transaction->generated_document_data['content'] ?? '';
+        $generatedData = is_array($transaction->generated_document_data) ? $transaction->generated_document_data : [];
+        $templateType = $transaction->documentType->template_type;
+        $content = $generatedData['content'] ?? '';
+        $templateTwoData = $generatedData['template_two_data'] ?? null;
 
-        if (empty($content)) {
+        // Template_two only needs template_two_data; all other layouts need content HTML
+        if ($templateType === 'template_two') {
+            if ($templateTwoData === null) {
+                abort(404, 'Certificate content not found. Please generate the certificate first.');
+            }
+        } elseif (empty($content)) {
             abort(404, 'Certificate content not found. Please generate the certificate first.');
         }
 
-        // Get resident data for template
         $resident = $transaction->resident;
         $documentTypeName = $transaction->documentType->name;
         $currentDate = now()->format('F d, Y');
@@ -278,6 +311,8 @@ class TransactionController extends Controller
             'resident' => $resident,
             'documentTypeName' => $documentTypeName,
             'printLayout' => $printLayout,
+            'templateType' => $templateType,
+            'templateTwoData' => $templateTwoData,
             'content' => $content,
             'currentDate' => $currentDate,
             'currentDateFormatted' => $currentDateFormatted,

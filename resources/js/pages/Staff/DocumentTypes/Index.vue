@@ -660,6 +660,45 @@ const categoryOptions = [
     'taxes',
     'other'
 ];
+
+// Document template definitions
+const documentTemplates = [
+    {
+        value: 'template_one',
+        label: 'Classic Certificate',
+        description: 'Clean, text-only layout with official letterhead and seal. Ideal for standard barangay certificates of residency, good moral, and employment.',
+        image: '/images/documents_template/template_one.png',
+        badge: 'Standard',
+        badgeColor: 'bg-blue-100 text-blue-700',
+    },
+    {
+        value: 'template_two',
+        label: 'Formal with Background',
+        description: 'Enhanced layout with a styled background image for a more official and professional appearance.',
+        image: '/images/documents_template/template_two.png',
+        badge: 'Featured',
+        badgeColor: 'bg-amber-100 text-amber-700',
+    },
+    {
+        value: 'template_three',
+        label: 'Premium Certificate',
+        description: 'Decorative background layout suited for high-importance documents and special certifications.',
+        image: '/images/documents_template/template_three.png',
+        badge: 'Premium',
+        badgeColor: 'bg-violet-100 text-violet-700',
+    },
+];
+
+// Template preview dialog
+const templatePreviewOpen = ref(false);
+const templatePreviewImage = ref('');
+const templatePreviewLabel = ref('');
+
+const openTemplatePreview = (tpl: { image: string; label: string }) => {
+    templatePreviewImage.value = tpl.image;
+    templatePreviewLabel.value = tpl.label;
+    templatePreviewOpen.value = true;
+};
 </script>
 
 <template>
@@ -1143,59 +1182,76 @@ const categoryOptions = [
 
                     <!-- Document Template -->
                     <div class="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-xl p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-2">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-1">
                             <LayoutTemplate class="h-5 w-5 text-violet-600" />
                             Document Template
                         </h3>
-                        <p class="text-sm text-gray-600 mb-5">Choose the template layout that will be used when generating this document.</p>
+                        <p class="text-sm text-gray-600 mb-5">
+                            Click a template to select it. Use the
+                            <Eye class="inline h-3.5 w-3.5 align-text-bottom mx-0.5" />
+                            icon to preview full size.
+                        </p>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <!-- Certification Template -->
+                        <div class="grid grid-cols-3 gap-4">
                             <button
+                                v-for="tpl in documentTemplates"
+                                :key="tpl.value"
                                 type="button"
-                                @click="createForm.template_type = 'certification'"
+                                @click="createForm.template_type = tpl.value"
                                 :class="[
-                                    'relative flex flex-col items-start gap-3 rounded-xl border-2 p-5 text-left transition-all duration-150',
-                                    createForm.template_type === 'certification'
-                                        ? 'border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-300'
-                                        : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/40'
+                                    'group relative flex flex-col rounded-xl border-2 overflow-hidden text-left transition-all duration-200 focus:outline-none',
+                                    createForm.template_type === tpl.value
+                                        ? 'border-violet-500 ring-2 ring-violet-300 shadow-lg'
+                                        : 'border-gray-200 bg-white hover:border-violet-300 hover:shadow-md',
                                 ]"
                             >
-                                <div :class="['flex h-12 w-12 items-center justify-center rounded-xl', createForm.template_type === 'certification' ? 'bg-violet-600' : 'bg-gray-100']">
-                                    <ScrollText :class="['h-6 w-6', createForm.template_type === 'certification' ? 'text-white' : 'text-gray-500']" />
+                                <!-- Document preview image -->
+                                <div class="relative w-full overflow-hidden bg-gray-100" style="aspect-ratio: 3/4;">
+                                    <img
+                                        :src="tpl.image"
+                                        :alt="tpl.label"
+                                        class="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-105"
+                                    />
+                                    <!-- Eye / enlarge button (shows on hover) -->
+                                    <button
+                                        type="button"
+                                        @click.stop="openTemplatePreview(tpl)"
+                                        class="absolute top-2 right-2 bg-black/60 hover:bg-black/80 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+                                        title="Preview full size"
+                                    >
+                                        <Eye class="h-3.5 w-3.5 text-white" />
+                                    </button>
+                                    <!-- Selected checkmark overlay -->
+                                    <div v-if="createForm.template_type === tpl.value" class="absolute inset-0 bg-violet-600/10 flex items-start justify-end p-2">
+                                        <div class="bg-violet-600 rounded-full p-1 shadow-md">
+                                            <CheckCircle class="h-4 w-4 text-white" />
+                                        </div>
+                                    </div>
+                                    <!-- Bottom fade for visual polish -->
+                                    <div class="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
                                 </div>
-                                <div>
-                                    <p class="font-semibold text-gray-900">Certification Template</p>
-                                    <p class="mt-0.5 text-xs text-gray-500 leading-relaxed">Formal certificate layout with official seal and letterhead. Ideal for certificates of residency, good moral, employment, etc.</p>
-                                </div>
-                                <div v-if="createForm.template_type === 'certification'" class="absolute top-3 right-3 h-5 w-5 rounded-full bg-violet-600 flex items-center justify-center">
-                                    <CheckCircle class="h-4 w-4 text-white" />
-                                </div>
-                            </button>
 
-                            <!-- Clearance Template -->
-                            <button
-                                type="button"
-                                @click="createForm.template_type = 'clearance'"
-                                :class="[
-                                    'relative flex flex-col items-start gap-3 rounded-xl border-2 p-5 text-left transition-all duration-150',
-                                    createForm.template_type === 'clearance'
-                                        ? 'border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-300'
-                                        : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/40'
-                                ]"
-                            >
-                                <div :class="['flex h-12 w-12 items-center justify-center rounded-xl', createForm.template_type === 'clearance' ? 'bg-violet-600' : 'bg-gray-100']">
-                                    <FileText :class="['h-6 w-6', createForm.template_type === 'clearance' ? 'text-white' : 'text-gray-500']" />
-                                </div>
-                                <div>
-                                    <p class="font-semibold text-gray-900">Clearance Template</p>
-                                    <p class="mt-0.5 text-xs text-gray-500 leading-relaxed">Standard clearance layout with endorsement block. Suited for barangay clearance, business permit clearance, etc.</p>
-                                </div>
-                                <div v-if="createForm.template_type === 'clearance'" class="absolute top-3 right-3 h-5 w-5 rounded-full bg-violet-600 flex items-center justify-center">
-                                    <CheckCircle class="h-4 w-4 text-white" />
+                                <!-- Template label and description -->
+                                <div class="p-3 bg-white flex flex-col gap-1 flex-1">
+                                    <div class="flex items-center justify-between gap-1">
+                                        <span class="font-semibold text-sm text-gray-900 truncate">{{ tpl.label }}</span>
+                                        <span :class="['text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0', tpl.badgeColor]">{{ tpl.badge }}</span>
+                                    </div>
+                                    <p class="text-xs text-gray-500 leading-relaxed line-clamp-2">{{ tpl.description }}</p>
                                 </div>
                             </button>
                         </div>
+
+                        <!-- Selection feedback -->
+                        <div v-if="!createForm.template_type" class="mt-4 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            <Lightbulb class="h-3.5 w-3.5 flex-shrink-0" />
+                            No template selected. Please choose one above.
+                        </div>
+                        <div v-else class="mt-4 flex items-center gap-2 text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2">
+                            <CheckCircle class="h-3.5 w-3.5 flex-shrink-0" />
+                            <span><strong>{{ documentTemplates.find(t => t.value === createForm.template_type)?.label }}</strong> selected as the document template.</span>
+                        </div>
+
                         <p v-if="createForm.errors.template_type" class="text-red-500 text-xs mt-2">{{ createForm.errors.template_type }}</p>
                     </div>
 
@@ -1537,59 +1593,70 @@ const categoryOptions = [
 
                     <!-- Document Template -->
                     <div class="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-xl p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-2">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-1">
                             <LayoutTemplate class="h-5 w-5 text-violet-600" />
                             Document Template
                         </h3>
-                        <p class="text-sm text-gray-600 mb-5">Choose the template layout that will be used when generating this document.</p>
+                        <p class="text-sm text-gray-600 mb-5">
+                            Click a template to select it. Use the
+                            <Eye class="inline h-3.5 w-3.5 align-text-bottom mx-0.5" />
+                            icon to preview full size.
+                        </p>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <!-- Certification Template -->
+                        <div class="grid grid-cols-3 gap-4">
                             <button
+                                v-for="tpl in documentTemplates"
+                                :key="tpl.value"
                                 type="button"
-                                @click="editForm.template_type = 'certification'"
+                                @click="editForm.template_type = tpl.value"
                                 :class="[
-                                    'relative flex flex-col items-start gap-3 rounded-xl border-2 p-5 text-left transition-all duration-150',
-                                    editForm.template_type === 'certification'
-                                        ? 'border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-300'
-                                        : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/40'
+                                    'group relative flex flex-col rounded-xl border-2 overflow-hidden text-left transition-all duration-200 focus:outline-none',
+                                    editForm.template_type === tpl.value
+                                        ? 'border-violet-500 ring-2 ring-violet-300 shadow-lg'
+                                        : 'border-gray-200 bg-white hover:border-violet-300 hover:shadow-md',
                                 ]"
                             >
-                                <div :class="['flex h-12 w-12 items-center justify-center rounded-xl', editForm.template_type === 'certification' ? 'bg-violet-600' : 'bg-gray-100']">
-                                    <ScrollText :class="['h-6 w-6', editForm.template_type === 'certification' ? 'text-white' : 'text-gray-500']" />
+                                <div class="relative w-full overflow-hidden bg-gray-100" style="aspect-ratio: 3/4;">
+                                    <img
+                                        :src="tpl.image"
+                                        :alt="tpl.label"
+                                        class="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-105"
+                                    />
+                                    <button
+                                        type="button"
+                                        @click.stop="openTemplatePreview(tpl)"
+                                        class="absolute top-2 right-2 bg-black/60 hover:bg-black/80 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+                                        title="Preview full size"
+                                    >
+                                        <Eye class="h-3.5 w-3.5 text-white" />
+                                    </button>
+                                    <div v-if="editForm.template_type === tpl.value" class="absolute inset-0 bg-violet-600/10 flex items-start justify-end p-2">
+                                        <div class="bg-violet-600 rounded-full p-1 shadow-md">
+                                            <CheckCircle class="h-4 w-4 text-white" />
+                                        </div>
+                                    </div>
+                                    <div class="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
                                 </div>
-                                <div>
-                                    <p class="font-semibold text-gray-900">Certification Template</p>
-                                    <p class="mt-0.5 text-xs text-gray-500 leading-relaxed">Formal certificate layout with official seal and letterhead. Ideal for certificates of residency, good moral, employment, etc.</p>
-                                </div>
-                                <div v-if="editForm.template_type === 'certification'" class="absolute top-3 right-3 h-5 w-5 rounded-full bg-violet-600 flex items-center justify-center">
-                                    <CheckCircle class="h-4 w-4 text-white" />
-                                </div>
-                            </button>
 
-                            <!-- Clearance Template -->
-                            <button
-                                type="button"
-                                @click="editForm.template_type = 'clearance'"
-                                :class="[
-                                    'relative flex flex-col items-start gap-3 rounded-xl border-2 p-5 text-left transition-all duration-150',
-                                    editForm.template_type === 'clearance'
-                                        ? 'border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-300'
-                                        : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/40'
-                                ]"
-                            >
-                                <div :class="['flex h-12 w-12 items-center justify-center rounded-xl', editForm.template_type === 'clearance' ? 'bg-violet-600' : 'bg-gray-100']">
-                                    <FileText :class="['h-6 w-6', editForm.template_type === 'clearance' ? 'text-white' : 'text-gray-500']" />
-                                </div>
-                                <div>
-                                    <p class="font-semibold text-gray-900">Clearance Template</p>
-                                    <p class="mt-0.5 text-xs text-gray-500 leading-relaxed">Standard clearance layout with endorsement block. Suited for barangay clearance, business permit clearance, etc.</p>
-                                </div>
-                                <div v-if="editForm.template_type === 'clearance'" class="absolute top-3 right-3 h-5 w-5 rounded-full bg-violet-600 flex items-center justify-center">
-                                    <CheckCircle class="h-4 w-4 text-white" />
+                                <div class="p-3 bg-white flex flex-col gap-1 flex-1">
+                                    <div class="flex items-center justify-between gap-1">
+                                        <span class="font-semibold text-sm text-gray-900 truncate">{{ tpl.label }}</span>
+                                        <span :class="['text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0', tpl.badgeColor]">{{ tpl.badge }}</span>
+                                    </div>
+                                    <p class="text-xs text-gray-500 leading-relaxed line-clamp-2">{{ tpl.description }}</p>
                                 </div>
                             </button>
                         </div>
+
+                        <div v-if="!editForm.template_type" class="mt-4 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            <Lightbulb class="h-3.5 w-3.5 flex-shrink-0" />
+                            No template selected. Please choose one above.
+                        </div>
+                        <div v-else class="mt-4 flex items-center gap-2 text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2">
+                            <CheckCircle class="h-3.5 w-3.5 flex-shrink-0" />
+                            <span><strong>{{ documentTemplates.find(t => t.value === editForm.template_type)?.label }}</strong> selected as the document template.</span>
+                        </div>
+
                         <p v-if="editForm.errors.template_type" class="text-red-500 text-xs mt-2">{{ editForm.errors.template_type }}</p>
                     </div>
 
@@ -1643,6 +1710,29 @@ const categoryOptions = [
                 </form>
             </SheetContent>
         </Sheet>
+
+        <!-- Template Full-Size Preview Dialog -->
+        <Dialog v-model:open="templatePreviewOpen">
+            <DialogContent class="max-w-2xl p-0 overflow-hidden">
+                <DialogHeader class="px-6 pt-5 pb-4 border-b border-gray-100">
+                    <DialogTitle class="flex items-center gap-2">
+                        <LayoutTemplate class="h-5 w-5 text-violet-600" />
+                        {{ templatePreviewLabel }} — Preview
+                    </DialogTitle>
+                    <DialogDescription>
+                        Template preview. Actual output may vary based on document content.
+                    </DialogDescription>
+                </DialogHeader>
+                <div class="flex justify-center items-center bg-gray-50 p-6 overflow-auto max-h-[70vh]">
+                    <img
+                        :src="templatePreviewImage"
+                        :alt="templatePreviewLabel"
+                        class="max-w-full w-auto h-auto object-contain rounded-lg shadow-2xl border border-gray-200"
+                        style="max-height: 62vh;"
+                    />
+                </div>
+            </DialogContent>
+        </Dialog>
 
         <!-- Delete Confirmation Dialog -->
         <Dialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">

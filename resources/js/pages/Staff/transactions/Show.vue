@@ -552,6 +552,35 @@ const canGenerateCertificate = computed(() => {
 });
 
 
+function formatTemplateTwoPreview(fields: Record<string, string>): string {
+    const rows: Array<{ label: string; key: string }> = [
+        { label: 'Name', key: 'name' },
+        { label: 'Birthdate', key: 'birthdate' },
+        { label: 'Birthplace', key: 'birthplace' },
+        { label: 'Civil Status', key: 'civil_status' },
+        { label: 'Nationality', key: 'nationality' },
+        { label: 'Address', key: 'address' },
+        { label: 'Purpose', key: 'purpose' },
+        { label: 'Purok Cert. No.', key: 'purok_cert_no' },
+        { label: 'CTC No.', key: 'ctc_no' },
+        { label: 'Date Issued', key: 'date_issued' },
+        { label: 'OR No.', key: 'or_no' },
+        { label: 'Certification Fee', key: 'certification_fee' },
+        { label: 'Doc Stamp', key: 'doc_stamp' },
+        { label: 'Amount Paid', key: 'amount_paid' },
+    ];
+
+    const lines = rows
+        .map(r => {
+            const v = (fields[r.key] ?? '').trim();
+            return v ? `<p><strong>${r.label}:</strong> ${v}</p>` : '';
+        })
+        .filter(Boolean)
+        .join('\n');
+
+    return `<p><em>Template Two — Background Image Layout</em></p>\n<p>Review the generated data below, then click <strong>Print Certificate</strong> to preview the form.</p>\n${lines}`;
+}
+
 const generateWithAI = async () => {
     isGeneratingAI.value = true;
     try {
@@ -565,7 +594,13 @@ const generateWithAI = async () => {
 
         if (response.ok) {
             const data = await response.json();
-            if (data.content) {
+            if (data.is_template_two) {
+                // Show the generated field values in the editor as a readable preview
+                if (data.template_two_data) {
+                    certificateForm.document_content = formatTemplateTwoPreview(data.template_two_data as Record<string, string>);
+                }
+                toast.success('Template Two content generated! Review below, then click "Print Certificate".');
+            } else if (data.content) {
                 certificateForm.document_content = data.content;
                 toast.success('Certificate content generated successfully using AI!');
             } else {

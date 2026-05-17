@@ -140,7 +140,7 @@ class DocumentTypeController extends Controller
             'required_fields.*.placeholder' => ['nullable', 'string', 'max:255'],
             'required_fields.*.options' => ['nullable', 'array'],
             'required_fields.*.options.*' => ['string', 'max:255'],
-            'template_type' => ['nullable', 'string', Rule::in(['certification', 'clearance'])],
+            'template_type' => ['nullable', 'string', Rule::in(['template_one', 'template_two', 'template_three'])],
             'processing_days' => 'required|integer|min:1',
             'is_active' => 'boolean',
             'requires_payment' => 'boolean',

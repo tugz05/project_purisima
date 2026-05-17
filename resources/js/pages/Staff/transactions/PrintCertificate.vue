@@ -3,6 +3,24 @@ import { Head } from '@inertiajs/vue3';
 import { ref, onMounted, computed } from 'vue';
 import QRCode from 'qrcode';
 
+interface TemplateTwoData {
+    name: string;
+    birthdate: string;
+    birthplace: string;
+    civil_status: string;
+    nationality: string;
+    address: string;
+    purpose: string;
+    purok_cert_no: string;
+    ctc_no: string;
+    date_issued: string;
+    or_no: string;
+    certification_fee: string;
+    doc_stamp: string;
+    amount_paid: string;
+    body_issued_statement?: string;
+}
+
 interface Props {
     /** Present for transaction-based print; omitted for walk-in manual certificate print. */
     transaction?: Record<string, unknown> | null;
@@ -12,7 +30,11 @@ interface Props {
      * Which printable shell to use (matches ManualCertificateWizardService / walk-in wizard).
      * When null, layout is inferred from document type name (legacy).
      */
-    printLayout?: 'clearance' | 'standard' | null;
+    printLayout?: 'clearance' | 'standard' | 'template_two' | null;
+    /** Raw template_type from DocumentType — drives layout selection before printLayout heuristics. */
+    templateType?: string | null;
+    /** Structured field values for the template_two PNG background overlay. */
+    templateTwoData?: TemplateTwoData | null;
     content: string;
     currentDate: string;
     currentDateFormatted: string;
@@ -27,6 +49,8 @@ const props = withDefaults(defineProps<Props>(), {
     transaction: null,
     resident: null,
     printLayout: null,
+    templateType: null,
+    templateTwoData: null,
     officerOfTheDay: undefined,
     verificationUrl: null,
     previewQrUrl: null,
@@ -55,14 +79,16 @@ const sealImagesLoaded = ref({
     barangay: false
 });
 
+// Template Two uses a pre-printed PNG background; takes priority over all other layouts
+const isTemplateTwoBackground = computed(() =>
+    props.templateType === 'template_two' || props.printLayout === 'template_two'
+);
+
 // Barangay clearance layout vs standard certificate (see ManualCertificateWizardService)
 const isBarangayClearance = computed(() => {
-    if (props.printLayout === 'clearance') {
-        return true;
-    }
-    if (props.printLayout === 'standard') {
-        return false;
-    }
+    if (isTemplateTwoBackground.value) return false;
+    if (props.printLayout === 'clearance') return true;
+    if (props.printLayout === 'standard') return false;
     const docName = props.documentTypeName?.toLowerCase() || '';
     return docName.includes('barangay clearance') || docName === 'barangay clearance';
 });
@@ -145,8 +171,111 @@ onMounted(async () => {
         page (Chrome: More settings → uncheck Headers and footers).
     </p>
 
+    <!-- TEMPLATE TWO — PNG background; text overlaid transparently -->
+    <div v-if="isTemplateTwoBackground" class="t2-page">
+        <div class="t2-content">
+
+            <!-- ── Dynamic document title (header is pre-printed in PNG) ── -->
+            <div class="t2-title">{{ documentTypeName.toUpperCase() }}</div>
+
+            <!-- ── Salutations ───────────────────────────────────── -->
+            <p class="t2-whom">TO WHOM IT MAY CONCERN</p>
+            <p class="t2-certify"><em>THIS IS TO CERTIFY that:</em></p>
+
+            <!-- ── Resident data table (always rendered, blank if empty) -->
+            <div class="t2-table">
+                <div class="t2-row">
+                    <span class="t2-lbl">Name</span>
+                    <span class="t2-colon">:</span>
+                    <span class="t2-val t2-name-val">{{ templateTwoData?.name }}</span>
+                </div>
+                <div class="t2-row">
+                    <span class="t2-lbl">Birthdate</span>
+                    <span class="t2-colon">:</span>
+                    <span class="t2-val">{{ templateTwoData?.birthdate }}</span>
+                </div>
+                <div class="t2-row">
+                    <span class="t2-lbl">Birthplace</span>
+                    <span class="t2-colon">:</span>
+                    <span class="t2-val">{{ templateTwoData?.birthplace }}</span>
+                </div>
+                <div class="t2-row">
+                    <span class="t2-lbl">Civil Status</span>
+                    <span class="t2-colon">:</span>
+                    <span class="t2-val">{{ templateTwoData?.civil_status }}</span>
+                </div>
+                <div class="t2-row">
+                    <span class="t2-lbl">Nationality</span>
+                    <span class="t2-colon">:</span>
+                    <span class="t2-val">{{ templateTwoData?.nationality }}</span>
+                </div>
+                <div class="t2-row t2-row-addr">
+                    <span class="t2-lbl">Address</span>
+                    <span class="t2-colon">:</span>
+                    <span class="t2-val t2-addr-val">{{ templateTwoData?.address }}</span>
+                </div>
+            </div>
+
+            <!-- ── No criminal record ────────────────────────────── -->
+            <p class="t2-nocrim"><em>Has no criminal nor administrative case/s filed in this office as of this date.</em></p>
+
+            <!-- ── Purpose box (static orange border) ───────────── -->
+            <div class="t2-purpose-box">{{ templateTwoData?.purpose }}</div>
+
+            <!-- ── Body certification text ───────────────────────── -->
+            <p class="t2-body-p"><em>This certification is being issued upon the request of the above-named person for the purpose stated above.</em></p>
+            <p class="t2-body-p" v-if="templateTwoData?.body_issued_statement">
+                <em>{{ templateTwoData.body_issued_statement }}</em>
+            </p>
+
+            <!-- ── Transaction details (two-column) ─────────────── -->
+            <div class="t2-txn-grid">
+                <div class="t2-txn-col">
+                    <div class="t2-txn-row">
+                        <span class="t2-txn-lbl">Purok Cert. No.</span>
+                        <span class="t2-txn-sep">:</span>
+                        <span class="t2-txn-val">{{ templateTwoData?.purok_cert_no }}</span>
+                    </div>
+                    <div class="t2-txn-row">
+                        <span class="t2-txn-lbl">CTC No.</span>
+                        <span class="t2-txn-sep">:</span>
+                        <span class="t2-txn-val">{{ templateTwoData?.ctc_no }}</span>
+                    </div>
+                    <div class="t2-txn-row">
+                        <span class="t2-txn-lbl">Date Issued</span>
+                        <span class="t2-txn-sep">:</span>
+                        <span class="t2-txn-val">{{ templateTwoData?.date_issued }}</span>
+                    </div>
+                </div>
+                <div class="t2-txn-col">
+                    <div class="t2-txn-row">
+                        <span class="t2-txn-lbl">OR No.</span>
+                        <span class="t2-txn-sep">:</span>
+                        <span class="t2-txn-val">{{ templateTwoData?.or_no }}</span>
+                    </div>
+                    <div class="t2-txn-row">
+                        <span class="t2-txn-lbl">Certification</span>
+                        <span class="t2-txn-sep">:</span>
+                        <span class="t2-txn-val">{{ templateTwoData?.certification_fee }}</span>
+                    </div>
+                    <div class="t2-txn-row">
+                        <span class="t2-txn-lbl">Doc Stamp</span>
+                        <span class="t2-txn-sep">:</span>
+                        <span class="t2-txn-val">{{ templateTwoData?.doc_stamp }}</span>
+                    </div>
+                    <div class="t2-txn-row">
+                        <span class="t2-txn-lbl">Amount Paid</span>
+                        <span class="t2-txn-sep">:</span>
+                        <span class="t2-txn-val">{{ templateTwoData?.amount_paid }}</span>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /t2-content -->
+    </div><!-- /t2-page -->
+
     <!-- BARANGAY CLEARANCE DESIGN -->
-    <div v-if="isBarangayClearance" class="clearance-container">
+    <div v-else-if="isBarangayClearance" class="clearance-container">
         <!-- Watermark -->
         <div class="clearance-watermark">
             <img
@@ -368,6 +497,148 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* ============================================
+   TEMPLATE TWO — PNG background image overlay
+   ============================================ */
+
+.t2-page {
+    position: relative;
+    width: 8.5in;
+    height: 11in;
+    background: url('/images/documents_template/template_two.png') no-repeat top left / 100% 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    color: #000;
+}
+
+/* ── Content area: transparent; padding clears pre-printed header/footer ─ */
+.t2-content {
+    position: absolute;
+    top: 0;
+    left: 32%;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    padding: 1.55in 0.25in 1.6in 0.18in;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+
+/* ── Document title ──────────────────────────────────────────── */
+.t2-title {
+
+    font-size: 22pt;
+    font-weight: bold;
+    text-decoration: underline;
+    color: #001a6e;
+    letter-spacing: 0.5px;
+    margin-bottom: 16px;
+    margin-top: 30px;
+    margin-left: 4px;
+    flex-shrink: 0;
+}
+
+/* ── Salutations ─────────────────────────────────────────────── */
+.t2-whom {
+    text-align: center;
+    font-weight: bold;
+    font-size: 10pt;
+    margin: 1px 0;
+    flex-shrink: 0;
+}
+
+.t2-certify {
+    text-align: center;
+    font-size: 9.5pt;
+    margin: 1px 0 3px;
+    flex-shrink: 0;
+}
+
+/* ── Data table ──────────────────────────────────────────────── */
+.t2-table { margin-bottom: 3px; flex-shrink: 0; }
+
+.t2-row {
+    display: grid;
+    grid-template-columns: 0.9in 0.15in 1fr;
+    align-items: baseline;
+    font-size: 9.5pt;
+    line-height: 1.7;
+}
+
+.t2-row-addr { align-items: flex-start; }
+
+.t2-lbl   { font-size: 9.5pt; }
+.t2-colon { text-align: center; font-size: 9.5pt; }
+.t2-val   { font-size: 9.5pt; }
+.t2-name-val { font-weight: bold; }
+.t2-addr-val { white-space: pre-line; line-height: 1.4; }
+
+/* ── No criminal statement ───────────────────────────────────── */
+.t2-nocrim {
+    text-align: center;
+    font-size: 9pt;
+    font-style: italic;
+    font-weight: bold;
+    margin: 3px 0 3px;
+    flex-shrink: 0;
+}
+
+/* ── Purpose box — static orange border ─────────────────────── */
+.t2-purpose-box {
+    border: 2.5px solid #cc6600;
+    text-align: center;
+    font-size: 17pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 5px 12px;
+    margin: 3px 0 3px;
+    color: #000;
+    min-height: 0.42in;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* ── Body paragraphs ─────────────────────────────────────────── */
+.t2-body-p {
+    font-size: 9pt;
+    text-align: center;
+    font-style: italic;
+    margin: 1px 0;
+    line-height: 1.4;
+    flex-shrink: 0;
+}
+
+/* ── Transaction grid ────────────────────────────────────────── */
+.t2-txn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 0.1in;
+    margin: 4px 0 3px;
+    flex-shrink: 0;
+}
+
+.t2-txn-col { display: flex; flex-direction: column; }
+
+.t2-txn-row {
+    display: grid;
+    grid-template-columns: 0.95in 0.14in 1fr;
+    align-items: baseline;
+    font-size: 8.5pt;
+    line-height: 1.65;
+}
+
+.t2-txn-lbl { font-size: 8.5pt; }
+.t2-txn-sep { text-align: center; font-size: 8.5pt; }
+.t2-txn-val { font-size: 8.5pt; }
+
+
 /* ============================================
    STANDARD CERTIFICATION STYLES
    ============================================ */
@@ -922,6 +1193,17 @@ onMounted(async () => {
         padding: 0;
     }
 
+    .t2-page {
+        width: 100%;
+        height: 11in;
+        margin: 0;
+        box-shadow: none;
+        page-break-after: avoid;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        background: url('/images/documents_template/template_two.png') no-repeat top left / 100% 100% !important;
+    }
+
     .certificate-container .header {
         margin-top: 0;
         margin-bottom: 10px;
@@ -959,7 +1241,8 @@ onMounted(async () => {
 /* SCREEN STYLES */
 @media screen {
     .certificate-container,
-    .clearance-container {
+    .clearance-container,
+    .t2-page {
         margin: 20px auto;
         box-shadow: 0 0 20px rgba(0, 0, 0, 0.12);
     }

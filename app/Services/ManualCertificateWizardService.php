@@ -16,16 +16,22 @@ class ManualCertificateWizardService
 
     public const LAYOUT_STANDARD = 'standard';
 
+    public const LAYOUT_TEMPLATE_TWO = 'template_two';
+
     /**
      * @var list<string>
      */
     private const REQUESTOR_NAME_KEYS = ['name', 'full_name', 'requestor_name', 'applicant_name'];
 
     /**
-     * Match PrintCertificate.vue: barangay clearance uses the orange-sidebar layout; everything else uses standard.
+     * Match PrintCertificate.vue: template_type field takes priority; falls back to name heuristics.
      */
     public function resolvePrintLayout(DocumentType $documentType): string
     {
+        if ($documentType->template_type === 'template_two') {
+            return self::LAYOUT_TEMPLATE_TWO;
+        }
+
         $code = strtolower((string) $documentType->code);
         $name = strtolower((string) $documentType->name);
 
@@ -38,9 +44,11 @@ class ManualCertificateWizardService
 
     public function layoutDisplayName(string $layout): string
     {
-        return $layout === self::LAYOUT_CLEARANCE
-            ? 'Barangay clearance (official print layout)'
-            : 'Standard certificate (official print layout)';
+        return match ($layout) {
+            self::LAYOUT_CLEARANCE => 'Barangay clearance (official print layout)',
+            self::LAYOUT_TEMPLATE_TWO => 'Template Two — background image clearance',
+            default => 'Standard certificate (official print layout)',
+        };
     }
 
     /**
@@ -267,7 +275,7 @@ class ManualCertificateWizardService
      */
     private function fieldDefinitions(string $layout): array
     {
-        if ($layout === self::LAYOUT_CLEARANCE) {
+        if ($layout === self::LAYOUT_CLEARANCE || $layout === self::LAYOUT_TEMPLATE_TWO) {
             return [
                 ['name' => 'name', 'label' => 'Full name', 'type' => 'text', 'required' => true, 'placeholder' => 'LAST NAME, FIRST NAME M.I.'],
                 ['name' => 'birthdate', 'label' => 'Birthdate', 'type' => 'date', 'required' => true, 'placeholder' => ''],
