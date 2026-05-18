@@ -26,6 +26,7 @@ import {
     Lightbulb,
     LayoutTemplate,
     ScrollText,
+    Users,
 } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import StaffLayout from '@/layouts/staff/Layout.vue';
@@ -33,6 +34,14 @@ import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { useUtils } from '@/composables/useUtils';
 
 type DynamicFieldType = 'text' | 'textarea' | 'number' | 'date' | 'email' | 'select';
+
+interface StaffUser {
+    id: number;
+    first_name: string | null;
+    middle_name: string | null;
+    last_name: string | null;
+    email: string;
+}
 
 /** `key` is kept for saving existing document types (not shown in UI; new fields get a key from the label on submit). */
 interface DynamicInputFieldForm {
@@ -61,12 +70,14 @@ interface DocumentType {
     sort_order: number;
     notes?: string;
     template_type?: string | null;
+    assigned_staff?: StaffUser[];
     created_at: string;
     updated_at: string;
 }
 
 interface Props {
     documentTypes: DocumentType[];
+    staffUsers: StaffUser[];
     filters: {
         search?: string;
         active?: boolean;
@@ -301,6 +312,27 @@ const addCreateDynamicField = () => {
 
 const removeCreateDynamicField = (index: number) => {
     createForm.required_fields.splice(index, 1);
+};
+
+/** Standard questions for template_three (Vehicle/Business Permit). */
+const TEMPLATE_THREE_FIELDS: DynamicInputFieldForm[] = [
+    { key: 'type',           label: 'Type',                      type: 'select', required: true,  placeholder: '', optionsText: 'NEW,RENEW' },
+    { key: 'control_no',     label: 'Control No',                 type: 'text',   required: true,  placeholder: 'e.g. 047-2025', optionsText: '' },
+    { key: 'full_name',      label: 'Full Name',                  type: 'text',   required: true,  placeholder: 'Full legal name', optionsText: '' },
+    { key: 'address',        label: 'Address',                    type: 'textarea', required: true, placeholder: 'Purok, Barangay, Municipality, Province', optionsText: '' },
+    { key: 'vehicle_info',   label: 'Number and Type of Vehicle', type: 'text',   required: true,  placeholder: 'e.g. one (1) unit of Tricycle/Bao-bao', optionsText: '' },
+    { key: 'year_permitted', label: 'Year Permitted',             type: 'text',   required: true,  placeholder: 'e.g. 2025', optionsText: '' },
+    { key: 'date_issued',    label: 'Date Issued',                type: 'date',   required: true,  placeholder: '', optionsText: '' },
+];
+
+const autoPopulateCreateTemplateThree = () => {
+    createForm.required_fields = TEMPLATE_THREE_FIELDS.map(f => ({ ...f }));
+};
+
+const autoPopulateEditTemplateThree = () => {
+    if (editForm.value) {
+        editForm.value.required_fields = TEMPLATE_THREE_FIELDS.map(f => ({ ...f }));
+    }
 };
 
 // Edit form helpers
@@ -683,7 +715,7 @@ const documentTemplates = [
         value: 'template_three',
         label: 'Premium Certificate',
         description: 'Decorative background layout suited for high-importance documents and special certifications.',
-        image: '/images/documents_template/template_three.png',
+        image: '/images/documents_template/template_three.jpg',
         badge: 'Premium',
         badgeColor: 'bg-violet-100 text-violet-700',
     },
@@ -698,6 +730,61 @@ const openTemplatePreview = (tpl: { image: string; label: string }) => {
     templatePreviewImage.value = tpl.image;
     templatePreviewLabel.value = tpl.label;
     templatePreviewOpen.value = true;
+};
+
+// Staff assignment sheet
+const staffAssignSheetOpen = ref(false);
+const staffAssignTarget = ref<DocumentType | null>(null);
+const staffAssignIds = ref<number[]>([]);
+const staffAssignSaving = ref(false);
+
+const staffDisplayName = (s: StaffUser): string => {
+    const parts = [s.first_name, s.last_name].filter(Boolean);
+    return parts.length ? parts.join(' ') : s.email;
+};
+
+const openStaffSheet = (documentType: DocumentType) => {
+    staffAssignTarget.value = documentType;
+    staffAssignIds.value = (documentType.assigned_staff ?? []).map(s => s.id);
+    staffAssignSheetOpen.value = true;
+};
+
+const toggleStaffId = (id: number) => {
+    const idx = staffAssignIds.value.indexOf(id);
+    if (idx === -1) {
+        staffAssignIds.value.push(id);
+    } else {
+        staffAssignIds.value.splice(idx, 1);
+    }
+};
+
+const saveStaffAssignments = async () => {
+    if (!staffAssignTarget.value) return;
+    staffAssignSaving.value = true;
+    try {
+        const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '';
+        const response = await fetch(`/staff/document-types/${staffAssignTarget.value.id}/staff`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ staff_ids: staffAssignIds.value }),
+        });
+        if (!response.ok) throw new Error('Request failed');
+        const data = await response.json();
+        // Update local assigned_staff to reflect saved state
+        if (staffAssignTarget.value) {
+            staffAssignTarget.value.assigned_staff = data.assigned_staff;
+        }
+        toast.success('Staff assignments saved.');
+        staffAssignSheetOpen.value = false;
+    } catch {
+        toast.error('Failed to save staff assignments.');
+    } finally {
+        staffAssignSaving.value = false;
+    }
 };
 </script>
 
@@ -844,10 +931,21 @@ const openTemplatePreview = (tpl: { image: string; label: string }) => {
 
                                 <!-- Quick Actions - Always at bottom -->
                                 <div class="flex flex-col gap-2 pt-2 border-t border-gray-100 mt-auto flex-shrink-0">
+                                    <!-- Staff assignment hint -->
+                                    <div class="flex items-center gap-1.5 text-xs text-gray-500">
+                                        <Users class="h-3.5 w-3.5 flex-shrink-0" />
+                                        <span v-if="documentType.assigned_staff && documentType.assigned_staff.length > 0">
+                                            {{ documentType.assigned_staff.length }} assigned staff
+                                        </span>
+                                        <span v-else class="italic">All staff (unrestricted)</span>
+                                    </div>
                                     <div class="flex gap-2">
                                         <Button @click="openEditSheet(documentType)" variant="outline" size="sm" class="flex-1 h-8 text-green-600 border-green-200 hover:bg-green-50">
                                             <Edit class="h-3 w-3 mr-1" />
                                             Edit
+                                        </Button>
+                                        <Button @click="openStaffSheet(documentType)" variant="outline" size="sm" class="h-8 px-2.5 text-blue-600 border-blue-200 hover:bg-blue-50" title="Manage assigned staff">
+                                            <Users class="h-3 w-3" />
                                         </Button>
                                         <Button
                                             @click="openDeleteDialog(documentType)"
@@ -1092,10 +1190,22 @@ const openTemplatePreview = (tpl: { image: string; label: string }) => {
                         <p class="text-xs text-gray-500 mb-4">You can skip this section if you do not need anything beyond uploads and the main request form.</p>
 
                         <div class="space-y-4">
-                            <Button type="button" variant="outline" size="sm" class="w-full sm:w-auto" @click="addCreateDynamicField">
-                                <Plus class="h-4 w-4 mr-1" />
-                                Add a question
-                            </Button>
+                            <div class="flex flex-wrap gap-2">
+                                <Button type="button" variant="outline" size="sm" @click="addCreateDynamicField">
+                                    <Plus class="h-4 w-4 mr-1" />
+                                    Add a question
+                                </Button>
+                                <Button
+                                    v-if="createForm.template_type === 'template_three'"
+                                    type="button"
+                                    size="sm"
+                                    class="bg-violet-600 hover:bg-violet-700 text-white"
+                                    @click="autoPopulateCreateTemplateThree"
+                                >
+                                    <CheckCircle class="h-4 w-4 mr-1" />
+                                    Auto-populate template questions
+                                </Button>
+                            </div>
 
                             <div v-if="Array.isArray(createForm.required_fields) && createForm.required_fields.length > 0" class="space-y-4">
                                 <div
@@ -1501,10 +1611,22 @@ const openTemplatePreview = (tpl: { image: string; label: string }) => {
                         <p class="text-xs text-gray-500 mb-4">You can skip this section if you do not need anything beyond uploads and the main request form.</p>
 
                         <div class="space-y-4">
-                            <Button type="button" variant="outline" size="sm" class="w-full sm:w-auto" @click="addEditDynamicField">
-                                <Plus class="h-4 w-4 mr-1" />
-                                Add a question
-                            </Button>
+                            <div class="flex flex-wrap gap-2">
+                                <Button type="button" variant="outline" size="sm" @click="addEditDynamicField">
+                                    <Plus class="h-4 w-4 mr-1" />
+                                    Add a question
+                                </Button>
+                                <Button
+                                    v-if="editForm?.template_type === 'template_three'"
+                                    type="button"
+                                    size="sm"
+                                    class="bg-violet-600 hover:bg-violet-700 text-white"
+                                    @click="autoPopulateEditTemplateThree"
+                                >
+                                    <CheckCircle class="h-4 w-4 mr-1" />
+                                    Auto-populate template questions
+                                </Button>
+                            </div>
 
                             <div v-if="editForm && Array.isArray(editForm.required_fields) && editForm.required_fields.length > 0" class="space-y-4">
                                 <div
@@ -1733,6 +1855,52 @@ const openTemplatePreview = (tpl: { image: string; label: string }) => {
                 </div>
             </DialogContent>
         </Dialog>
+
+        <!-- Staff Assignment Sheet -->
+        <Sheet :open="staffAssignSheetOpen" @update:open="staffAssignSheetOpen = $event">
+            <SheetContent class="p-0 flex flex-col h-full overflow-y-auto">
+                <SheetHeader class="p-6 pb-4 border-b border-gray-200">
+                    <SheetTitle class="flex items-center gap-2 text-xl font-semibold">
+                        <Users class="h-5 w-5 text-blue-600" />
+                        Staff Assignments
+                    </SheetTitle>
+                    <SheetDescription>
+                        <span class="font-medium text-gray-800">{{ staffAssignTarget?.name }}</span><br />
+                        Select staff who can handle this document type. Leave all unchecked to allow any staff member.
+                    </SheetDescription>
+                </SheetHeader>
+
+                <div class="flex-1 overflow-y-auto p-6 space-y-3">
+                    <div v-if="props.staffUsers.length === 0" class="text-sm text-gray-500 italic">
+                        No staff users found.
+                    </div>
+                    <label
+                        v-for="staff in props.staffUsers"
+                        :key="staff.id"
+                        class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/40 cursor-pointer transition-colors"
+                        :class="{ 'border-blue-400 bg-blue-50': staffAssignIds.includes(staff.id) }"
+                    >
+                        <input
+                            type="checkbox"
+                            :checked="staffAssignIds.includes(staff.id)"
+                            @change="toggleStaffId(staff.id)"
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate">{{ staffDisplayName(staff) }}</p>
+                            <p class="text-xs text-gray-500 truncate">{{ staff.email }}</p>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="p-6 border-t border-gray-200 flex gap-3 justify-end">
+                    <Button variant="outline" @click="staffAssignSheetOpen = false">Cancel</Button>
+                    <Button :disabled="staffAssignSaving" @click="saveStaffAssignments" class="bg-blue-600 hover:bg-blue-700 text-white">
+                        {{ staffAssignSaving ? 'Saving…' : 'Save Assignments' }}
+                    </Button>
+                </div>
+            </SheetContent>
+        </Sheet>
 
         <!-- Delete Confirmation Dialog -->
         <Dialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">

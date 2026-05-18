@@ -2,13 +2,16 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\URL;
 use App\Models\IncidentReport;
 use App\Models\Transaction;
 use App\Policies\IncidentReportPolicy;
 use App\Policies\TransactionPolicy;
+use App\Services\Sms\LogSmsGateway;
+use App\Services\Sms\SmsGatewayInterface;
+use App\Services\Sms\TwilioSmsGateway;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -17,7 +20,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Use Twilio in production; log-only in local/testing to avoid real SMS costs
+        $this->app->bind(SmsGatewayInterface::class, function () {
+            if (config('services.twilio.sid') && ! app()->isLocal() && ! app()->runningUnitTests()) {
+                return new TwilioSmsGateway;
+            }
+
+            return new LogSmsGateway;
+        });
     }
 
     /**

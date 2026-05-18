@@ -8,6 +8,7 @@ use App\Models\Transaction;
 use App\Services\NotificationService;
 use App\Services\PaymentService;
 use App\Services\PendingFileUploadService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,6 +17,8 @@ use Inertia\Response;
 
 class PaymentController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
         private PaymentService $paymentService,
         private NotificationService $notificationService
@@ -28,6 +31,8 @@ class PaymentController extends Controller
      */
     public function show(Transaction $transaction): Response
     {
+        $this->authorize('update', $transaction);
+
         $transaction->load(['resident', 'documentType', 'paymentVerifier']);
 
         return Inertia::render('Staff/transactions/Payment', [
@@ -47,6 +52,8 @@ class PaymentController extends Controller
      */
     public function process(Request $request, Transaction $transaction): RedirectResponse
     {
+        $this->authorize('update', $transaction);
+
         $request->validate([
             'payment_method' => ['required', Rule::in(['cash', 'gcash', 'paymaya', 'bank_transfer', 'check'])],
             'amount_paid' => ['required', 'numeric', 'min:'.$transaction->fee_amount],
@@ -91,6 +98,8 @@ class PaymentController extends Controller
      */
     public function markFailed(Request $request, Transaction $transaction): RedirectResponse
     {
+        $this->authorize('update', $transaction);
+
         $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
         ]);
@@ -118,6 +127,8 @@ class PaymentController extends Controller
      */
     public function refund(Request $request, Transaction $transaction): RedirectResponse
     {
+        $this->authorize('update', $transaction);
+
         $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
         ]);
@@ -145,6 +156,8 @@ class PaymentController extends Controller
      */
     public function reset(Transaction $transaction): RedirectResponse
     {
+        $this->authorize('update', $transaction);
+
         try {
             $this->paymentService->resetPaymentStatus(
                 $transaction,

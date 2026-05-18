@@ -161,6 +161,12 @@ class ManualCertificateController extends Controller
         try {
             $validated = $request->validated();
             $documentType = DocumentType::findOrFail($validated['document_type_id']);
+
+            if (! $documentType->canBeHandledBy($request->user())) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['error' => 'You are not assigned to handle this document type.']);
+            }
             $sanitizedFields = $this->wizardService->filterFieldValuesForDocumentType($documentType, $validated['field_values'] ?? []);
 
             $manualFullName = trim((string) ($validated['manual_full_name'] ?? ''));

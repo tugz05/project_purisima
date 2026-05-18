@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\DB;
 class PaymentService
 {
     public function __construct(
-        private PendingFileUploadService $pendingFileUploadService
+        private PendingFileUploadService $pendingFileUploadService,
+        private SmsService $smsService,
     ) {}
 
     /**
@@ -88,7 +89,10 @@ class PaymentService
                 'fee_paid' => true,
             ]);
 
-            return $transaction->fresh();
+            $fresh = $transaction->fresh();
+            $this->dispatchPaymentSms($fresh);
+
+            return $fresh;
         });
     }
 
@@ -156,6 +160,30 @@ class PaymentService
 
             return $transaction->fresh();
         });
+    }
+
+    /**
+     * Dispatch an SMS to the resident when their payment is confirmed.
+     */
+    private function dispatchPaymentSms(Transaction $transaction): void
+    {
+        $phone = $transaction->resident?->phone
+            ?? data_get($transaction->resident_input_data, '__manual_requestor.phone');
+
+        if (! $phone) {
+            return;
+        }
+
+        $transaction->loadMissing('documentType');
+        $docName  = $transaction->documentType?->name ?? 'document request';
+        $txnId    = $transaction->transaction_id ?? $transaction->id;
+        $amount   = number_format((float) $transaction->amount_paid, 2);
+        $receipt  = $transaction->receipt_number ?? 'N/A';
+        $appName  = config('app.name', 'Barangay Purisima');
+
+        $message = "[{$appName}] Payment of ₱{$amount} for your {$docName} (#{$txnId}) has been received. Receipt #: {$receipt}. Thank you!";
+
+        $this->smsService->send($phone, $message, 'transaction', $transaction->id);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -63,6 +64,12 @@ class User extends Authenticatable
     public function assignedTransactions()
     {
         return $this->hasMany(Transaction::class, 'staff_id');
+    }
+
+    /** Document types this staff member is explicitly assigned to handle. */
+    public function assignedDocumentTypes(): BelongsToMany
+    {
+        return $this->belongsToMany(DocumentType::class, 'document_type_staff', 'user_id', 'document_type_id');
     }
 
     /**

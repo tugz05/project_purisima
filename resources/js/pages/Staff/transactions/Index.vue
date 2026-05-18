@@ -31,6 +31,11 @@ interface Transaction {
         name: string;
         email: string;
     } | null;
+    staff: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
 }
 
 interface Props {
@@ -296,6 +301,7 @@ const getStatusColor = (status: string) => {
                                         <TableHead class="font-semibold text-gray-900">Document Type</TableHead>
                                         <TableHead class="font-semibold text-gray-900">Fee</TableHead>
                                         <TableHead class="font-semibold text-gray-900">Status</TableHead>
+                                        <TableHead class="font-semibold text-gray-900">Assigned Staff</TableHead>
                                         <TableHead class="font-semibold text-gray-900">Submitted</TableHead>
                                         <TableHead class="font-semibold text-gray-900 text-right">Actions</TableHead>
                                     </TableRow>
@@ -336,6 +342,15 @@ const getStatusColor = (status: string) => {
                                             <Badge :class="getStatusColor(transaction.status)">
                                                 {{ transaction.status.replace('_', ' ').toUpperCase() }}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell class="py-4 px-4">
+                                            <div v-if="transaction.staff" class="flex items-center gap-2">
+                                                <div class="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                                    <span class="text-xs font-semibold text-blue-700">{{ transaction.staff.name.charAt(0).toUpperCase() }}</span>
+                                                </div>
+                                                <span class="text-sm font-medium text-gray-900 truncate max-w-[120px]">{{ transaction.staff.name }}</span>
+                                            </div>
+                                            <span v-else class="text-xs text-gray-400 italic">Unassigned</span>
                                         </TableCell>
                                         <TableCell class="py-4 px-4">
                                             <span class="text-sm text-gray-600">{{ formatDateShort(transaction.submitted_at) }}</span>

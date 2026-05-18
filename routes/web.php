@@ -268,6 +268,7 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
 
     // Document Type management routes
     Route::resource('document-types', \App\Http\Controllers\Staff\DocumentTypeController::class);
+    Route::put('document-types/{documentType}/staff', [\App\Http\Controllers\Staff\DocumentTypeController::class, 'syncStaff'])->name('document-types.sync-staff');
 
     // Document Request processing routes (individual requests from residents)
     Route::resource('document-requests', \App\Http\Controllers\Staff\DocumentRequestController::class);
@@ -296,6 +297,10 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
     Route::put('incidents/{incidentReport}', [\App\Http\Controllers\Staff\IncidentReportController::class, 'update'])->name('incidents.update');
 
     Route::post('announcements/reorder', [\App\Http\Controllers\Staff\AnnouncementController::class, 'reorder'])->name('announcements.reorder');
+
+    // SMS Broadcast routes
+    Route::get('sms', [\App\Http\Controllers\Staff\SmsAnnouncementController::class, 'index'])->name('sms.index');
+    Route::post('sms', [\App\Http\Controllers\Staff\SmsAnnouncementController::class, 'store'])->name('sms.store');
 
     // Notification routes
     Route::prefix('notifications')->name('notifications.')->group(function () {

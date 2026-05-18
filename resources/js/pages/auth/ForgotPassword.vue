@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/AuthLayout.vue';
 import { login } from '@/routes';
 import { Form, Head } from '@inertiajs/vue3';
-import { LoaderCircle } from 'lucide-vue-next';
+import { LoaderCircle, Smartphone } from 'lucide-vue-next';
 
 defineProps<{
     status?: string;
@@ -39,7 +39,21 @@ defineProps<{
                 </div>
             </Form>
 
-            <div class="space-x-1 text-center text-sm text-muted-foreground">
+            <div class="relative my-4">
+                <div class="absolute inset-0 flex items-center">
+                    <span class="w-full border-t border-gray-200"></span>
+                </div>
+                <div class="relative flex justify-center text-xs">
+                    <span class="bg-white px-2 text-gray-400">or</span>
+                </div>
+            </div>
+
+            <TextLink :href="route('password.sms.show')" class="flex items-center justify-center gap-1.5 text-sm">
+                <Smartphone class="h-4 w-4" />
+                Reset via SMS OTP instead
+            </TextLink>
+
+            <div class="space-x-1 text-center text-sm text-muted-foreground mt-4">
                 <span>Or, return to</span>
                 <TextLink :href="login()">log in</TextLink>
             </div>

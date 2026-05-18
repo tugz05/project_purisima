@@ -8,7 +8,24 @@
       "Bash(npm run *)",
       "Bash(xargs grep -l \"calamity\\\\|Calamity\")",
       "Bash(cp c:/laragon/www/project_purisima/.claude/worktrees/agent-ae3499229bcab399d/resources/js/pages/Staff/Incidents/*.vue c:/laragon/www/project_purisima/resources/js/pages/Staff/Incidents/)",
-      "Bash(cp c:/laragon/www/project_purisima/.claude/worktrees/agent-ae3499229bcab399d/resources/js/pages/resident/incidents/*.vue c:/laragon/www/project_purisima/resources/js/pages/resident/incidents/)"
+      "Bash(cp c:/laragon/www/project_purisima/.claude/worktrees/agent-ae3499229bcab399d/resources/js/pages/resident/incidents/*.vue c:/laragon/www/project_purisima/resources/js/pages/resident/incidents/)",
+      "PowerShell(cd c:\\\\laragon\\\\www\\\\project_purisima; php -r \"list\\(,,$w,$h\\)=array\\(\\)+getimagesize\\('public/images/documents_template/template_three.jpg'\\);echo $w.'x'.$h;\")",
+      "Bash(xargs grep -l \"Gate::\")",
+      "Bash(composer show *)",
+      "Bash(composer install *)",
+      "Bash(composer dump-autoload *)",
+      "Bash(findstr \"boost\")",
+      "Bash(Get-Content C:\\\\laragon\\\\www\\\\project_purisima\\\\vendor\\\\composer\\\\autoload_psr4.php)",
+      "Bash(Select-String \"boost\" -Context 2,2)",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\laragon\\\\www\\\\project_purisima\\\\resources\\\\js\\\\pages\\\\Staff\\\\Sms\")",
+      "Bash(Out-Null)",
+      "PowerShell(New-Item -ItemType Directory -Force \"C:\\\\laragon\\\\www\\\\project_purisima\\\\resources\\\\js\\\\pages\\\\Staff\\\\Sms\")",
+      "PowerShell(\"done\")",
+      "PowerShell(\"deleted\")",
+      "Bash(php -l C:\\\\laragon\\\\www\\\\project_purisima\\\\app\\\\Http\\\\Controllers\\\\Staff\\\\SmsAnnouncementController.php)",
+      "PowerShell(php -l \"C:\\\\laragon\\\\www\\\\project_purisima\\\\app\\\\Http\\\\Controllers\\\\Staff\\\\SmsAnnouncementController.php\")",
+      "PowerShell(php -l \"C:\\\\laragon\\\\www\\\\project_purisima\\\\app\\\\Http\\\\Controllers\\\\Auth\\\\SmsPasswordResetController.php\")",
+      "PowerShell(php -l \"C:\\\\laragon\\\\www\\\\project_purisima\\\\app\\\\Services\\\\PaymentService.php\")"
     ]
   }
 }

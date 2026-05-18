@@ -31,6 +31,18 @@ Route::middleware('guest')->group(function () {
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
         ->name('password.email');
 
+    // SMS OTP password reset
+    Route::get('forgot-password/phone', [\App\Http\Controllers\Auth\SmsPasswordResetController::class, 'show'])
+        ->name('password.sms.show');
+    Route::post('forgot-password/phone/send-otp', [\App\Http\Controllers\Auth\SmsPasswordResetController::class, 'sendOtp'])
+        ->middleware('throttle:5,1')
+        ->name('password.sms.send');
+    Route::post('forgot-password/phone/verify-otp', [\App\Http\Controllers\Auth\SmsPasswordResetController::class, 'verifyOtp'])
+        ->middleware('throttle:10,1')
+        ->name('password.sms.verify');
+    Route::post('forgot-password/phone/reset', [\App\Http\Controllers\Auth\SmsPasswordResetController::class, 'resetPassword'])
+        ->name('password.sms.reset');
+
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
         ->name('password.reset');
 
@@ -38,11 +50,11 @@ Route::middleware('guest')->group(function () {
         ->name('password.store');
 
     Route::get('auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])
-        ->whereIn('provider', ['google', 'facebook'])
+        ->whereIn('provider', ['google'])
         ->name('oauth.redirect');
 
     Route::get('auth/{provider}/callback', [SocialAuthController::class, 'callback'])
-        ->whereIn('provider', ['google', 'facebook'])
+        ->whereIn('provider', ['google'])
         ->name('oauth.callback');
 });
 

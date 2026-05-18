@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\DocumentType;
+use App\Models\User;
 use App\Services\DocumentTypeService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -31,8 +33,17 @@ class DocumentTypeController extends Controller
 
         $documentTypes = $this->documentTypeService->getAll($filters);
 
+        // Eager-load assigned staff for the assignment panel
+        $documentTypes->load('assignedStaff');
+
+        $staffUsers = User::where('role', 'staff')
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'email']);
+
         return Inertia::render('Staff/DocumentTypes/Index', [
             'documentTypes' => $documentTypes,
+            'staffUsers' => $staffUsers,
             'filters' => $filters,
         ]);
     }
@@ -113,6 +124,24 @@ class DocumentTypeController extends Controller
             return redirect()->route('staff.document-types.index')
                 ->with('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Sync the staff members assigned to handle a document type.
+     * An empty list means all staff may handle it.
+     */
+    public function syncStaff(Request $request, DocumentType $documentType): JsonResponse
+    {
+        $validated = $request->validate([
+            'staff_ids' => ['present', 'array'],
+            'staff_ids.*' => ['integer', 'exists:users,id'],
+        ]);
+
+        $documentType->assignedStaff()->sync($validated['staff_ids']);
+
+        return response()->json([
+            'assigned_staff' => $documentType->assignedStaff()->get(['users.id', 'first_name', 'middle_name', 'last_name', 'email']),
+        ]);
     }
 
     /**

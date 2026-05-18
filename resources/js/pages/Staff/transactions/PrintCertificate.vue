@@ -3,13 +3,29 @@ import { Head } from '@inertiajs/vue3';
 import { ref, onMounted, computed } from 'vue';
 import QRCode from 'qrcode';
 
-interface TemplateTwoData {
-    name: string;
-    birthdate: string;
-    birthplace: string;
-    civil_status: string;
-    nationality: string;
+interface TemplateThreeData {
+    type: string;
+    control_no: string;
+    full_name: string;
     address: string;
+    vehicle_info: string;
+    year_permitted: string;
+    date_issued: string;
+    issued_day: string;
+    issued_month: string;
+    issued_year: string;
+}
+
+interface TemplateTwoField {
+    key: string;
+    label: string;
+    value: string;
+}
+
+interface TemplateTwoData {
+    /** Dynamic rows built from the document type's input_fields */
+    fields?: TemplateTwoField[];
+    /** Administrative / transaction fields */
     purpose: string;
     purok_cert_no: string;
     ctc_no: string;
@@ -19,6 +35,13 @@ interface TemplateTwoData {
     doc_stamp: string;
     amount_paid: string;
     body_issued_statement?: string;
+    /** Backward-compat flat keys (old saved records) */
+    name?: string;
+    birthdate?: string;
+    birthplace?: string;
+    civil_status?: string;
+    nationality?: string;
+    address?: string;
 }
 
 interface Props {
@@ -35,6 +58,8 @@ interface Props {
     templateType?: string | null;
     /** Structured field values for the template_two PNG background overlay. */
     templateTwoData?: TemplateTwoData | null;
+    /** Positioned field values for the template_three JPG background overlay. */
+    templateThreeData?: TemplateThreeData | null;
     content: string;
     currentDate: string;
     currentDateFormatted: string;
@@ -51,6 +76,7 @@ const props = withDefaults(defineProps<Props>(), {
     printLayout: null,
     templateType: null,
     templateTwoData: null,
+    templateThreeData: null,
     officerOfTheDay: undefined,
     verificationUrl: null,
     previewQrUrl: null,
@@ -79,14 +105,20 @@ const sealImagesLoaded = ref({
     barangay: false
 });
 
-// Template Two uses a pre-printed PNG background; takes priority over all other layouts
+// Template Two — pre-printed PNG background (Barangay Clearance)
 const isTemplateTwoBackground = computed(() =>
     props.templateType === 'template_two' || props.printLayout === 'template_two'
+);
+
+// Template Three — pre-printed JPG background (Vehicle/Business Permit)
+const isTemplateThreeBackground = computed(() =>
+    props.templateType === 'template_three'
 );
 
 // Barangay clearance layout vs standard certificate (see ManualCertificateWizardService)
 const isBarangayClearance = computed(() => {
     if (isTemplateTwoBackground.value) return false;
+    if (isTemplateThreeBackground.value) return false;
     if (props.printLayout === 'clearance') return true;
     if (props.printLayout === 'standard') return false;
     const docName = props.documentTypeName?.toLowerCase() || '';
@@ -182,38 +214,54 @@ onMounted(async () => {
             <p class="t2-whom">TO WHOM IT MAY CONCERN</p>
             <p class="t2-certify"><em>THIS IS TO CERTIFY that:</em></p>
 
-            <!-- ── Resident data table (always rendered, blank if empty) -->
+            <!-- ── Resident data table — labels from document type input_fields ── -->
             <div class="t2-table">
-                <div class="t2-row">
-                    <span class="t2-lbl">Name</span>
-                    <span class="t2-colon">:</span>
-                    <span class="t2-val t2-name-val">{{ templateTwoData?.name }}</span>
-                </div>
-                <div class="t2-row">
-                    <span class="t2-lbl">Birthdate</span>
-                    <span class="t2-colon">:</span>
-                    <span class="t2-val">{{ templateTwoData?.birthdate }}</span>
-                </div>
-                <div class="t2-row">
-                    <span class="t2-lbl">Birthplace</span>
-                    <span class="t2-colon">:</span>
-                    <span class="t2-val">{{ templateTwoData?.birthplace }}</span>
-                </div>
-                <div class="t2-row">
-                    <span class="t2-lbl">Civil Status</span>
-                    <span class="t2-colon">:</span>
-                    <span class="t2-val">{{ templateTwoData?.civil_status }}</span>
-                </div>
-                <div class="t2-row">
-                    <span class="t2-lbl">Nationality</span>
-                    <span class="t2-colon">:</span>
-                    <span class="t2-val">{{ templateTwoData?.nationality }}</span>
-                </div>
-                <div class="t2-row t2-row-addr">
-                    <span class="t2-lbl">Address</span>
-                    <span class="t2-colon">:</span>
-                    <span class="t2-val t2-addr-val">{{ templateTwoData?.address }}</span>
-                </div>
+                <!-- New structure: dynamic fields array from input_fields -->
+                <template v-if="templateTwoData?.fields?.length">
+                    <div
+                        v-for="field in templateTwoData.fields"
+                        :key="field.key"
+                        class="t2-row"
+                        :class="{ 't2-row-addr': /address/i.test(field.key) }"
+                    >
+                        <span class="t2-lbl">{{ field.label }}</span>
+                        <span class="t2-colon">:</span>
+                        <span
+                            class="t2-val"
+                            :class="{
+                                't2-name-val': /name/i.test(field.key),
+                                't2-addr-val': /address/i.test(field.key),
+                            }"
+                        >{{ field.value }}</span>
+                    </div>
+                </template>
+                <!-- Backward-compat: old flat structure (pre-existing saved records) -->
+                <template v-else>
+                    <div class="t2-row">
+                        <span class="t2-lbl">Name</span><span class="t2-colon">:</span>
+                        <span class="t2-val t2-name-val">{{ templateTwoData?.name }}</span>
+                    </div>
+                    <div class="t2-row">
+                        <span class="t2-lbl">Birthdate</span><span class="t2-colon">:</span>
+                        <span class="t2-val">{{ templateTwoData?.birthdate }}</span>
+                    </div>
+                    <div class="t2-row">
+                        <span class="t2-lbl">Birthplace</span><span class="t2-colon">:</span>
+                        <span class="t2-val">{{ templateTwoData?.birthplace }}</span>
+                    </div>
+                    <div class="t2-row">
+                        <span class="t2-lbl">Civil Status</span><span class="t2-colon">:</span>
+                        <span class="t2-val">{{ templateTwoData?.civil_status }}</span>
+                    </div>
+                    <div class="t2-row">
+                        <span class="t2-lbl">Nationality</span><span class="t2-colon">:</span>
+                        <span class="t2-val">{{ templateTwoData?.nationality }}</span>
+                    </div>
+                    <div class="t2-row t2-row-addr">
+                        <span class="t2-lbl">Address</span><span class="t2-colon">:</span>
+                        <span class="t2-val t2-addr-val">{{ templateTwoData?.address }}</span>
+                    </div>
+                </template>
             </div>
 
             <!-- ── No criminal record ────────────────────────────── -->
@@ -273,6 +321,34 @@ onMounted(async () => {
 
         </div><!-- /t2-content -->
     </div><!-- /t2-page -->
+
+    <!-- TEMPLATE THREE — JPG background; individual values positioned absolutely -->
+    <div v-else-if="isTemplateThreeBackground" class="t3-page">
+
+        <!-- Type field (in the Type: ___ box) -->
+        <span class="t3-type">{{ templateThreeData?.type }}</span>
+
+        <!-- Control No field -->
+        <span class="t3-control-no">{{ templateThreeData?.control_no }}</span>
+
+        <!-- Full Name (large bold in rectangle) -->
+        <span class="t3-name">{{ templateThreeData?.full_name }}</span>
+
+        <!-- Address -->
+        <span class="t3-address">{{ templateThreeData?.address }}</span>
+
+        <!-- Vehicle info (inline within "is now operating ___") -->
+        <span class="t3-vehicle">{{ templateThreeData?.vehicle_info }}</span>
+
+        <!-- Year permitted (in "for the year ___") -->
+        <span class="t3-year">{{ templateThreeData?.year_permitted }}</span>
+
+        <!-- Issued date parts: day / month / year -->
+        <span class="t3-issued-day">{{ templateThreeData?.issued_day }}</span>
+        <span class="t3-issued-month">{{ templateThreeData?.issued_month }}</span>
+        <span class="t3-issued-year">{{ templateThreeData?.issued_year }}</span>
+
+    </div><!-- /t3-page -->
 
     <!-- BARANGAY CLEARANCE DESIGN -->
     <div v-else-if="isBarangayClearance" class="clearance-container">
@@ -638,6 +714,111 @@ onMounted(async () => {
 .t2-txn-sep { text-align: center; font-size: 8.5pt; }
 .t2-txn-val { font-size: 8.5pt; }
 
+
+/* ============================================
+   TEMPLATE THREE — JPG background positioned overlay
+   Positions calibrated against 2481×3508 source image
+   rendered at 8.5in × 11in
+   ============================================ */
+
+.t3-page {
+    position: relative;
+    width: 8.5in;
+    height: 11in;
+    background: url('/images/documents_template/template_three.jpg') no-repeat top left / 100% 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    color: #000;
+}
+
+/* Type: NEW / RENEW — in the Type box, top-right content area */
+.t3-type {
+    position: absolute;
+    top: 20.5%;
+    left: 38.5%;
+    font-size: 9.5pt;
+    font-weight: bold;
+    letter-spacing: 0.3px;
+}
+
+/* Control No — right of Type box */
+.t3-control-no {
+    position: absolute;
+    top: 20.5%;
+    left: 65%;
+    font-size: 9.5pt;
+    font-weight: bold;
+}
+
+/* Full Name — large bold text in the name rectangle */
+.t3-name {
+    position: absolute;
+    top: 27.2%;
+    left: 33%;
+    right: 2%;
+    text-align: center;
+    font-size: 15pt;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+/* Address — below the name box */
+.t3-address {
+    position: absolute;
+    top: 32%;
+    left: 33%;
+    right: 2%;
+    text-align: center;
+    font-size: 9pt;
+    line-height: 1.35;
+    white-space: pre-line;
+}
+
+/* Vehicle info — inline after "is now operating" */
+.t3-vehicle {
+    position: absolute;
+    top: 36.8%;
+    left: 33%;
+    right: 2%;
+    text-align: center;
+    font-size: 9pt;
+    font-weight: bold;
+}
+
+/* Year permitted — in "for the year ___" */
+.t3-year {
+    position: absolute;
+    top: 46.2%;
+    left: 64%;
+    font-size: 9pt;
+    font-weight: bold;
+}
+
+/* Issued date parts */
+.t3-issued-day {
+    position: absolute;
+    top: 49%;
+    left: 37%;
+    font-size: 9pt;
+    font-weight: bold;
+}
+
+.t3-issued-month {
+    position: absolute;
+    top: 49%;
+    left: 50%;
+    font-size: 9pt;
+    font-weight: bold;
+}
+
+.t3-issued-year {
+    position: absolute;
+    top: 49%;
+    left: 72%;
+    font-size: 9pt;
+    font-weight: bold;
+}
 
 /* ============================================
    STANDARD CERTIFICATION STYLES
@@ -1204,6 +1385,17 @@ onMounted(async () => {
         background: url('/images/documents_template/template_two.png') no-repeat top left / 100% 100% !important;
     }
 
+    .t3-page {
+        width: 100%;
+        height: 11in;
+        margin: 0;
+        box-shadow: none;
+        page-break-after: avoid;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        background: url('/images/documents_template/template_three.jpg') no-repeat top left / 100% 100% !important;
+    }
+
     .certificate-container .header {
         margin-top: 0;
         margin-bottom: 10px;
@@ -1242,7 +1434,8 @@ onMounted(async () => {
 @media screen {
     .certificate-container,
     .clearance-container,
-    .t2-page {
+    .t2-page,
+    .t3-page {
         margin: 20px auto;
         box-shadow: 0 0 20px rgba(0, 0, 0, 0.12);
     }

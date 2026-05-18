@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\DB;
 class TransactionService
 {
     public function __construct(
-        private PendingFileUploadService $pendingFileUploadService
+        private PendingFileUploadService $pendingFileUploadService,
+        private SmsService $smsService,
     ) {}
 
     /**
@@ -229,8 +230,40 @@ class TransactionService
                 'officer_of_the_day_after_refresh' => $transaction->fresh()->officer_of_the_day,
             ]);
 
-            return $transaction->fresh();
+            $fresh = $transaction->fresh();
+
+            // Dispatch SMS notification to resident for notable status changes
+            $this->dispatchStatusSms($fresh, $status);
+
+            return $fresh;
         });
+    }
+
+    private function dispatchStatusSms(Transaction $transaction, string $status): void
+    {
+        $phone = $transaction->resident?->phone
+            ?? data_get($transaction->resident_input_data, '__manual_requestor.phone');
+
+        if (! $phone) {
+            return;
+        }
+
+        $transaction->loadMissing('documentType');
+        $docName = $transaction->documentType?->name ?? 'document request';
+        $txnId = $transaction->transaction_id ?? $transaction->id;
+        $appName = config('app.name', 'Barangay Purisima');
+
+        $message = match ($status) {
+            'in_progress' => "[{$appName}] Your {$docName} request (#{$txnId}) is now being processed. We'll notify you when it's ready.",
+            'completed'   => "[{$appName}] Your {$docName} (#{$txnId}) is ready for pick-up. Please visit the barangay hall during office hours.",
+            'rejected'    => "[{$appName}] Your {$docName} request (#{$txnId}) was not approved. Please visit the barangay hall for details.",
+            'cancelled'   => "[{$appName}] Your {$docName} request (#{$txnId}) has been cancelled. Contact us if you have questions.",
+            default       => null,
+        };
+
+        if ($message) {
+            $this->smsService->send($phone, $message, 'transaction', $transaction->id);
+        }
     }
 
     /**
@@ -256,11 +289,37 @@ class TransactionService
     }
 
     /**
-     * Get transactions for staff management
+     * Get transactions for staff management.
+     * For staff users, only returns transactions for document types they are assigned to handle.
      */
-    public function getStaffTransactions(array $filters = [], int $perPage = 15)
+    public function getStaffTransactions(array $filters = [], int $perPage = 15, ?User $user = null)
     {
         $query = Transaction::with(['resident', 'staff', 'documentType']);
+
+        // Restrict staff to only transactions they are authorised to see (mirrors TransactionPolicy)
+        if ($user && $user->role === 'staff') {
+            $query->where(function ($q) use ($user) {
+                // Tier 1 — transactions already claimed by this staff member
+                $q->where('staff_id', $user->id)
+                    // Tier 2 — unassigned transactions for document types this staff can handle
+                    ->orWhere(function ($unassigned) use ($user) {
+                        $unassigned->whereNull('staff_id')
+                            ->where(function ($docCheck) use ($user) {
+                                $docCheck->whereNull('document_type_id')
+                                    ->orWhereHas('documentType', function ($dtQuery) use ($user) {
+                                        $dtQuery->where(function ($inner) use ($user) {
+                                            // No assigned staff on the document type → open to all staff
+                                            $inner->whereDoesntHave('assignedStaff')
+                                                // OR this staff is explicitly assigned
+                                                ->orWhereHas('assignedStaff', function ($staffQuery) use ($user) {
+                                                    $staffQuery->where('users.id', $user->id);
+                                                });
+                                        });
+                                    });
+                            });
+                    });
+            });
+        }
 
         if (isset($filters['status']) && $filters['status'] && $filters['status'] !== 'all') {
             $query->where('status', $filters['status']);

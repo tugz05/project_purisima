@@ -101,7 +101,7 @@ class SocialAuthController extends Controller
 
     protected function ensureSupportedProvider(string $provider): void
     {
-        if (! in_array($provider, ['google', 'facebook'], true)) {
+        if (! in_array($provider, ['google'], true)) {
             abort(404);
         }
     }

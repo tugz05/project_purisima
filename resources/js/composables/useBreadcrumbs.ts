@@ -68,6 +68,13 @@ export function useBreadcrumbs() {
         ])
     );
 
+    const staffSmsBroadcastBreadcrumbs = computed(() =>
+        createBreadcrumbs([
+            { title: 'Dashboard', href: DASHBOARD_URL },
+            { title: 'SMS Broadcast', href: '/staff/sms' },
+        ])
+    );
+
     const staffPaymentHistoryBreadcrumbs = computed(() =>
         createBreadcrumbs([
             { title: 'Dashboard', href: DASHBOARD_URL },
@@ -180,6 +187,7 @@ export function useBreadcrumbs() {
         staffDocumentTypesBreadcrumbs,
         staffBarangayOfficialsBreadcrumbs,
         staffAnnouncementsBreadcrumbs,
+        staffSmsBroadcastBreadcrumbs,
         staffPaymentHistoryBreadcrumbs,
         staffPaymentStatisticsBreadcrumbs,
 

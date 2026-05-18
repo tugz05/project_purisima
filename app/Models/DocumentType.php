@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
@@ -170,6 +171,30 @@ class DocumentType extends Model
         }
 
         return $key;
+    }
+
+    /**
+     * Staff members explicitly assigned to handle this document type.
+     * If the collection is empty, all staff may handle it.
+     */
+    public function assignedStaff(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'document_type_staff', 'document_type_id', 'user_id');
+    }
+
+    /**
+     * Returns true if the given user is allowed to handle transactions of this document type.
+     * Admins are always allowed. If no staff is assigned, all staff are allowed.
+     */
+    public function canBeHandledBy(User $user): bool
+    {
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        $assigned = $this->assignedStaff()->pluck('users.id');
+
+        return $assigned->isEmpty() || $assigned->contains($user->id);
     }
 
     /**

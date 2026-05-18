@@ -12,6 +12,7 @@ use App\Services\CertificateVerificationService;
 use App\Services\ManualCertificateWizardService;
 use App\Services\NotificationService;
 use App\Services\TemplateTwoAIService;
+use App\Services\TemplateThreeAIService;
 use App\Services\TransactionService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -31,6 +32,7 @@ class TransactionController extends Controller
         private CertificateTemplateService $templateService,
         private AIDocumentGeneratorService $aiService,
         private TemplateTwoAIService $templateTwoAiService,
+        private TemplateThreeAIService $templateThreeAiService,
         private ManualCertificateWizardService $manualCertificateWizardService,
         private CertificateVerificationService $certificateVerificationService
     ) {}
@@ -40,7 +42,7 @@ class TransactionController extends Controller
         $filters = $request->only(['status', 'type', 'staff_id', 'payment_status', 'search', 'sort', 'direction']);
         $perPage = $request->get('per_page', 15);
 
-        $transactions = $this->transactionService->getStaffTransactions($filters, $perPage);
+        $transactions = $this->transactionService->getStaffTransactions($filters, $perPage, $request->user());
         $statistics = $this->transactionService->getStatistics();
         $transactionTypes = $this->transactionService->getTransactionTypes();
 
@@ -62,6 +64,8 @@ class TransactionController extends Controller
 
     public function show(Transaction $transaction): Response
     {
+        $this->authorize('view', $transaction);
+
         // Refresh to get latest data including officer_of_the_day
         $transaction->refresh();
         $transaction->load(['resident', 'staff', 'documentType']);
@@ -80,6 +84,8 @@ class TransactionController extends Controller
 
     public function update(StaffTransactionUpdateRequest $request, Transaction $transaction): RedirectResponse
     {
+        $this->authorize('update', $transaction);
+
         try {
             $oldStatus = $transaction->status;
 
@@ -141,6 +147,8 @@ class TransactionController extends Controller
 
     public function assign(Request $request, Transaction $transaction): RedirectResponse
     {
+        $this->authorize('update', $transaction);
+
         $this->transactionService->updateStatus(
             $transaction,
             'in_progress',
@@ -161,6 +169,8 @@ class TransactionController extends Controller
      */
     public function loadTemplate(Transaction $transaction, Request $request): JsonResponse
     {
+        $this->authorize('update', $transaction);
+
         if ($this->paymentRequired($transaction)) {
             return response()->json([
                 'error' => 'Payment must be completed before generating the certificate.',
@@ -201,6 +211,8 @@ class TransactionController extends Controller
      */
     public function generateWithAI(Transaction $transaction, Request $request): JsonResponse
     {
+        $this->authorize('update', $transaction);
+
         if ($this->paymentRequired($transaction)) {
             return response()->json([
                 'error' => 'Payment must be completed before generating the certificate.',
@@ -218,11 +230,10 @@ class TransactionController extends Controller
                 ], 404);
             }
 
-            // Template Two uses a background-image layout — generate structured field data
+            // Template Two — background-image layout with structured field data
             if ($transaction->documentType->template_type === 'template_two') {
                 $templateTwoData = $this->templateTwoAiService->generateContent($transaction);
 
-                // Save immediately (template_two doesn't use the rich-text editor flow)
                 $existing = is_array($transaction->generated_document_data) ? $transaction->generated_document_data : [];
                 $transaction->update([
                     'generated_document_data' => array_merge($existing, [
@@ -237,6 +248,29 @@ class TransactionController extends Controller
                     'content' => '',
                     'template_two_data' => $templateTwoData,
                     'is_template_two' => true,
+                    'generated_by' => 'AI (OpenAI)',
+                    'success' => true,
+                ]);
+            }
+
+            // Template Three — positioned overlay on permit/vehicle clearance background
+            if ($transaction->documentType->template_type === 'template_three') {
+                $templateThreeData = $this->templateThreeAiService->generateContent($transaction);
+
+                $existing = is_array($transaction->generated_document_data) ? $transaction->generated_document_data : [];
+                $transaction->update([
+                    'generated_document_data' => array_merge($existing, [
+                        'template_three_data' => $templateThreeData,
+                        'generated_at' => now()->toIso8601String(),
+                        'generated_by' => $request->user()?->id,
+                    ]),
+                    'document_generated_at' => now(),
+                ]);
+
+                return response()->json([
+                    'content' => '',
+                    'template_three_data' => $templateThreeData,
+                    'is_template_three' => true,
                     'generated_by' => 'AI (OpenAI)',
                     'success' => true,
                 ]);
@@ -269,6 +303,8 @@ class TransactionController extends Controller
      */
     public function printCertificate(Transaction $transaction): Response
     {
+        $this->authorize('update', $transaction);
+
         if ($this->paymentRequired($transaction)) {
             abort(403, 'Payment must be completed before printing the certificate.');
         }
@@ -285,10 +321,15 @@ class TransactionController extends Controller
         $templateType = $transaction->documentType->template_type;
         $content = $generatedData['content'] ?? '';
         $templateTwoData = $generatedData['template_two_data'] ?? null;
+        $templateThreeData = $generatedData['template_three_data'] ?? null;
 
-        // Template_two only needs template_two_data; all other layouts need content HTML
+        // Background-image templates only need their structured data; others need HTML content
         if ($templateType === 'template_two') {
             if ($templateTwoData === null) {
+                abort(404, 'Certificate content not found. Please generate the certificate first.');
+            }
+        } elseif ($templateType === 'template_three') {
+            if ($templateThreeData === null) {
                 abort(404, 'Certificate content not found. Please generate the certificate first.');
             }
         } elseif (empty($content)) {
@@ -313,6 +354,7 @@ class TransactionController extends Controller
             'printLayout' => $printLayout,
             'templateType' => $templateType,
             'templateTwoData' => $templateTwoData,
+            'templateThreeData' => $templateThreeData,
             'content' => $content,
             'currentDate' => $currentDate,
             'currentDateFormatted' => $currentDateFormatted,
