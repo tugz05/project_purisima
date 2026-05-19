@@ -174,12 +174,6 @@ class TransactionController extends Controller
     {
         $this->authorize('update', $transaction);
 
-        if ($this->paymentRequired($transaction)) {
-            return response()->json([
-                'error' => 'Payment must be completed before generating the certificate.',
-            ], 403);
-        }
-
         $templateId = $request->get('template_id');
 
         if ($templateId) {
@@ -215,12 +209,6 @@ class TransactionController extends Controller
     public function generateWithAI(Transaction $transaction, Request $request): JsonResponse
     {
         $this->authorize('update', $transaction);
-
-        if ($this->paymentRequired($transaction)) {
-            return response()->json([
-                'error' => 'Payment must be completed before generating the certificate.',
-            ], 403);
-        }
 
         try {
             // Refresh transaction to get latest data including officer_of_the_day
