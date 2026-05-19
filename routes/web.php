@@ -273,6 +273,7 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
     Route::post('transactions/{transaction}/load-template', [\App\Http\Controllers\Staff\TransactionController::class, 'loadTemplate'])->name('transactions.load-template');
     Route::post('transactions/{transaction}/generate-ai', [\App\Http\Controllers\Staff\TransactionController::class, 'generateWithAI'])->name('transactions.generate-ai');
     Route::get('transactions/{transaction}/print-certificate', [\App\Http\Controllers\Staff\TransactionController::class, 'printCertificate'])->name('transactions.print-certificate');
+    Route::get('transactions/{transaction}/print-receipt', [\App\Http\Controllers\Staff\TransactionController::class, 'printReceipt'])->name('transactions.print-receipt');
 
     // Payment processing routes
     Route::get('payments/history', [\App\Http\Controllers\Staff\PaymentController::class, 'history'])->name('payments.history');

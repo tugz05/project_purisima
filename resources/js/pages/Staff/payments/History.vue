@@ -17,6 +17,7 @@ import {
     CreditCard,
     Eye,
     Filter,
+    Printer,
     Receipt,
     Search,
     TrendingUp,
@@ -513,6 +514,16 @@ const documentLabel = (row: PaymentRow) => row.document_type?.name ?? row.title;
                                                         <span class="hidden sm:inline">Transaction</span>
                                                     </Button>
                                                 </Link>
+                                                <a
+                                                    v-if="row.payment_status === 'paid'"
+                                                    :href="`/staff/transactions/${row.id}/print-receipt`"
+                                                    target="_blank"
+                                                >
+                                                    <Button variant="outline" size="sm" class="h-9 gap-1.5 px-3 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                                                        <Printer class="h-3.5 w-3.5" />
+                                                        <span class="hidden sm:inline">Receipt</span>
+                                                    </Button>
+                                                </a>
                                                 <Link
                                                     v-if="row.payment_status === 'pending'"
                                                     :href="staff.payments.show.url(row.id)"

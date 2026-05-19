@@ -42,7 +42,9 @@ class SmsBroadcastService
             SendSmsJob::dispatch($phone, $message, 'broadcast', $broadcast->id);
         }
 
-        $broadcast->update(['status' => 'completed', 'completed_at' => now()]);
+        if ($normalized->isEmpty()) {
+            $broadcast->update(['status' => 'completed', 'completed_at' => now()]);
+        }
 
         return $broadcast;
     }

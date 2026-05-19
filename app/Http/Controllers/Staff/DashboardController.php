@@ -35,18 +35,22 @@ class DashboardController extends Controller
     public function printReport(Request $request): Response
     {
         $period = $this->validPeriod($request->get('period', 'monthly'));
-        [$start, $end] = $this->dateRange($period);
-        $stats = $this->periodStats($start, $end);
+        [$start, $end, $prevStart, $prevEnd] = $this->dateRange($period);
+
+        $current  = $this->periodStats($start, $end);
+        $previous = $this->periodStats($prevStart, $prevEnd);
+        $stats    = $this->buildStats($current, $previous);
 
         return Inertia::render('Staff/reports/PrintReport', [
             'period'             => $period,
             'meta'               => $this->buildMeta($period, $start, $end),
             'stats'              => $stats,
-            'completionRate'     => $stats['total'] > 0
-                ? round(($stats['completed'] / $stats['total']) * 100, 1) : 0,
+            'completionRate'     => $stats['completion_rate'],
             'documentTypes'      => $this->documentTypeBreakdown($start, $end),
             'paymentMethods'     => $this->paymentMethodBreakdown($start, $end),
             'recentTransactions' => $this->recentTransactions(20),
+            'printedBy'          => $request->user()?->name ?? 'System',
+            'printedAt'          => now()->format('F d, Y g:i A'),
         ]);
     }
 

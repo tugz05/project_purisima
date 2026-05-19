@@ -364,6 +364,50 @@ class TransactionController extends Controller
         ]);
     }
 
+    public function printReceipt(Transaction $transaction, Request $request): Response
+    {
+        $transaction->refresh();
+        $transaction->load(['resident', 'documentType', 'paymentVerifier', 'staff']);
+
+        if ($transaction->payment_status !== 'paid') {
+            abort(404, 'Receipt is only available for paid transactions.');
+        }
+
+        return Inertia::render('Staff/transactions/PrintReceipt', [
+            'transaction' => [
+                'id'                => $transaction->id,
+                'transaction_id'    => $transaction->transaction_id,
+                'title'             => $transaction->title,
+                'fee_amount'        => $transaction->fee_amount,
+                'amount_paid'       => $transaction->amount_paid,
+                'payment_method'    => $transaction->payment_method,
+                'payment_reference' => $transaction->payment_reference,
+                'receipt_number'    => $transaction->receipt_number,
+                'payment_date'      => $transaction->payment_date?->format('F d, Y g:i A'),
+                'resident'          => $transaction->resident ? [
+                    'name'  => $transaction->resident->name,
+                    'email' => $transaction->resident->email,
+                    'purok' => $transaction->resident->purok,
+                ] : null,
+                'document_type'     => $transaction->documentType ? [
+                    'name' => $transaction->documentType->name,
+                    'code' => $transaction->documentType->code,
+                ] : null,
+                'payment_verifier'  => $transaction->paymentVerifier ? [
+                    'name' => $transaction->paymentVerifier->name,
+                ] : null,
+                'staff'             => $transaction->staff ? [
+                    'name' => $transaction->staff->name,
+                ] : null,
+            ],
+            'barangayName' => \App\Models\SystemSetting::get('barangay_name', 'Barangay Purisima'),
+            'municipality' => \App\Models\SystemSetting::get('municipality', 'Municipality of Tago'),
+            'province'     => \App\Models\SystemSetting::get('province', 'Province of Surigao del Sur'),
+            'printedBy'    => $request->user()?->name ?? 'System',
+            'printedAt'    => now()->format('F d, Y g:i A'),
+        ]);
+    }
+
     /**
      * Create notification for transaction status change.
      */

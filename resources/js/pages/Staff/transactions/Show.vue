@@ -784,6 +784,22 @@ onUnmounted(() => {
                                             </Button>
                                         </Link>
 
+                                        <!-- Print Receipt: shown only when paid -->
+                                        <a
+                                            v-if="props.transaction.payment_status === 'paid'"
+                                            :href="`/staff/transactions/${props.transaction.id}/print-receipt`"
+                                            target="_blank"
+                                            class="inline-flex"
+                                        >
+                                            <Button
+                                                size="sm"
+                                                class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                                            >
+                                                <Printer class="h-4 w-4 mr-2" />
+                                                Print Receipt
+                                            </Button>
+                                        </a>
+
                                         <!-- Print Certificate: also gated by payment -->
                                         <template v-if="(props.transaction.status === 'in_progress' || props.transaction.status === 'completed') && props.transaction.generated_document_data?.content">
                                             <TooltipProvider v-if="!canGenerateCertificate" :delay-duration="100">

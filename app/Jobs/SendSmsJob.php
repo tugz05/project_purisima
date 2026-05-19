@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\SmsBroadcast;
 use App\Models\SmsOutboundMessage;
 use App\Services\Sms\SmsGatewayInterface;
 use Illuminate\Bus\Queueable;
@@ -48,6 +49,11 @@ class SendSmsJob implements ShouldQueue
                 'sent_at' => now(),
             ]);
 
+            if ($this->contextType === 'broadcast' && $this->contextId) {
+                SmsBroadcast::where('id', $this->contextId)->increment('sent_count');
+                $this->checkBroadcastCompletion();
+            }
+
             Log::info('[SMS] Sent successfully', [
                 'to' => $this->to,
                 'sid' => $sid,
@@ -58,6 +64,11 @@ class SendSmsJob implements ShouldQueue
                 'status' => 'failed',
                 'error_message' => $e->getMessage(),
             ]);
+
+            if ($this->contextType === 'broadcast' && $this->contextId) {
+                SmsBroadcast::where('id', $this->contextId)->increment('failed_count');
+                $this->checkBroadcastCompletion();
+            }
 
             Log::error('[SMS] Failed to send', [
                 'to' => $this->to,
@@ -82,5 +93,26 @@ class SendSmsJob implements ShouldQueue
             'message' => $this->message,
             'error' => $exception->getMessage(),
         ]);
+
+        if ($this->contextType === 'broadcast' && $this->contextId) {
+            SmsBroadcast::where('id', $this->contextId)->increment('failed_count');
+            $this->checkBroadcastCompletion();
+        }
+    }
+
+    private function checkBroadcastCompletion(): void
+    {
+        $broadcast = SmsBroadcast::find($this->contextId);
+        if (! $broadcast) {
+            return;
+        }
+
+        $done = $broadcast->sent_count + $broadcast->failed_count;
+        if ($done >= $broadcast->recipients_count) {
+            $broadcast->update([
+                'status' => $broadcast->failed_count === $broadcast->recipients_count ? 'failed' : 'completed',
+                'completed_at' => now(),
+            ]);
+        }
     }
 }

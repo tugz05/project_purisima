@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm, router } from '@inertiajs/vue3';
+import { Head, useForm, router, usePage } from '@inertiajs/vue3';
 import { ref, computed, nextTick, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -661,19 +661,26 @@ const openDeleteDialog = (documentType: DocumentType) => {
 };
 
 const confirmDelete = () => {
-    if (documentTypeToDelete.value) {
-        const deleteForm = useForm({});
-        deleteForm.delete(`/staff/document-types/${documentTypeToDelete.value.id}`, {
-            onSuccess: () => {
-                toast.success(`${documentTypeToDelete.value?.name} has been deleted successfully.`);
+    if (!documentTypeToDelete.value) return;
+
+    const name = documentTypeToDelete.value.name;
+    const id   = documentTypeToDelete.value.id;
+
+    router.delete(`/staff/document-types/${id}`, {
+        onSuccess: () => {
+            const flash = (usePage().props as any).flash;
+            if (flash?.error) {
+                toast.error(flash.error);
+            } else {
+                toast.success(`${name} has been deleted successfully.`);
                 deleteDialogOpen.value = false;
                 documentTypeToDelete.value = null;
-            },
-            onError: (errors) => {
-                toast.error(errors.message || 'Failed to delete document type. Please try again.');
             }
-        });
-    }
+        },
+        onError: () => {
+            toast.error('Failed to delete document type. Please try again.');
+        },
+    });
 };
 
 const cancelDelete = () => {
