@@ -219,14 +219,15 @@ body { background: #e5e7eb; font-family: 'Arial', sans-serif; }
     background: #e5e7eb;
 }
 
-/* ── Receipt sheet — half short bond: 8.5 × 5.5 in ─────────── */
+/* ── Receipt sheet — top half of short bond: 8.5 × 5.5 in ─── */
 .receipt-sheet {
     width: 8.5in;
-    min-height: 5.5in;
+    height: 5.5in;
     background: #fff;
     box-shadow: 0 4px 24px rgba(0,0,0,0.18);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 /* ── Cut-line strips ────────────────────────────────────────── */
@@ -404,12 +405,13 @@ body { background: #e5e7eb; font-family: 'Arial', sans-serif; }
 /* ── Print media ─────────────────────────────────────────────── */
 @media print {
     @page {
-        size: 8.5in 5.5in;
+        size: 8.5in 11in;   /* full short bond paper */
         margin: 0;
     }
 
     body { background: #fff !important; }
 
+    /* Flush to top-left — bottom half stays blank for reuse */
     .print-page-wrapper {
         display: block;
         padding: 0;
@@ -418,9 +420,11 @@ body { background: #e5e7eb; font-family: 'Arial', sans-serif; }
     }
 
     .receipt-sheet {
-        width: 100%;
+        width: 8.5in;
+        height: 5.5in;          /* occupies exactly the top half */
         min-height: unset;
         box-shadow: none;
+        page-break-after: avoid;
     }
 
     .amount-box,
