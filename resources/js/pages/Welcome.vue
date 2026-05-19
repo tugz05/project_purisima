@@ -2,6 +2,7 @@
 import AnnouncementController from '@/actions/App/Http/Controllers/Staff/AnnouncementController';
 import { dashboard, login, register } from '@/routes';
 import { Head, Link, usePage } from '@inertiajs/vue3';
+import PwaInstallButton from '@/components/PwaInstallButton.vue';
 import {
   Shield, Bell, Activity, FileText, Users, Smartphone, ClipboardCheck,
   Send, AlertTriangle, MapPin, Phone, Mail, Globe, Accessibility, Lock,
@@ -374,6 +375,9 @@ const closeAnnouncementView = () => {
   <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:shadow">Skip to content</a>
 
   <div class="min-h-screen bg-[#F0F9FF] text-[#0f172a]">
+    <!-- PWA install banner — shown to all visitors regardless of auth state -->
+    <PwaInstallButton />
+
     <!-- Top utility bar -->
     <div class="hidden bg-[#0EA5E9] text-white lg:block" aria-label="utility bar">
       <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-2 text-[12px]">
