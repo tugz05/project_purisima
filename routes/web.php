@@ -231,9 +231,26 @@ Route::middleware(['auth', 'verified', 'superadmin'])->prefix('superadmin')->nam
 });
 
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('admin/Dashboard');
-    })->name('dashboard');
+    Route::get('dashboard', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
+
+    // Staff management
+    Route::get('staff', [\App\Http\Controllers\Admin\StaffController::class, 'index'])->name('staff.index');
+    Route::post('staff', [\App\Http\Controllers\Admin\StaffController::class, 'store'])->name('staff.store');
+    Route::put('staff/{staff}', [\App\Http\Controllers\Admin\StaffController::class, 'update'])->name('staff.update');
+    Route::delete('staff/{staff}', [\App\Http\Controllers\Admin\StaffController::class, 'destroy'])->name('staff.destroy');
+
+    // Purok management
+    Route::get('puroks', [\App\Http\Controllers\Admin\PurokController::class, 'index'])->name('puroks.index');
+    Route::post('puroks', [\App\Http\Controllers\Admin\PurokController::class, 'store'])->name('puroks.store');
+    Route::put('puroks/{purok}', [\App\Http\Controllers\Admin\PurokController::class, 'update'])->name('puroks.update');
+    Route::delete('puroks/{purok}', [\App\Http\Controllers\Admin\PurokController::class, 'destroy'])->name('puroks.destroy');
+
+    // Residents (read-only)
+    Route::get('residents', [\App\Http\Controllers\Admin\ResidentController::class, 'index'])->name('residents.index');
+
+    // System settings
+    Route::get('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
+    Route::post('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'update'])->name('settings.update');
 });
 
 Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->group(function () {

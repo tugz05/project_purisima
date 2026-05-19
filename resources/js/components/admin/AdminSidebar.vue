@@ -5,15 +5,35 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { LayoutGrid } from 'lucide-vue-next';
+import { LayoutGrid, Users, MapPin, UserCircle, Settings } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
-import { dashboard as adminDashboard } from '@/routes/admin';
+import admin from '@/routes/admin';
 
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
-        href: adminDashboard().url,
+        href: admin.dashboard().url,
         icon: LayoutGrid,
+    },
+    {
+        title: 'Staff Management',
+        href: admin.staff.index().url,
+        icon: Users,
+    },
+    {
+        title: 'Purok Management',
+        href: admin.puroks.index().url,
+        icon: MapPin,
+    },
+    {
+        title: 'Residents',
+        href: admin.residents.index().url,
+        icon: UserCircle,
+    },
+    {
+        title: 'System Settings',
+        href: admin.settings.index().url,
+        icon: Settings,
     },
 ];
 
@@ -26,7 +46,7 @@ const footerNavItems: NavItem[] = [];
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" as-child>
-                        <Link :href="adminDashboard().url">
+                        <Link :href="admin.dashboard().url">
                             <AppLogo />
                         </Link>
                     </SidebarMenuButton>
@@ -44,36 +64,4 @@ const footerNavItems: NavItem[] = [];
         </SidebarFooter>
     </Sidebar>
     <slot />
-    </template>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+</template>

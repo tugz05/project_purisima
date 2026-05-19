@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Resident;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\OnboardingPhotoRequest;
 use App\Http\Requests\ResidentProfileRequest;
+use App\Models\Purok;
 use App\Models\User;
 use App\Services\ResidentProfileService;
 use DateTimeInterface;
@@ -25,9 +26,12 @@ class OnboardingController extends Controller
             ? trim($user->photo_url)
             : null;
 
+        $purokOptions = Purok::active()->ordered()->pluck('name')->toArray();
+
         return Inertia::render('resident/Onboarding', [
             'existingPhotoUrl' => $existingPhotoUrl,
-            'profileDraft' => $user instanceof User ? $this->residentProfileDraft($user) : null,
+            'profileDraft'     => $user instanceof User ? $this->residentProfileDraft($user) : null,
+            'purokOptions'     => $purokOptions,
         ]);
     }
 

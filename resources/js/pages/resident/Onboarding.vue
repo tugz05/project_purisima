@@ -4,7 +4,6 @@ import { ref, computed, onUnmounted } from 'vue'
 import { toast } from 'vue-sonner'
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { PUROK_OPTIONS } from '@/purokOptions';
 
 /** resident.onboarding.photo.store — use literal URL so builds survive Wayfinder regenerating onboarding/index.ts without photoStore. */
 const ONBOARDING_PHOTO_STORE_URL = '/resident/onboarding/photo';
@@ -26,10 +25,12 @@ const props = withDefaults(
   defineProps<{
     existingPhotoUrl?: string | null
     profileDraft?: ProfileDraft | null
+    purokOptions?: string[]
   }>(),
   {
     existingPhotoUrl: null,
     profileDraft: null,
+    purokOptions: () => [],
   },
 );
 
@@ -73,11 +74,9 @@ const form = useForm({
   purok: d?.purok ?? '',
 })
 
-const purokOptions = PUROK_OPTIONS
-
 const hasLegacyPurok = computed(() => {
   const p = form.purok
-  return typeof p === 'string' && p.length > 0 && !PUROK_OPTIONS.includes(p)
+  return typeof p === 'string' && p.length > 0 && !props.purokOptions.includes(p)
 })
 
 /** Matches server rule max:5120 (kilobytes) in ResidentProfileRequest. */
@@ -290,7 +289,7 @@ const submit = () => {
           <select v-model="form.purok" class="w-full rounded border px-3 py-2">
             <option value="">Select Purok</option>
             <option v-if="hasLegacyPurok" :value="form.purok">{{ form.purok }} (current — choose a new purok)</option>
-            <option v-for="p in purokOptions" :key="p" :value="p">{{ p }}</option>
+            <option v-for="p in props.purokOptions" :key="p" :value="p">{{ p }}</option>
           </select>
         </div>
         <div class="sm:col-span-2">

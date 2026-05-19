@@ -15,6 +15,9 @@ class DatabaseSeeder extends Seeder
         $this->call([
             SuperadminSeeder::class,
             UserSeeder::class,
+            PurokSeeder::class,
+            SystemSettingSeeder::class,
+            DocumentTypeSeeder::class,
         ]);
     }
 }
