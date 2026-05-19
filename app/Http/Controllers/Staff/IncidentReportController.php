@@ -116,7 +116,40 @@ class IncidentReportController extends Controller
         $incidentReport->load(['resident', 'staff']);
 
         return Inertia::render('Staff/Incidents/Show', [
-            'report' => $incidentReport,
+            'report' => [
+                'id'                  => $incidentReport->id,
+                'latitude'            => $incidentReport->latitude !== null ? (float) $incidentReport->latitude : null,
+                'longitude'           => $incidentReport->longitude !== null ? (float) $incidentReport->longitude : null,
+                'address'             => $incidentReport->address,
+                'location_notes'      => $incidentReport->location_notes,
+                'incident_type'       => $incidentReport->incident_type,
+                'severity'            => $incidentReport->severity,
+                'status'              => $incidentReport->status,
+                'description'         => $incidentReport->description,
+                'needs'               => $incidentReport->needs ?? [],
+                'specific_needs'      => $incidentReport->specific_needs,
+                'number_of_people'    => $incidentReport->number_of_people,
+                'has_elderly'         => (bool) $incidentReport->has_elderly,
+                'has_children'        => (bool) $incidentReport->has_children,
+                'has_pwd'             => (bool) $incidentReport->has_pwd,
+                'has_pregnant'        => (bool) $incidentReport->has_pregnant,
+                'medical_conditions'  => $incidentReport->medical_conditions,
+                'staff_notes'         => $incidentReport->staff_notes,
+                'assistance_provided' => $incidentReport->assistance_provided,
+                'created_at'          => $incidentReport->created_at?->toIso8601String(),
+                'acknowledged_at'     => $incidentReport->acknowledged_at?->toIso8601String(),
+                'assisted_at'         => $incidentReport->assisted_at?->toIso8601String(),
+                'resolved_at'         => $incidentReport->resolved_at?->toIso8601String(),
+                'resident'            => $incidentReport->resident ? [
+                    'id'    => $incidentReport->resident->id,
+                    'name'  => $incidentReport->resident->name,
+                    'email' => $incidentReport->resident->email,
+                    'phone' => $incidentReport->resident->phone,
+                ] : null,
+                'staff'               => $incidentReport->staff ? [
+                    'name' => $incidentReport->staff->name,
+                ] : null,
+            ],
         ]);
     }
 

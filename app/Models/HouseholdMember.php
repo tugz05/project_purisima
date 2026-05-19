@@ -13,6 +13,7 @@ class HouseholdMember extends Model
 
     protected $fillable = [
         'user_id',
+        'linked_user_id',
         'first_name',
         'middle_name',
         'last_name',
@@ -28,6 +29,7 @@ class HouseholdMember extends Model
         'is_senior_citizen',
         'is_pwd',
         'notes',
+        'invitation_status',
     ];
 
     protected $casts = [
@@ -44,6 +46,14 @@ class HouseholdMember extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the linked registered resident (if any).
+     */
+    public function linkedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'linked_user_id');
     }
 
     /**

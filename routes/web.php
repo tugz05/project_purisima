@@ -372,6 +372,8 @@ Route::middleware(['auth', 'role:resident', 'registration.geo', 'profile.complet
     Route::get('dashboard', [\App\Http\Controllers\Resident\DashboardController::class, 'index'])->name('dashboard');
 
     // Household Members routes
+    Route::get('household-members/search-residents', [\App\Http\Controllers\Resident\HouseholdMemberController::class, 'searchResidents'])->name('household-members.search-residents');
+    Route::post('household-members/{householdMember}/respond-invitation', [\App\Http\Controllers\Resident\HouseholdMemberController::class, 'respondInvitation'])->name('household-members.respond-invitation');
     Route::resource('household-members', \App\Http\Controllers\Resident\HouseholdMemberController::class);
 
     // Transaction routes
@@ -380,7 +382,9 @@ Route::middleware(['auth', 'role:resident', 'registration.geo', 'profile.complet
     // Incident Report routes
     // Map route must be defined BEFORE resource route to avoid route conflict
     Route::get('incidents/map', [\App\Http\Controllers\Resident\LocationController::class, 'map'])->name('incidents.map');
-    Route::resource('incidents', \App\Http\Controllers\Resident\IncidentReportController::class)->except(['create', 'edit', 'destroy']);
+    Route::resource('incidents', \App\Http\Controllers\Resident\IncidentReportController::class)
+        ->except(['create', 'edit', 'destroy'])
+        ->parameters(['incidents' => 'incidentReport']);
     Route::post('incidents/{incidentReport}/update-location', [\App\Http\Controllers\Resident\IncidentReportController::class, 'updateLocation'])->name('incidents.update-location');
 
     // Location tracking routes

@@ -47,7 +47,7 @@ class IncidentReportController extends Controller
      */
     public function store(IncidentReportRequest $request): RedirectResponse
     {
-        $report = $this->incidentReportService->create($request->validated(), $request->user());
+        $this->incidentReportService->create($request->validated(), $request->user());
 
         return redirect()->route('resident.incidents.index')
             ->with('success', 'Incident report submitted successfully. Help is on the way!');
@@ -63,7 +63,34 @@ class IncidentReportController extends Controller
         $incidentReport->load(['staff']);
 
         return Inertia::render('resident/incidents/Show', [
-            'report' => $incidentReport,
+            'report' => [
+                'id'                  => $incidentReport->id,
+                'latitude'            => $incidentReport->latitude !== null ? (float) $incidentReport->latitude : null,
+                'longitude'           => $incidentReport->longitude !== null ? (float) $incidentReport->longitude : null,
+                'address'             => $incidentReport->address,
+                'location_notes'      => $incidentReport->location_notes,
+                'incident_type'       => $incidentReport->incident_type,
+                'severity'            => $incidentReport->severity,
+                'status'              => $incidentReport->status,
+                'description'         => $incidentReport->description,
+                'needs'               => $incidentReport->needs ?? [],
+                'specific_needs'      => $incidentReport->specific_needs,
+                'number_of_people'    => $incidentReport->number_of_people,
+                'has_elderly'         => (bool) $incidentReport->has_elderly,
+                'has_children'        => (bool) $incidentReport->has_children,
+                'has_pwd'             => (bool) $incidentReport->has_pwd,
+                'has_pregnant'        => (bool) $incidentReport->has_pregnant,
+                'medical_conditions'  => $incidentReport->medical_conditions,
+                'staff_notes'         => $incidentReport->staff_notes,
+                'assistance_provided' => $incidentReport->assistance_provided,
+                'created_at'          => $incidentReport->created_at?->toIso8601String(),
+                'acknowledged_at'     => $incidentReport->acknowledged_at?->toIso8601String(),
+                'assisted_at'         => $incidentReport->assisted_at?->toIso8601String(),
+                'resolved_at'         => $incidentReport->resolved_at?->toIso8601String(),
+                'staff'               => $incidentReport->staff ? [
+                    'name' => $incidentReport->staff->name,
+                ] : null,
+            ],
         ]);
     }
 
