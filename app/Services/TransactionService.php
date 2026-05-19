@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class TransactionService
 {
@@ -117,6 +118,42 @@ class TransactionService
     {
         return DB::transaction(function () use ($transaction, $data, $resident) {
             $existingDocuments = is_array($transaction->submitted_documents) ? $transaction->submitted_documents : [];
+            $keepPaths = null;
+            if (array_key_exists('keep_submitted_document_paths', $data)) {
+                $kp = $data['keep_submitted_document_paths'];
+                $keepPaths = is_array($kp)
+                    ? array_values(array_unique(array_filter($kp, fn ($p) => is_string($p) && trim($p) !== '')))
+                    : [];
+            }
+
+            $keptDocuments = $existingDocuments;
+            if (is_array($keepPaths)) {
+                $keepLookup = array_fill_keys($keepPaths, true);
+                $keptDocuments = array_values(array_filter(
+                    $existingDocuments,
+                    fn ($d) => is_array($d) && isset($d['path']) && is_string($d['path']) && isset($keepLookup[$d['path']])
+                ));
+
+                // Delete removed files (best-effort) to support "replaceable/modifiable" uploads
+                $removed = array_filter(
+                    $existingDocuments,
+                    fn ($d) => is_array($d) && isset($d['path']) && is_string($d['path']) && !isset($keepLookup[$d['path']])
+                );
+                foreach ($removed as $doc) {
+                    $path = $doc['path'] ?? null;
+                    if (!is_string($path) || $path === '') {
+                        continue;
+                    }
+                    if (!str_starts_with($path, 'submitted-documents/')) {
+                        continue;
+                    }
+                    try {
+                        Storage::disk('public')->delete($path);
+                    } catch (\Throwable) {
+                        // ignore
+                    }
+                }
+            }
             $newDocuments = [];
 
             if (isset($data['submitted_document_upload_ids']) && is_array($data['submitted_document_upload_ids'])) {
@@ -182,9 +219,7 @@ class TransactionService
                 'resident_input_data' => $data['required_fields'] ?? ($transaction->resident_input_data ?? []),
             ];
 
-            if ($newDocuments !== []) {
-                $updateData['submitted_documents'] = array_values(array_merge($existingDocuments, $newDocuments));
-            }
+            $updateData['submitted_documents'] = array_values(array_merge($keptDocuments, $newDocuments));
 
             // Resubmission: rejected -> pending + clear rejection metadata
             if ($transaction->status === 'rejected') {

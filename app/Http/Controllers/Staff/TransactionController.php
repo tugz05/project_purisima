@@ -149,11 +149,14 @@ class TransactionController extends Controller
     {
         $this->authorize('update', $transaction);
 
-        $this->transactionService->updateStatus(
+        $transaction = $this->transactionService->updateStatus(
             $transaction,
             'in_progress',
             $request->user()
         );
+
+        // Notify the resident that processing has started
+        $this->notificationService->notifyResidentAboutTransaction($transaction, 'in_progress');
 
         return redirect()->back()
             ->with('success', 'Transaction assigned to you successfully.');
@@ -456,5 +459,8 @@ class TransactionController extends Controller
             $priority,
             'transaction'
         );
+
+        // Notify the resident with user-friendly messaging (if applicable)
+        $this->notificationService->notifyResidentAboutTransaction($transaction, $status);
     }
 }

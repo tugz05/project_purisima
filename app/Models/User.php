@@ -103,6 +103,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Convenience relationship for unread notifications.
+     */
+    public function unreadNotifications()
+    {
+        return $this->notifications()->where('is_read', false);
+    }
+
+    /**
+     * Convenience relationship for read notifications.
+     */
+    public function readNotifications()
+    {
+        return $this->notifications()->where('is_read', true);
+    }
+
+    /**
      * Get the conversations where the user is a resident.
      */
     public function residentConversations()

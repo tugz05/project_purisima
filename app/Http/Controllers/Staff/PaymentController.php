@@ -215,6 +215,8 @@ class PaymentController extends Controller
      */
     private function createPaymentNotification(Transaction $transaction, string $type): void
     {
+        $transaction->loadMissing(['resident', 'documentType']);
+
         $notificationData = [
             'transaction_id' => $transaction->id,
             'resident_name' => $transaction->resident->name,
@@ -252,5 +254,8 @@ class PaymentController extends Controller
             'normal',
             'transaction'
         );
+
+        // Notify the resident too (for in-app bell/toast)
+        $this->notificationService->notifyResidentAboutPayment($transaction, $type);
     }
 }

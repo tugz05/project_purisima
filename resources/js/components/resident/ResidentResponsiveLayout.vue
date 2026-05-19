@@ -16,6 +16,7 @@ import { Toaster } from 'vue-sonner';
 import { useAuth } from '@/composables/useAuth';
 import FloatingChat from './FloatingChat.vue';
 import PwaInstallButton from '@/components/PwaInstallButton.vue';
+import ResidentNotificationDropdown from '@/components/resident/NotificationDropdown.vue';
 import { logout } from '@/routes';
 import resident from '@/routes/resident';
 import { Link, router } from '@inertiajs/vue3';
@@ -120,6 +121,8 @@ onUnmounted(() => {
                     />
                     <h1 class="text-lg font-semibold text-gray-900">Uni Respond</h1>
                 </div>
+                <div class="flex items-center gap-1">
+                    <ResidentNotificationDropdown />
                 <DropdownMenu>
                     <DropdownMenuTrigger as-child>
                         <button
@@ -179,6 +182,7 @@ onUnmounted(() => {
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
+                </div>
             </div>
         </header>
 

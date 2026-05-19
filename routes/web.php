@@ -380,6 +380,16 @@ Route::middleware(['auth', 'role:resident', 'registration.geo', 'profile.complet
     // Transaction routes
     Route::resource('transactions', \App\Http\Controllers\Resident\TransactionController::class);
 
+    // Notifications (resident)
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Resident\NotificationController::class, 'index'])->name('index');
+        Route::get('/unread', [\App\Http\Controllers\Resident\NotificationController::class, 'unread'])->name('unread');
+        Route::get('/count', [\App\Http\Controllers\Resident\NotificationController::class, 'count'])->name('count');
+        Route::post('/mark-read/{notification}', [\App\Http\Controllers\Resident\NotificationController::class, 'markAsRead'])->name('mark-read');
+        Route::post('/mark-all-read', [\App\Http\Controllers\Resident\NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::delete('/{notification}', [\App\Http\Controllers\Resident\NotificationController::class, 'destroy'])->name('destroy');
+    });
+
     // Incident Report routes
     // Map route must be defined BEFORE resource route to avoid route conflict
     Route::get('incidents/map', [\App\Http\Controllers\Resident\LocationController::class, 'map'])->name('incidents.map');

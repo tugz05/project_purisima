@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Events\NotificationCreated;
 use App\Models\Notification;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Support\BroadcastHelper;
 use Illuminate\Support\Facades\DB;
@@ -100,6 +101,119 @@ class NotificationService
     }
 
     /**
+     * Notify a resident about a change to their own transaction.
+     * Uses plain, resident-friendly language.
+     */
+    public function notifyResidentAboutTransaction(
+        Transaction $transaction,
+        string $status
+    ): void {
+        $transaction->loadMissing(['resident', 'documentType']);
+
+        /** @var User|null $resident */
+        $resident = $transaction->resident instanceof User ? $transaction->resident : null;
+        if (! $resident) {
+            return;
+        }
+
+        $doc = $transaction->documentType?->name ?? 'document';
+        $txId = $transaction->id;
+
+        [$type, $title, $message, $priority] = match ($status) {
+            'in_progress' => [
+                'transaction_updated',
+                'Request In Progress',
+                "Your {$doc} request (#{$txId}) is now being processed.",
+                'normal',
+            ],
+            'completed' => [
+                'transaction_completed',
+                'Request Completed',
+                "Your {$doc} request (#{$txId}) has been completed. Please visit the barangay office to claim it.",
+                'normal',
+            ],
+            'rejected' => [
+                'transaction_rejected',
+                'Request Rejected',
+                "Your {$doc} request (#{$txId}) was rejected." .
+                    ($transaction->rejection_reason ? " Reason: {$transaction->rejection_reason}" : ''),
+                'high',
+            ],
+            'cancelled' => [
+                'transaction_cancelled',
+                'Request Cancelled',
+                "Your {$doc} request (#{$txId}) has been cancelled.",
+                'normal',
+            ],
+            default => [
+                'transaction_updated',
+                'Transaction Updated',
+                "Your {$doc} request (#{$txId}) has been updated.",
+                'normal',
+            ],
+        };
+
+        $this->createNotification(
+            $resident,
+            $type,
+            $title,
+            $message,
+            ['transaction_id' => $txId, 'document_type' => $doc, 'status' => $status],
+            $priority,
+            'transaction'
+        );
+    }
+
+    /**
+     * Notify a resident about a payment event on their transaction.
+     */
+    public function notifyResidentAboutPayment(Transaction $transaction, string $type): void
+    {
+        $transaction->loadMissing(['resident', 'documentType']);
+
+        /** @var User|null $resident */
+        $resident = $transaction->resident instanceof User ? $transaction->resident : null;
+        if (! $resident) {
+            return;
+        }
+
+        $doc = $transaction->documentType?->name ?? 'document';
+        $txId = $transaction->id;
+        $amount = number_format((float) ($transaction->amount_paid ?? $transaction->fee_amount), 2);
+
+        [$notifType, $title, $message, $priority] = match ($type) {
+            'payment_completed' => [
+                'payment_completed',
+                'Payment Confirmed',
+                "Your payment of ₱{$amount} for {$doc} (#{$txId}) has been confirmed.",
+                'normal',
+            ],
+            'payment_failed' => [
+                'payment_failed',
+                'Payment Issue',
+                "There was an issue with your payment for {$doc} (#{$txId}). Please contact the barangay office.",
+                'high',
+            ],
+            default => [
+                'payment_updated',
+                'Payment Update',
+                "Payment status updated for your {$doc} (#{$txId}).",
+                'normal',
+            ],
+        };
+
+        $this->createNotification(
+            $resident,
+            $notifType,
+            $title,
+            $message,
+            ['transaction_id' => $txId, 'document_type' => $doc, 'type' => $type, 'amount' => $amount],
+            $priority,
+            'transaction'
+        );
+    }
+
+    /**
      * Mark notification as read.
      */
     public function markAsRead(Notification $notification): void
@@ -169,9 +283,16 @@ class NotificationService
      */
     public function getUserNotifications(User $user, int $perPage = 20)
     {
-        return $user->notifications()
+        $paginator = $user->notifications()
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
+
+        $paginator->getCollection()->transform(function (Notification $n) {
+            $n->append('time_ago');
+            return $n;
+        });
+
+        return $paginator;
     }
 
     /**
@@ -179,10 +300,14 @@ class NotificationService
      */
     public function getUnreadNotifications(User $user, int $limit = 10)
     {
-        return $user->unreadNotifications()
+        $rows = $user->unreadNotifications()
             ->orderBy('created_at', 'desc')
             ->limit($limit)
             ->get();
+
+        $rows->each->append('time_ago');
+
+        return $rows;
     }
 
     /**

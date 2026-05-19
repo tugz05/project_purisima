@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { watch, nextTick, ref, onBeforeUnmount, computed } from 'vue';
+import { watch, nextTick, ref, onBeforeUnmount, computed, onMounted } from 'vue';
 import resident from '@/routes/resident';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -91,6 +91,7 @@ interface Props {
         type?: string;
     };
     transactionTypes: Record<string, TransactionType>;
+    openEditTransaction?: Transaction | null;
 }
 
 const props = defineProps<Props>();
@@ -109,6 +110,7 @@ const {
     createTransactionForm,
     updateFormForTransactionType,
     submitTransactionCreate,
+    submitTransactionUpdate,
     createFilterForm,
     applyFilters: applyFiltersUtil,
     addSubmittedDocument,
@@ -116,17 +118,6 @@ const {
     addMultipleSubmittedDocuments,
     transactionDocumentUploadSlots,
     clearTransactionDocumentUploadSlots,
-} = useFormHandlers();
-
-// Separate handler instance for edit/resubmit to avoid clobbering create uploads state
-const {
-    createTransactionForm: createEditTransactionForm,
-    updateFormForTransactionType: updateEditFormForTransactionType,
-    submitTransactionUpdate: submitEditTransactionUpdate,
-    addMultipleSubmittedDocuments: addMultipleSubmittedDocumentsEdit,
-    removeSubmittedDocument: removeSubmittedDocumentEdit,
-    transactionDocumentUploadSlots: editTransactionDocumentUploadSlots,
-    clearTransactionDocumentUploadSlots: clearEditTransactionDocumentUploadSlots,
 } = useFormHandlers();
 const { formatDateShort } = useUtils();
 
@@ -160,45 +151,25 @@ const inputFieldsForCreate = computed((): TransactionInputField[] => {
     }));
 });
 
-const inputFieldsForEdit = computed((): TransactionInputField[] => {
-    const code = editForm.value?.type;
-    const t = code ? props.transactionTypes[code] : null;
-    if (!t) {
-        return [];
-    }
-    if (Array.isArray(t.input_fields) && t.input_fields.length > 0) {
-        return t.input_fields;
-    }
-    const rf = t.required_fields;
-    if (!Array.isArray(rf)) {
-        return [];
-    }
-    return rf.map((s: string, i: number) => ({
-        key: String(s)
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '_')
-            .replace(/^_|_$/g, '') || `field_${i}`,
-        label: String(s),
-        type: 'text',
-        required: true,
-        placeholder: null,
-        options: [],
-    }));
-});
-
 const transactionUploadsBusy = computed(() =>
     Object.values(transactionDocumentUploadSlots.value).some((rows) => rows.some((r) => r.id === '' && !r.error)),
 );
 
-const editTransactionUploadsBusy = computed(() =>
-    Object.values(editTransactionDocumentUploadSlots.value).some((rows) => rows.some((r) => r.id === '' && !r.error)),
-);
-
 // Sheet states
 const viewSheetOpen = ref(false);
-const editSheetOpen = ref(false);
 const selectedTransaction = ref<Transaction | null>(null);
+const editingTransaction = ref<Transaction | null>(null);
+
+// Legacy edit sheet (kept temporarily to avoid a large template diff).
+// Editing now reuses the "New Request" sheet via `openEditInCreateSheet`.
+const editSheetOpen = ref(false);
 const editForm = ref<any>(null);
+const inputFieldsForEdit = computed((): TransactionInputField[] => []);
+const editTransactionUploadsBusy = computed(() => false);
+const editTransactionDocumentUploadSlots = {} as Record<string, any[]>;
+const submitEdit = () => {};
+const handleEditFileUpload = (_documentType: string, _files: File[]) => {};
+const removeEditFile = (_documentType: string, _index: number) => {};
 
 // Camera states for each document type
 const cameraStates = ref<Record<string, {
@@ -212,6 +183,60 @@ const cameraStates = ref<Record<string, {
 // Breadcrumbs
 const breadcrumbs = residentTransactionsBreadcrumbs.value;
 
+const existingSubmittedDocumentsByType = computed((): Record<string, any[]> => {
+    const docs = editingTransaction.value?.submitted_documents;
+    if (!Array.isArray(docs)) {
+        return {};
+    }
+    return docs.reduce((acc: Record<string, any[]>, d: any) => {
+        const t = typeof d?.document_type === 'string' && d.document_type ? d.document_type : 'Other';
+        if (!acc[t]) {
+            acc[t] = [];
+        }
+        acc[t].push(d);
+        return acc;
+    }, {});
+});
+
+const keptSubmittedDocumentsByType = computed((): Record<string, any[]> => {
+    const keep = new Set(Array.isArray(createForm.keep_submitted_document_paths) ? createForm.keep_submitted_document_paths : []);
+    const docs = editingTransaction.value?.submitted_documents;
+    if (!Array.isArray(docs)) {
+        return {};
+    }
+    return docs.reduce((acc: Record<string, any[]>, d: any) => {
+        const path = d?.path;
+        if (typeof path !== 'string' || !keep.has(path)) {
+            return acc;
+        }
+        const t = typeof d?.document_type === 'string' && d.document_type ? d.document_type : 'Other';
+        if (!acc[t]) {
+            acc[t] = [];
+        }
+        acc[t].push(d);
+        return acc;
+    }, {});
+});
+
+const removeKeptSubmittedDocument = (path: string) => {
+    if (!path) {
+        return;
+    }
+    createForm.keep_submitted_document_paths = (createForm.keep_submitted_document_paths || []).filter((p: string) => p !== path);
+};
+
+const storageUrlForPath = (path: string) => {
+    const p = String(path || '').replace(/^\/+/, '');
+    return `/storage/${p}`;
+};
+
+const formatLabel = (value: string) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const spaced = raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return spaced.replace(/\b\w/g, (m) => m.toUpperCase());
+};
+
 // Methods
 const updateFormForType = (type: string) => {
     if (type && typeof type === 'string' && props.transactionTypes && props.transactionTypes[type]) {
@@ -221,13 +246,6 @@ const updateFormForType = (type: string) => {
             console.warn('Error updating form for type:', type, error);
         }
     }
-};
-
-const submitCreate = () => {
-    submitTransactionCreate(createForm, resident.transactions.store().url, () => {
-        sheetOpen.value = false;
-        selectedType.value = '';
-    });
 };
 
 const applyFilters = () => {
@@ -381,67 +399,69 @@ const openViewSheet = (transaction: Transaction) => {
     viewSheetOpen.value = true;
 };
 
-const openEditSheet = (transaction: Transaction) => {
-    selectedTransaction.value = transaction;
-    clearEditTransactionDocumentUploadSlots();
+const openCreateSheet = () => {
+    editingTransaction.value = null;
+    selectedType.value = '';
+    createForm.reset();
+    createForm.keep_submitted_document_paths = [];
+    clearTransactionDocumentUploadSlots();
+    sheetOpen.value = true;
+};
 
-    const f = createEditTransactionForm();
+const openEditInCreateSheet = (transaction: Transaction) => {
+    editingTransaction.value = transaction;
+    selectedType.value = transaction.type;
     if (transaction.type && props.transactionTypes[transaction.type]) {
-        updateEditFormForTransactionType(transaction.type, f, props.transactionTypes);
+        updateFormForTransactionType(transaction.type, createForm, props.transactionTypes);
     } else {
-        f.type = transaction.type;
+        createForm.type = transaction.type;
     }
 
-    f.title = transaction.title;
-    f.description = transaction.description || '';
-    f.fee_amount = Number(transaction.fee_amount) || 0;
+    createForm.title = transaction.title;
+    createForm.description = transaction.description || '';
+    createForm.fee_amount = Number(transaction.fee_amount) || 0;
 
     const answers = transaction.resident_input_data && typeof transaction.resident_input_data === 'object'
         ? transaction.resident_input_data
         : {};
     Object.keys(answers).forEach((key) => {
-        f.required_fields[key] = (answers as any)[key] ?? '';
+        if (key) {
+            createForm.required_fields[key] = (answers as any)[key] ?? '';
+        }
     });
 
-    editForm.value = f;
-    editSheetOpen.value = true;
+    const existingPaths = Array.isArray(transaction.submitted_documents)
+        ? transaction.submitted_documents.map((d: any) => d?.path).filter((p: any) => typeof p === 'string' && p)
+        : [];
+    createForm.keep_submitted_document_paths = existingPaths;
+
+    clearTransactionDocumentUploadSlots();
+    sheetOpen.value = true;
 };
 
-const submitEdit = () => {
-    if (editForm.value && selectedTransaction.value) {
-        submitEditTransactionUpdate(editForm.value, resident.transactions.update(selectedTransaction.value.id).url, () => {
-            editSheetOpen.value = false;
-            selectedTransaction.value = null;
-            editForm.value = null;
+const submitSheet = () => {
+    if (editingTransaction.value) {
+        submitTransactionUpdate(createForm, resident.transactions.update(editingTransaction.value.id).url, () => {
+            sheetOpen.value = false;
+            editingTransaction.value = null;
+            selectedType.value = '';
+        });
+        return;
+    }
+
+    submitTransactionCreate(createForm, resident.transactions.store().url, () => {
+        sheetOpen.value = false;
+        selectedType.value = '';
+    });
+};
+
+onMounted(() => {
+    if (props.openEditTransaction) {
+        nextTick(() => {
+            openEditInCreateSheet(props.openEditTransaction as Transaction);
         });
     }
-};
-
-watch(
-    () => editForm.value?.type,
-    (newType, oldType) => {
-        if (!editForm.value || !newType || newType === oldType) {
-            return;
-        }
-        if (props.transactionTypes[newType]) {
-            updateEditFormForTransactionType(newType, editForm.value, props.transactionTypes);
-        }
-    },
-);
-
-const handleEditFileUpload = (documentType: string, files: File[]) => {
-    if (!editForm.value) {
-        return;
-    }
-    void addMultipleSubmittedDocumentsEdit(editForm.value, documentType, files);
-};
-
-const removeEditFile = (documentType: string, index: number) => {
-    if (!editForm.value) {
-        return;
-    }
-    void removeSubmittedDocumentEdit(editForm.value, documentType, index);
-};
+});
 
 // Watch for sheet close to clean up selectedType
 watch(sheetOpen, (newValue) => {
@@ -450,17 +470,9 @@ watch(sheetOpen, (newValue) => {
         nextTick(() => {
             selectedType.value = '';
             createForm.reset();
+            createForm.keep_submitted_document_paths = [];
             clearTransactionDocumentUploadSlots();
-        });
-    }
-});
-
-watch(editSheetOpen, (newValue) => {
-    if (!newValue) {
-        nextTick(() => {
-            clearEditTransactionDocumentUploadSlots();
-            selectedTransaction.value = null;
-            editForm.value = null;
+            editingTransaction.value = null;
         });
     }
 });
@@ -483,7 +495,11 @@ watch(editSheetOpen, (newValue) => {
                         </div>
                         <Sheet v-model:open="sheetOpen">
                             <SheetTrigger as-child>
-                                <Button size="lg" class="shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 px-4 md:px-8 py-3 md:py-4 rounded-xl font-semibold text-sm md:text-base">
+                                <Button
+                                    size="lg"
+                                    class="shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 px-4 md:px-8 py-3 md:py-4 rounded-xl font-semibold text-sm md:text-base"
+                                    @click="openCreateSheet"
+                                >
                                     <Plus class="h-6 w-6 mr-3" />
                                     New Request
                                 </Button>
@@ -491,15 +507,32 @@ watch(editSheetOpen, (newValue) => {
                             <SheetContent class="w-full sm:w-[580px] lg:w-[640px] p-0 flex flex-col h-full">
                                 <div class="p-6 sm:p-8 flex-shrink-0">
                                     <SheetHeader class="pb-6">
-                                        <SheetTitle class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">New Document Request</SheetTitle>
+                                        <SheetTitle class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+                                            {{ editingTransaction ? (editingTransaction.status === 'rejected' ? 'Resubmit Request' : 'Edit Request') : 'New Document Request' }}
+                                        </SheetTitle>
                                         <SheetDescription class="text-base sm:text-lg text-gray-600 leading-relaxed">
-                                            Select the type of document you need and provide the required information
+                                            {{ editingTransaction
+                                                ? 'Update your request details. You can upload new supporting documents or replace existing ones.'
+                                                : 'Select the type of document you need and provide the required information'
+                                            }}
                                         </SheetDescription>
                                     </SheetHeader>
                                 </div>
 
                                 <div class="flex-1 overflow-y-auto px-6 sm:px-8">
-                                    <form @submit.prevent="submitCreate" enctype="multipart/form-data" class="space-y-6 sm:space-y-8">
+                                    <form @submit.prevent="submitSheet" enctype="multipart/form-data" class="space-y-6 sm:space-y-8">
+                                        <div
+                                            v-if="editingTransaction && editingTransaction.status === 'rejected' && editingTransaction.rejection_reason"
+                                            class="rounded-2xl border-2 border-red-200 bg-gradient-to-r from-red-50 to-rose-50 p-5"
+                                        >
+                                            <div class="flex items-start gap-3">
+                                                <Ban class="h-5 w-5 mt-0.5 shrink-0 text-red-700" />
+                                                <div class="min-w-0">
+                                                    <p class="font-bold text-red-900">Rejection reason</p>
+                                                    <p class="mt-1 text-sm text-red-800 whitespace-pre-line break-words">{{ editingTransaction.rejection_reason }}</p>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div class="space-y-3">
                                             <Label for="type" class="text-base font-bold text-gray-800">Document Type</Label>
                                             <Select
@@ -558,8 +591,8 @@ watch(editSheetOpen, (newValue) => {
                                                             <FileText class="h-5 w-5 text-blue-600" />
                                                         </div>
                                                         <div>
-                                                            <span class="font-semibold text-lg">{{ doc.replace('_', ' ').toUpperCase() }}</span>
-                                                            <p class="text-sm text-blue-600 mt-1">Please upload your {{ doc.replace('_', ' ').toLowerCase() }}</p>
+                                                            <span class="font-semibold text-lg">{{ formatLabel(doc) }}</span>
+                                                            <p class="text-sm text-blue-600 mt-1">Upload supporting document (optional)</p>
                                                         </div>
                                                     </div>
 
@@ -599,7 +632,7 @@ watch(editSheetOpen, (newValue) => {
                                                         />
                                                         <label :for="`upload-${doc}`" class="cursor-pointer">
                                                             <Upload class="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                                                            <p class="text-sm text-gray-600 mb-1 font-medium">Click to upload {{ doc.replace('_', ' ').toLowerCase() }}</p>
+                                                            <p class="text-sm text-gray-600 mb-1 font-medium">Click to upload (optional)</p>
                                                             <p class="text-xs text-gray-500">PDF, DOC, DOCX, JPG, PNG (max 10MB each)</p>
                                                         </label>
                                                     </div>
@@ -676,6 +709,40 @@ watch(editSheetOpen, (newValue) => {
                                                         <p class="text-xs text-gray-500 text-center">
                                                             Review your captured image. If it looks good, confirm to upload.
                                                         </p>
+                                                    </div>
+
+                                                    <!-- Existing uploaded files (edit/resubmit) -->
+                                                    <div v-if="editingTransaction && keptSubmittedDocumentsByType[doc]?.length" class="space-y-2">
+                                                        <Label class="text-sm font-medium text-gray-700">Current files</Label>
+                                                        <div class="space-y-2">
+                                                            <div
+                                                                v-for="file in keptSubmittedDocumentsByType[doc]"
+                                                                :key="file.path || file.name"
+                                                                class="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+                                                            >
+                                                                <a
+                                                                    v-if="file.path"
+                                                                    :href="storageUrlForPath(file.path)"
+                                                                    target="_blank"
+                                                                    rel="noopener"
+                                                                    class="min-w-0 truncate font-medium text-blue-700 hover:underline"
+                                                                >
+                                                                    {{ file.name || file.path }}
+                                                                </a>
+                                                                <span v-else class="min-w-0 truncate font-medium text-gray-800">{{ file.name || 'File' }}</span>
+
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    class="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                                                    @click="file.path && removeKeptSubmittedDocument(file.path)"
+                                                                    :disabled="!file.path"
+                                                                >
+                                                                    <X class="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
                                                     </div>
 
                                                     <!-- Uploaded Files for this specific document -->
@@ -839,14 +906,17 @@ watch(editSheetOpen, (newValue) => {
                                     <div class="flex flex-row gap-3 sm:gap-4">
                                         <Button
                                             type="button"
-                                            :disabled="createForm.processing || transactionUploadsBusy"
-                                            @click="submitCreate"
+                                            :disabled="createForm.processing || transactionUploadsBusy || !createForm.type || !createForm.title"
+                                            @click="submitSheet"
                                             size="lg"
                                             class="flex flex-1 h-12 sm:h-14 items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300"
                                         >
                                             <Loader2 v-if="createForm.processing" class="h-5 w-5 shrink-0 animate-spin" />
                                             <Rocket v-else class="h-5 w-5 shrink-0" />
-                                            {{ createForm.processing ? 'Submitting...' : 'Submit Request' }}
+                                            {{ createForm.processing
+                                                ? (editingTransaction ? (editingTransaction.status === 'rejected' ? 'Resubmitting...' : 'Updating...') : 'Submitting...')
+                                                : (editingTransaction ? (editingTransaction.status === 'rejected' ? 'Resubmit Request' : 'Update Request') : 'Submit Request')
+                                            }}
                                         </Button>
                                         <Button type="button" variant="outline" size="lg" @click="sheetOpen = false" class="flex-1 h-12 sm:h-14 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-bold text-base sm:text-lg rounded-xl transition-all duration-300">
                                             Cancel
@@ -1087,7 +1157,7 @@ watch(editSheetOpen, (newValue) => {
                                         <div class="flex flex-row gap-3 sm:gap-4">
                                             <Button
                                                 v-if="selectedTransaction?.status === 'pending' || selectedTransaction?.status === 'rejected'"
-                                                @click="openEditSheet(selectedTransaction); viewSheetOpen = false"
+                                                @click="openEditInCreateSheet(selectedTransaction); viewSheetOpen = false"
                                                 size="lg"
                                                 class="flex flex-1 h-12 sm:h-14 items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300"
                                             >
@@ -1109,8 +1179,8 @@ watch(editSheetOpen, (newValue) => {
                             </SheetContent>
                         </Sheet>
 
-                        <!-- Edit Transaction Sheet -->
-                        <Sheet v-model:open="editSheetOpen">
+                        <!-- Legacy Edit Transaction Sheet (disabled; edit now reuses the create sheet) -->
+                        <Sheet v-if="false" v-model:open="editSheetOpen">
                             <SheetContent class="w-full sm:w-[580px] lg:w-[640px] p-0 flex flex-col h-full">
                                 <div class="flex flex-col h-full">
                                     <!-- Header -->
@@ -1462,7 +1532,7 @@ watch(editSheetOpen, (newValue) => {
                                     </Button>
                                     <Button
                                         v-if="transaction.status === 'pending' || transaction.status === 'rejected'"
-                                        @click="openEditSheet(transaction)"
+                                        @click="openEditInCreateSheet(transaction)"
                                         variant="outline"
                                         size="lg"
                                         class="flex w-full h-12 items-center justify-center gap-2 bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100 border-2 border-gray-200 text-gray-700 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"

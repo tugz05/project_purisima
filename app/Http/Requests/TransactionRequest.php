@@ -29,6 +29,8 @@ class TransactionRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'required_documents' => ['nullable', 'array'],
+            'keep_submitted_document_paths' => ['nullable', 'array'],
+            'keep_submitted_document_paths.*' => ['string', 'max:2048'],
             'required_fields' => ['nullable', 'array'],
             'required_fields.*' => ['nullable', 'string', 'max:5000'],
             'submitted_documents' => ['nullable', 'array'],

@@ -114,6 +114,7 @@ export function useFormHandlers() {
             title: '',
             description: '',
             required_documents: [] as string[],
+            keep_submitted_document_paths: [] as string[],
             required_fields: {} as Record<string, string>,
             submitted_documents: {} as Record<string, File[]>,
             submitted_document_upload_ids: {} as Record<string, string[]>,
@@ -134,6 +135,7 @@ export function useFormHandlers() {
             form.fee_amount = typeInfo.fee;
             form.submitted_documents = {};
             form.submitted_document_upload_ids = {};
+            form.keep_submitted_document_paths = [];
             form.required_fields = {};
             const defs: Array<{ key: string }> =
                 Array.isArray(typeInfo.input_fields) && typeInfo.input_fields.length > 0
@@ -238,6 +240,14 @@ export function useFormHandlers() {
         if (form.required_documents && Array.isArray(form.required_documents)) {
             form.required_documents.forEach((doc: string, index: number) => {
                 formData.append(`required_documents[${index}]`, doc);
+            });
+        }
+
+        if (Array.isArray(form.keep_submitted_document_paths)) {
+            form.keep_submitted_document_paths.forEach((p: string, index: number) => {
+                if (p) {
+                    formData.append(`keep_submitted_document_paths[${index}]`, p);
+                }
             });
         }
 

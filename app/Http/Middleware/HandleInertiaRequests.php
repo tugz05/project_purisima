@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Transaction;
+use App\Models\Notification;
 use App\Services\MessagingService;
 use Closure;
 use Illuminate\Foundation\Inspiring;
@@ -64,6 +65,14 @@ class HandleInertiaRequests extends Middleware
             $staffPendingTransactionsCount = Transaction::query()->where('status', 'pending')->count();
         }
 
+        $residentUnreadNotificationsCount = null;
+        if ($user && $user->role === 'resident') {
+            $residentUnreadNotificationsCount = Notification::query()
+                ->where('user_id', $user->id)
+                ->where('is_read', false)
+                ->count();
+        }
+
         return [
             ...parent::share($request),
             'csrf_token' => csrf_token(),
@@ -75,6 +84,7 @@ class HandleInertiaRequests extends Middleware
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'messagingUnreadCount' => $messagingUnreadCount,
             'staffPendingTransactionsCount' => $staffPendingTransactionsCount,
+            'residentUnreadNotificationsCount' => $residentUnreadNotificationsCount,
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

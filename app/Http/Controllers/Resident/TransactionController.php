@@ -84,15 +84,20 @@ class TransactionController extends Controller
         ]);
     }
 
-    public function edit(Transaction $transaction): Response
+    public function edit(Request $request, Transaction $transaction): Response
     {
         $this->authorize('update', $transaction);
 
+        // Reuse the same "My Transactions" page + sheet UI for editing/resubmission
+        $filters = $request->only(['status', 'type']);
+        $transactions = $this->transactionService->getResidentTransactions($request->user(), $filters);
         $transactionTypes = $this->transactionService->getTransactionTypes();
 
-        return Inertia::render('resident/transactions/Edit', [
-            'transaction' => $transaction,
+        return Inertia::render('resident/transactions/Index', [
+            'transactions' => $transactions,
             'transactionTypes' => $transactionTypes,
+            'filters' => $filters,
+            'openEditTransaction' => $transaction->loadMissing(['staff', 'documentType']),
         ]);
     }
 

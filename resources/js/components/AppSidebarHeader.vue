@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import NotificationDropdown from '@/components/staff/NotificationDropdown.vue';
+import ResidentNotificationDropdown from '@/components/resident/NotificationDropdown.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { MessageSquare } from 'lucide-vue-next';
 import type { BreadcrumbItemType } from '@/types';
@@ -25,6 +26,7 @@ withDefaults(
 const page = usePage() as any;
 const currentUser = page?.props?.auth?.user || null;
 const isStaff = currentUser && (currentUser.role === 'staff' || currentUser.role === 'admin');
+const isResident = currentUser && currentUser.role === 'resident';
 
 function initialMessagingUnread(): number {
     const m = page?.props?.messagingUnreadCount;
@@ -177,7 +179,8 @@ onUnmounted(() => {
                         {{ headerUnread > 9 ? '9+' : headerUnread }}
                     </span>
                 </Link>
-                <NotificationDropdown />
+                <NotificationDropdown v-if="isStaff" />
+                <ResidentNotificationDropdown v-else-if="isResident" />
             </div>
         </div>
     </header>
