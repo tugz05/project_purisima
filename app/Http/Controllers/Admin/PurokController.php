@@ -39,8 +39,10 @@ class PurokController extends Controller
             'name'        => 'required|string|max:100|unique:puroks,name',
             'description' => 'nullable|string|max:255',
             'is_active'   => 'boolean',
-            'sort_order'  => 'integer|min:0',
         ]);
+
+        // Auto-assign sort_order: newest purok gets the next available slot
+        $data['sort_order'] = (Purok::max('sort_order') ?? 0) + 1;
 
         Purok::create($data);
 
@@ -53,7 +55,6 @@ class PurokController extends Controller
             'name'        => ['required', 'string', 'max:100', Rule::unique('puroks', 'name')->ignore($purok->id)],
             'description' => 'nullable|string|max:255',
             'is_active'   => 'boolean',
-            'sort_order'  => 'integer|min:0',
         ]);
 
         $purok->update($data);

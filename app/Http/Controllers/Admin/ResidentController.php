@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -38,8 +39,10 @@ class ResidentController extends Controller
                 'purok'                 => $u->purok,
                 'sex'                   => $u->sex,
                 'civil_status'          => $u->civil_status,
-                'profile_completed_at'  => $u->profile_completed_at?->format('M d, Y'),
-                'created_at'            => $u->created_at->format('M d, Y'),
+                'profile_completed_at'  => $u->profile_completed_at
+                    ? Carbon::parse($u->profile_completed_at)->format('M d, Y')
+                    : null,
+                'created_at'            => $u->created_at?->format('M d, Y') ?? '—',
             ]);
 
         $filters = $request->only(['search', 'purok']);

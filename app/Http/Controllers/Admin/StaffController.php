@@ -25,7 +25,7 @@ class StaffController extends Controller
                 'name'           => $u->name,
                 'email'          => $u->email,
                 'phone'          => $u->phone,
-                'created_at'     => $u->created_at->format('M d, Y'),
+                'created_at'     => $u->created_at?->format('M d, Y') ?? '—',
                 'document_types' => $u->assignedDocumentTypes->map(fn ($d) => ['id' => $d->id, 'name' => $d->name]),
             ]);
 
