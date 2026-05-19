@@ -95,7 +95,6 @@ const showDropdown = ref(false);
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 let searchAbortController: AbortController | null = null;
 const searchCache = new Map<string, ResidentSuggestion[]>();
-let skipWatch = false; // set to true before programmatic searchQuery changes
 
 const openViewSheet = (member: HouseholdMember) => {
     selectedMember.value = member;
@@ -171,16 +170,15 @@ const doSearch = (raw: string) => {
     }, 150);
 };
 
-// Watch with flush:'sync' so it fires inside the Vue setter — guaranteed to have the new
-// value and the skipWatch flag is checked before any async work starts.
-watch(searchQuery, (newVal) => {
-    if (skipWatch) { skipWatch = false; return; }
+const onInput = (e: Event) => {
+    const val = (e.target as HTMLInputElement).value;
+    searchQuery.value = val;
     if (selectedResident.value) {
         selectedResident.value = null;
         createForm.linked_user_id = null;
     }
-    doSearch(newVal);
-}, { flush: 'sync' });
+    doSearch(val);
+};
 
 const hideDropdownDelayed = () => {
     setTimeout(() => { showDropdown.value = false; }, 150);
@@ -190,7 +188,6 @@ const selectResident = (resident: ResidentSuggestion) => {
     selectedResident.value = resident;
     createForm.linked_user_id = resident.id;
     const parts = [resident.first_name, resident.middle_name, resident.last_name, resident.suffix].filter(Boolean);
-    skipWatch = true; // prevent the watcher from firing a search for the programmatic change
     searchQuery.value = parts.join(' ');
     createForm.full_name = searchQuery.value;
     createForm.birth_date = resident.birth_date ?? '';
@@ -205,7 +202,6 @@ const selectResident = (resident: ResidentSuggestion) => {
 const clearSelection = () => {
     selectedResident.value = null;
     createForm.linked_user_id = null;
-    skipWatch = true; // programmatic clear — don't trigger a search for ""
     searchQuery.value = '';
     createForm.full_name = '';
     createForm.birth_date = '';
@@ -213,8 +209,11 @@ const clearSelection = () => {
     createForm.civil_status = '';
     createForm.occupation = '';
     createForm.educational_attainment = '';
+    if (searchTimeout) { clearTimeout(searchTimeout); searchTimeout = null; }
+    if (searchAbortController) { searchAbortController.abort(); searchAbortController = null; }
     searchResults.value = [];
     showDropdown.value = false;
+    isSearching.value = false;
 };
 
 const submitCreate = () => {
@@ -330,12 +329,13 @@ const invitationStatusColor: Record<string, string> = {
                                             <Label class="text-sm font-semibold text-gray-700">Full Name <span class="text-red-500">*</span></Label>
                                             <div class="relative">
                                                 <div class="relative">
-                                                    <Input
-                                                        v-model="searchQuery"
+                                                    <input
+                                                        :value="searchQuery"
                                                         type="text"
                                                         placeholder="Type a name to search registered residents…"
-                                                        class="h-11 pr-10"
                                                         autocomplete="off"
+                                                        class="flex h-11 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs outline-none placeholder:text-muted-foreground transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] pr-10"
+                                                        @input="onInput"
                                                         @blur="hideDropdownDelayed"
                                                         @focus="showDropdown = searchResults.length > 0"
                                                     />
