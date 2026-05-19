@@ -246,3 +246,19 @@
     }
 }
 
+/* ============================================================
+   Mobile resident: push Sonner toasts above the bottom nav
+   ============================================================ */
+@media (max-width: 767px) {
+    /* Bottom-positioned toasts must clear the 72px nav + safe area */
+    [data-sonner-toaster][data-y-position='bottom'] {
+        bottom: calc(5rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    /* Prevent text selection on all interactive chrome (not page content) */
+    nav, header, footer, [role='navigation'], [role='toolbar'] {
+        user-select: none;
+        -webkit-user-select: none;
+    }
+}
+

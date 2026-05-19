@@ -7,6 +7,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Exceptions\PostTooLargeException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -58,6 +59,12 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             if ($e instanceof AuthorizationException && $request->header('X-Inertia')) {
+                return redirect()->back()->with('error', $e->getMessage() ?: 'You are not authorized to perform this action.');
+            }
+
+            // abort(403) throws HttpException, not AuthorizationException — handle it
+            // the same way so Inertia never receives a bare JSON 403 response.
+            if ($e instanceof HttpException && $e->getStatusCode() === 403 && $request->header('X-Inertia')) {
                 return redirect()->back()->with('error', $e->getMessage() ?: 'You are not authorized to perform this action.');
             }
 

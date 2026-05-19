@@ -38,24 +38,60 @@ const { user, userInitials, isAuthenticated, isProfileCompleted } = useAuth();
 
 // Detect if we're on mobile based on screen size
 const isMobile = ref(false);
+const mainRef = ref<HTMLElement | null>(null);
 
 const updateMobileState = () => {
     if (typeof window !== 'undefined') {
-        isMobile.value = window.innerWidth < 768; // md breakpoint
+        isMobile.value = window.innerWidth < 768;
     }
 };
 
+// Lock viewport to native-app behavior: no pinch-zoom, no keyboard-induced layout resize
+const lockMobileViewport = () => {
+    const vp = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    if (vp) {
+        vp.setAttribute('content',
+            'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual'
+        );
+    }
+    // Body must not scroll — only the inner main div scrolls
+    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.height = '100%';
+    document.body.style.overflow = 'hidden';
+    document.body.style.height = '100%';
+};
+
+const unlockMobileViewport = () => {
+    const vp = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    if (vp) {
+        vp.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
+    }
+    document.documentElement.style.overflow = '';
+    document.documentElement.style.height = '';
+    document.body.style.overflow = '';
+    document.body.style.height = '';
+};
+
+let removeFinishListener: (() => void) | null = null;
+
 onMounted(() => {
     updateMobileState();
+    if (isMobile.value) lockMobileViewport();
     if (typeof window !== 'undefined') {
         window.addEventListener('resize', updateMobileState);
     }
+    // Scroll the inner content div to top on every Inertia navigation
+    removeFinishListener = router.on('finish', () => {
+        if (mainRef.value) mainRef.value.scrollTop = 0;
+    });
 });
 
 onUnmounted(() => {
+    if (isMobile.value) unlockMobileViewport();
     if (typeof window !== 'undefined') {
         window.removeEventListener('resize', updateMobileState);
     }
+    removeFinishListener?.();
 });
 </script>
 
@@ -70,9 +106,9 @@ onUnmounted(() => {
     </AppShell>
 
     <!-- Mobile Layout with Bottom Navigation -->
-    <div v-else class="flex flex-col min-h-[100dvh] bg-gray-50 md:hidden">
+    <div v-else class="flex flex-col h-[100dvh] overflow-hidden bg-gray-50 md:hidden">
         <!-- Mobile Header -->
-        <header class="sticky top-0 z-40 divide-y divide-gray-200 border-b border-gray-200 bg-white">
+        <header class="shrink-0 z-40 divide-y divide-gray-200 border-b border-gray-200 bg-white select-none">
             <PwaInstallButton />
             <div class="flex items-center justify-between px-4 py-3">
                 <div class="flex items-center gap-3">
@@ -146,8 +182,11 @@ onUnmounted(() => {
             </div>
         </header>
 
-        <!-- Mobile Content -->
-        <main class="flex-1 overscroll-y-contain pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
+        <!-- Mobile Content — scrolls inside the fixed shell; body never scrolls -->
+        <main
+            ref="mainRef"
+            class="flex-1 overflow-y-auto overscroll-y-contain pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]"
+        >
             <slot />
         </main>
 
@@ -155,8 +194,8 @@ onUnmounted(() => {
         <ResidentBottomNav />
     </div>
 
-    <!-- Toast Notifications -->
-    <Toaster />
+    <!-- Toast Notifications — on mobile, position above the bottom nav -->
+    <Toaster :position="isMobile ? 'bottom-center' : 'bottom-right'" />
 
     <!-- Floating Chat for authenticated residents only -->
     <Teleport to="body">

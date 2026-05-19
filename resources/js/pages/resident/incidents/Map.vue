@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { MapPin, ArrowLeft, Users, Navigation, RefreshCw } from 'lucide-vue-next';
@@ -214,12 +214,21 @@ const initializeMap = () => {
         center,
         zoom,
         zoomControl: true,
+        // Prevents double-tap zoom conflicting with native app gestures
+        tap: false,
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
         maxZoom: 19,
     }).addTo(map);
+
+    // Force Leaflet to recalculate tile layout after the fixed-shell CSS is applied.
+    // Without this, body overflow:hidden causes Leaflet to read zero dimensions
+    // and never request tiles.
+    setTimeout(() => {
+        map?.invalidateSize();
+    }, 0);
 
     // Add markers
     updateMarkers();
@@ -283,13 +292,17 @@ const refreshLocations = () => {
 // Auto-refresh locations every 5 seconds for real-time updates
 let refreshInterval: number | null = null;
 
-onMounted(() => {
+onMounted(async () => {
+    // Wait for Vue to finish rendering the DOM (including Tailwind height classes)
+    // before Leaflet measures the container — without this the container reads as
+    // zero-height inside the fixed mobile shell and tiles never load.
+    await nextTick();
     initializeMap();
 
     // Start auto-refresh for real-time location updates
     refreshInterval = window.setInterval(() => {
         refreshLocations();
-    }, 5000); // Refresh every 5 seconds
+    }, 5000);
 });
 
 onUnmounted(() => {
@@ -385,9 +398,9 @@ watch(() => [props.staffLocations, props.residentLocations, props.currentUserLoc
                     </div>
                 </div>
 
-                <!-- Map -->
+                <!-- Map — fills available screen on mobile, fixed height on desktop -->
                 <Card class="shadow-lg border-gray-200 p-0 overflow-hidden">
-                    <div ref="mapContainer" class="w-full h-[600px] rounded-lg"></div>
+                    <div ref="mapContainer" class="w-full rounded-lg h-[calc(100dvh-16rem)] md:h-[600px]"></div>
                 </Card>
             </div>
         </div>
