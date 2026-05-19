@@ -18,7 +18,7 @@ class ManualCertificateFinalizeRequest extends FormRequest
     {
         $merge = [];
 
-        foreach (['manual_email', 'manual_phone', 'manual_purok', 'manual_address', 'staff_notes', 'title', 'officer_of_the_day'] as $key) {
+        foreach (['manual_email', 'manual_phone', 'manual_purok', 'manual_address', 'staff_notes', 'title', 'officer_of_the_day', 'officer_of_the_day_position'] as $key) {
             if ($this->input($key) === '') {
                 $merge[$key] = null;
             }
@@ -69,6 +69,7 @@ class ManualCertificateFinalizeRequest extends FormRequest
             'field_values.*' => ['nullable', 'string', 'max:50000'],
             'document_content' => ['required', 'string', 'min:1', 'max:500000'],
             'officer_of_the_day' => ['nullable', 'string', 'max:255'],
+            'officer_of_the_day_position' => ['nullable', 'string', 'max:255'],
             'manual_full_name' => ['nullable', 'string', 'max:255'],
             'manual_email' => ['nullable', 'string', 'email', 'max:255'],
             'manual_phone' => ['nullable', 'string', 'max:50'],

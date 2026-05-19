@@ -20,6 +20,7 @@ class ManualCertificatePrintRequest extends FormRequest
             'document_type_id' => ['required', 'integer', 'exists:document_types,id'],
             'content' => ['required', 'string', 'max:500000'],
             'officer_of_the_day' => ['nullable', 'string', 'max:255'],
+            'officer_of_the_day_position' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

@@ -148,6 +148,7 @@ class ManualCertificateController extends Controller
             'currentDate' => now()->format('F d, Y'),
             'currentDateFormatted' => now()->format('jS \d\a\y \o\f F, Y'),
             'officerOfTheDay' => $request->validated('officer_of_the_day'),
+            'officerOfTheDayPosition' => $request->validated('officer_of_the_day_position'),
             'verificationUrl' => null,
             'previewQrUrl' => URL::route('certificate.verify.about'),
         ]);
@@ -209,12 +210,17 @@ class ManualCertificateController extends Controller
             $officer = is_string($officer) ? trim($officer) : '';
             $officer = $officer !== '' ? $officer : null;
 
+            $officerPosition = $validated['officer_of_the_day_position'] ?? null;
+            $officerPosition = is_string($officerPosition) ? trim($officerPosition) : '';
+            $officerPosition = $officerPosition !== '' ? $officerPosition : null;
+
             $this->transactionService->updateStatus(
                 $transaction->fresh(),
                 'in_progress',
                 $request->user(),
                 [
                     'officer_of_the_day' => $officer,
+                    'officer_of_the_day_position' => $officerPosition,
                     'document_content' => $validated['document_content'],
                 ]
             );

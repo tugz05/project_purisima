@@ -64,6 +64,7 @@ interface Props {
     currentDate: string;
     currentDateFormatted: string;
     officerOfTheDay?: string | null;
+    officerOfTheDayPosition?: string | null;
     /** Public verification URL for QR (saved transaction print). */
     verificationUrl?: string | null;
     /** Fallback URL encoded in QR for draft walk-in print (explains verification). */
@@ -78,6 +79,7 @@ const props = withDefaults(defineProps<Props>(), {
     templateTwoData: null,
     templateThreeData: null,
     officerOfTheDay: undefined,
+    officerOfTheDayPosition: null,
     verificationUrl: null,
     previewQrUrl: null,
 });
@@ -119,8 +121,11 @@ const isTemplateThreeBackground = computed(() =>
 const isBarangayClearance = computed(() => {
     if (isTemplateTwoBackground.value) return false;
     if (isTemplateThreeBackground.value) return false;
+    // Explicit template_type wins — template_one is always the standard certification shell.
+    if (props.templateType === 'template_one') return false;
     if (props.printLayout === 'clearance') return true;
     if (props.printLayout === 'standard') return false;
+    // Name-based fallback — only reached when neither templateType nor printLayout is set.
     const docName = props.documentTypeName?.toLowerCase() || '';
     return docName.includes('barangay clearance') || docName === 'barangay clearance';
 });
@@ -513,12 +518,9 @@ onMounted(async () => {
                 </div>
             </div>
 
-            <!-- Decorative line with center element -->
-            <div class="decorative-line">
-                <div class="line-left"></div>
-                <div class="line-center"></div>
-                <div class="line-right"></div>
-            </div>
+            <!-- Decorative double rule -->
+            <div class="cert-rule-thick"></div>
+            <div class="cert-rule-thin"></div>
 
             <!-- Main title -->
             <div class="main-title">
@@ -532,41 +534,42 @@ onMounted(async () => {
             <div v-html="content"></div>
         </div>
 
-        <!-- SIGNATURES, QR, FOOTER (right-aligned) -->
+        <!-- SIGNATURES, QR, FOOTER -->
         <div class="signatures-section-standard">
-            <div class="signatures-rail">
-                <div
-                    v-if="props.officerOfTheDay"
-                    class="signature-block-standard"
-                >
-                    <div class="signature-name">
-                        {{ props.officerOfTheDay.toUpperCase() }}
-                    </div>
-                    <div class="signature-title">Sangguniang Barangay Member</div>
-                    <div class="signature-subtitle">Officer of the Day</div>
-                </div>
+            <div class="signatures-layout">
 
-                <div class="signature-block-standard">
-                    <div class="signature-name">EMMANUEL P. ISIANG</div>
-                    <div class="signature-title">Punong Barangay</div>
-                    <div class="signature-subtitle">
-                        President – <span class="signature-red">Liga ng mga Barangay</span>
-                    </div>
-                    <div class="signature-authority" v-if="props.officerOfTheDay">
-                        For and by the authority of the Punong Barangay
-                    </div>
-                </div>
-
-                <div v-if="qrCodeDataUrl" class="certificate-qr-wrap">
-                    <img :src="qrCodeDataUrl" alt="" class="certificate-qr-img" width="120" height="120" />
+                <!-- QR code — left side -->
+                <div v-if="qrCodeDataUrl" class="signatures-qr-col">
+                    <img :src="qrCodeDataUrl" alt="Verification QR" class="certificate-qr-img" width="110" height="110" />
                     <p class="certificate-qr-caption">
                         {{ qrIsVerification ? 'Scan to verify authenticity' : 'Draft — scan for verification info' }}
                     </p>
                 </div>
 
-                <div class="footer-standard">
-                    <div class="footer-text-standard">Not valid without official seal</div>
+                <!-- Right-aligned signature blocks -->
+                <div class="signatures-blocks">
+                    <!-- Punong Barangay -->
+                    <div class="signature-block-center">
+                        <div class="signature-name">EMMANUEL P. ISIANG</div>
+                        <div class="signature-title">Punong Barangay</div>
+                        <div class="signature-subtitle">
+                            President – <span class="signature-red">Liga ng mga Barangay</span>
+                        </div>
+                        <div class="signature-authority">For and by the authority of the Punong Barangay</div>
+                    </div>
+
+                    <!-- Officer of the Day (below Punong Barangay) -->
+                    <div v-if="props.officerOfTheDay" class="signature-block-center sig-officer">
+                        <div class="signature-name">{{ props.officerOfTheDay.toUpperCase() }}</div>
+                        <div v-if="props.officerOfTheDayPosition" class="signature-title">{{ props.officerOfTheDayPosition }}</div>
+                        <div class="signature-subtitle">Officer of the Day</div>
+                    </div>
                 </div>
+
+            </div>
+
+            <div class="footer-standard">
+                <div class="footer-text-standard">Not valid without official seal</div>
             </div>
         </div>
     </div>
@@ -931,52 +934,49 @@ onMounted(async () => {
 }
 
 .letterhead-office {
-    margin-top: 6px;
-    font-size: 15px;
+    margin-top: 4px;
+    font-size: 20px;
     font-style: italic;
-    font-family: 'Brush Script MT', 'Lucida Handwriting', 'Brush Script', cursive;
+    font-family: 'Great Vibes', 'Brush Script MT', 'Lucida Handwriting', cursive;
     font-weight: normal;
+    color: #1e3a8a;
 }
 
-.decorative-line {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 12px 0 25px 0;
-    position: relative;
-    height: 1px;
+/* Double rule separator — thick navy + thin blue */
+.cert-rule-thick {
+    height: 4px;
+    background: #1e3a8a;
+    margin-top: 10px;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
 }
 
-.line-left,
-.line-right {
-    flex: 1;
-    height: 1px;
-    background: #000;
-}
-
-.line-center {
-    width: 8px;
-    height: 8px;
-    background: #000;
-    border-radius: 50%;
-    margin: 0 8px;
-    flex-shrink: 0;
+.cert-rule-thin {
+    height: 1.5px;
+    background: #3b82f6;
+    margin-top: 2px;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
 }
 
 .main-title {
     text-align: center;
     font-size: 22px;
     font-weight: bold;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
     text-transform: uppercase;
-    margin-bottom: 25px;
+    text-decoration: underline;
+    text-underline-offset: 5px;
+    margin-top: 22px;
+    margin-bottom: 28px;
     font-family: 'Times New Roman', serif;
 }
 
 .body-content {
     position: relative;
     z-index: 1;
-    font-size: 15px;
+    font-family: 'Century Gothic', 'Avant Garde', 'Gill Sans', sans-serif;
+    font-size: 12pt;
     line-height: 1.8;
     text-align: justify;
     margin-bottom: 20px;
@@ -986,11 +986,15 @@ onMounted(async () => {
     font-weight: bold;
     margin-bottom: 12px;
     text-indent: 0;
+    font-family: 'Century Gothic', 'Avant Garde', 'Gill Sans', sans-serif;
+    font-size: 12pt;
 }
 
 .body-content :deep(p) {
     margin: 12px 0;
     text-indent: 2em;
+    font-family: 'Century Gothic', 'Avant Garde', 'Gill Sans', sans-serif;
+    font-size: 12pt;
 }
 
 .body-content :deep(b),
@@ -1005,25 +1009,39 @@ onMounted(async () => {
     margin-bottom: 24px;
 }
 
-.signatures-rail {
+/* Row: QR left, right-aligned signature blocks */
+.signatures-layout {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 22px;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 32px;
     width: 100%;
 }
 
-.signature-block-standard {
+.signatures-blocks {
     display: flex;
     flex-direction: column;
+    align-items: flex-end;
+    flex: 1;
+}
+
+.signature-block-center {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
     text-align: right;
     max-width: 320px;
+}
+
+.sig-officer {
+    margin-top: 22px;
 }
 
 .signature-name {
     font-weight: bold;
     font-size: 13px;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
     letter-spacing: 0.5px;
     line-height: 1.3;
 }
@@ -1042,7 +1060,7 @@ onMounted(async () => {
 .signature-authority {
     font-size: 9px;
     font-style: italic;
-    margin-top: 8px;
+    margin-top: 6px;
     line-height: 1.3;
 }
 
@@ -1051,13 +1069,17 @@ onMounted(async () => {
     text-decoration: underline;
 }
 
-.certificate-qr-wrap {
-    text-align: right;
+/* QR code column — right of signatures */
+.signatures-qr-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    padding-top: 6px;
 }
 
 .certificate-qr-img {
-    display: inline-block;
-    vertical-align: top;
+    display: block;
 }
 
 .certificate-qr-caption {
@@ -1065,13 +1087,14 @@ onMounted(async () => {
     font-size: 8px;
     font-style: normal;
     color: #333;
-    text-align: right;
+    text-align: center;
+    max-width: 110px;
 }
 
 .footer-standard {
     width: 100%;
     text-align: right;
-    padding-top: 4px;
+    padding-top: 10px;
 }
 
 .footer-text-standard {
@@ -1401,6 +1424,19 @@ onMounted(async () => {
         margin-bottom: 10px;
     }
 
+    /* Force Century Gothic at 12pt for all body content during print */
+    .body-content,
+    .salutation,
+    .body-content p,
+    .body-content span,
+    .body-content b,
+    .body-content strong,
+    .body-content em,
+    .body-content i {
+        font-family: 'Century Gothic', 'Avant Garde', 'Gill Sans', sans-serif !important;
+        font-size: 12pt !important;
+    }
+
     .certificate-container .header-row {
         margin-bottom: 6px;
     }
@@ -1418,11 +1454,18 @@ onMounted(async () => {
         padding: 0.3in 0.5in;
     }
 
+    .cert-rule-thick,
+    .cert-rule-thin {
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+    }
+
     .header,
     .body-content,
     .signatures-section-standard,
-    .signatures-rail,
-    .certificate-qr-wrap,
+    .signatures-layout,
+    .signatures-blocks,
+    .signatures-qr-col,
     .clearance-header,
     .clearance-content-wrapper {
         break-inside: avoid;
@@ -1455,6 +1498,8 @@ onMounted(async () => {
 </style>
 
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap');
+
 /* Must be unscoped: affects root document when printing */
 @media print {
     html,

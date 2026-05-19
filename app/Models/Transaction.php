@@ -21,6 +21,7 @@ class Transaction extends Model
         'status',
         'staff_notes',
         'officer_of_the_day',
+        'officer_of_the_day_position',
         'rejection_reason',
         'required_documents',
         'submitted_documents',

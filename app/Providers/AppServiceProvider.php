@@ -7,6 +7,7 @@ use App\Models\Transaction;
 use App\Policies\IncidentReportPolicy;
 use App\Policies\TransactionPolicy;
 use App\Services\Sms\LogSmsGateway;
+use App\Services\Sms\SemaphoreSmsGateway;
 use App\Services\Sms\SmsGatewayInterface;
 use App\Services\Sms\TwilioSmsGateway;
 use Illuminate\Support\Facades\Gate;
@@ -20,12 +21,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Use Twilio in production; log-only in local/testing to avoid real SMS costs
         $this->app->bind(SmsGatewayInterface::class, function () {
+            // Semaphore: preferred gateway — works in all environments including local
+            if (config('services.semaphore.api_key')) {
+                return new SemaphoreSmsGateway;
+            }
+
+            // Twilio: fallback, disabled in local/testing to avoid accidental charges
             if (config('services.twilio.sid') && ! app()->isLocal() && ! app()->runningUnitTests()) {
                 return new TwilioSmsGateway;
             }
 
+            // Log-only: no gateway configured or running in local/test
             return new LogSmsGateway;
         });
     }

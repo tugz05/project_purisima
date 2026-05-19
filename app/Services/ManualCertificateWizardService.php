@@ -28,10 +28,16 @@ class ManualCertificateWizardService
      */
     public function resolvePrintLayout(DocumentType $documentType): string
     {
+        // Explicit template_type always wins over name-based heuristics.
         if ($documentType->template_type === 'template_two') {
             return self::LAYOUT_TEMPLATE_TWO;
         }
 
+        if ($documentType->template_type === 'template_one') {
+            return self::LAYOUT_STANDARD;
+        }
+
+        // Name-based fallback — only reached when template_type is not set.
         $code = strtolower((string) $documentType->code);
         $name = strtolower((string) $documentType->name);
 

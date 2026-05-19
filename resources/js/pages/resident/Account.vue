@@ -99,7 +99,15 @@ const submit = () => {
         </div>
         <div>
           <label class="mb-1 block text-sm">Suffix</label>
-          <input v-model="form.suffix" class="w-full rounded border px-3 py-2" placeholder="Jr., Sr., II, III, etc." />
+          <select v-model="form.suffix" class="w-full rounded border px-3 py-2">
+            <option value="">None</option>
+            <option value="Jr.">Jr.</option>
+            <option value="Sr.">Sr.</option>
+            <option value="II">II</option>
+            <option value="III">III</option>
+            <option value="IV">IV</option>
+            <option value="V">V</option>
+          </select>
         </div>
         <div>
           <label class="mb-1 block text-sm">Phone</label>

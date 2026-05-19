@@ -79,6 +79,7 @@ interface Transaction {
     completed_at: string;
     staff_notes: string;
     officer_of_the_day?: string;
+    officer_of_the_day_position?: string;
     rejection_reason: string;
     required_documents: string[];
     submitted_documents: Array<{
@@ -203,6 +204,7 @@ const form = useForm({
     status: props.transaction.status,
     staff_notes: props.transaction.staff_notes || '',
     officer_of_the_day: props.transaction.officer_of_the_day || '',
+    officer_of_the_day_position: props.transaction.officer_of_the_day_position || '',
     rejection_reason: props.transaction.rejection_reason || '',
     document_content: props.transaction.generated_document_data?.content || '',
 });
@@ -222,6 +224,7 @@ const certificateSheetOpen = ref(false);
 const certificateForm = useForm({
     status: props.transaction.status,
     officer_of_the_day: props.transaction.officer_of_the_day || '',
+    officer_of_the_day_position: props.transaction.officer_of_the_day_position || '',
     document_content: props.transaction.generated_document_data?.content || '',
 });
 
@@ -230,6 +233,7 @@ const openCertificateSheet = () => {
     // Refresh form data with latest transaction data
     certificateForm.status = props.transaction.status;
     certificateForm.officer_of_the_day = props.transaction.officer_of_the_day || '';
+    certificateForm.officer_of_the_day_position = props.transaction.officer_of_the_day_position || '';
     certificateForm.document_content = props.transaction.generated_document_data?.content || '';
     certificateSheetOpen.value = true;
 };
@@ -540,14 +544,22 @@ const getPaymentMethodDisplay = (method: string) => {
     }
 };
 
-const canProcessPayment = () => {
-    return props.transaction.payment_status === 'pending' || props.transaction.payment_status === 'failed';
-};
-
-// Certificate generation is allowed only when payment is not required OR payment is already paid
+// Step 1: Generate certificate — available as soon as the transaction is active
 const canGenerateCertificate = computed(() => {
-    const activeStatus = props.transaction.status === 'in_progress' || props.transaction.status === 'completed';
-    if (!activeStatus) return false;
+    return props.transaction.status === 'in_progress' || props.transaction.status === 'completed';
+});
+
+// Step 2: Process payment — gated by certificate being generated first
+const canProcessPayment = computed(() => {
+    if (props.transaction.payment_status === 'paid') return false;
+    if (props.transaction.payment_status !== 'pending' && props.transaction.payment_status !== 'failed') return false;
+    return !!(props.transaction.generated_document_data?.content);
+});
+
+// Step 3: Print certificate — available after payment is done (or free transaction with certificate generated)
+const canPrintCertificate = computed(() => {
+    if (!canGenerateCertificate.value) return false;
+    if (!props.transaction.generated_document_data?.content) return false;
     return Number(props.transaction.fee_amount) === 0 || props.transaction.payment_status === 'paid';
 });
 
@@ -627,10 +639,13 @@ const saveCertificate = () => {
     certificateForm.officer_of_the_day = officerValue; // Always a string, even if empty
     certificateForm.document_content = certificateForm.document_content || '';
     
-    // Prepare the data object explicitly to ensure officer_of_the_day is always included
+    const positionValue = String(certificateForm.officer_of_the_day_position || '').trim();
+
+    // Prepare the data object explicitly to ensure officer fields are always included
     const submitData = {
         status: certificateForm.status,
-        officer_of_the_day: officerValue || null, // Use null instead of empty string to ensure it's sent
+        officer_of_the_day: officerValue || null,
+        officer_of_the_day_position: positionValue || null,
         document_content: certificateForm.document_content || '',
     };
     
@@ -644,6 +659,7 @@ const saveCertificate = () => {
             // Update the form with the latest data from the response
             if (page.props.transaction) {
                 certificateForm.officer_of_the_day = page.props.transaction.officer_of_the_day || '';
+                certificateForm.officer_of_the_day_position = page.props.transaction.officer_of_the_day_position || '';
                 certificateForm.document_content = page.props.transaction.generated_document_data?.content || '';
             }
             toast.success('Certificate content saved successfully!');
@@ -737,29 +753,9 @@ onUnmounted(() => {
                                         Reassign to Me
                                     </Button>
                                     <div class="flex gap-2 flex-wrap">
-                                        <!-- Generate Certificate: visible when in_progress/completed, gated by payment -->
+                                        <!-- Step 1: Generate Certificate — always available when transaction is active -->
                                         <template v-if="props.transaction.status === 'in_progress' || props.transaction.status === 'completed'">
-                                            <TooltipProvider v-if="!canGenerateCertificate" :delay-duration="100">
-                                                <Tooltip>
-                                                    <TooltipTrigger as-child>
-                                                        <span class="inline-flex cursor-not-allowed">
-                                                            <Button
-                                                                size="sm"
-                                                                disabled
-                                                                class="bg-teal-600 text-white font-medium opacity-50 pointer-events-none"
-                                                            >
-                                                                <Lock class="h-4 w-4 mr-2" />
-                                                                Generate Certificate
-                                                            </Button>
-                                                        </span>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent side="bottom" class="max-w-[220px] text-center">
-                                                        Payment must be completed before generating the certificate.
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
                                             <Button
-                                                v-else
                                                 @click="openCertificateSheet"
                                                 size="sm"
                                                 class="bg-teal-600 hover:bg-teal-700 text-white font-medium"
@@ -769,20 +765,41 @@ onUnmounted(() => {
                                             </Button>
                                         </template>
 
-                                        <!-- Process Payment -->
-                                        <Link
-                                            v-if="canProcessPayment()"
-                                            :href="`/staff/transactions/${props.transaction.id}/payment`"
-                                            class="inline-flex"
-                                        >
-                                            <Button
-                                                size="sm"
-                                                class="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                                        <!-- Step 2: Process Payment — only when fee > 0; locked until certificate is generated -->
+                                        <template v-if="Number(props.transaction.fee_amount) > 0 && props.transaction.payment_status !== 'paid'">
+                                            <TooltipProvider v-if="!canProcessPayment" :delay-duration="100">
+                                                <Tooltip>
+                                                    <TooltipTrigger as-child>
+                                                        <span class="inline-flex cursor-not-allowed">
+                                                            <Button
+                                                                size="sm"
+                                                                disabled
+                                                                class="bg-blue-600 text-white font-medium opacity-50 pointer-events-none"
+                                                            >
+                                                                <Lock class="h-4 w-4 mr-2" />
+                                                                Process Payment
+                                                            </Button>
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="bottom" class="max-w-[220px] text-center">
+                                                        Generate the certificate first before processing payment.
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                            <Link
+                                                v-else
+                                                :href="`/staff/transactions/${props.transaction.id}/payment`"
+                                                class="inline-flex"
                                             >
-                                                <DollarSign class="h-4 w-4 mr-2" />
-                                                Process Payment
-                                            </Button>
-                                        </Link>
+                                                <Button
+                                                    size="sm"
+                                                    class="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                                                >
+                                                    <DollarSign class="h-4 w-4 mr-2" />
+                                                    Process Payment
+                                                </Button>
+                                            </Link>
+                                        </template>
 
                                         <!-- Print Receipt: shown only when paid -->
                                         <a
@@ -800,9 +817,9 @@ onUnmounted(() => {
                                             </Button>
                                         </a>
 
-                                        <!-- Print Certificate: also gated by payment -->
-                                        <template v-if="(props.transaction.status === 'in_progress' || props.transaction.status === 'completed') && props.transaction.generated_document_data?.content">
-                                            <TooltipProvider v-if="!canGenerateCertificate" :delay-duration="100">
+                                        <!-- Step 3: Print Certificate — locked until payment done (or free) -->
+                                        <template v-if="canGenerateCertificate && props.transaction.generated_document_data?.content">
+                                            <TooltipProvider v-if="!canPrintCertificate" :delay-duration="100">
                                                 <Tooltip>
                                                     <TooltipTrigger as-child>
                                                         <span class="inline-flex cursor-not-allowed">
@@ -817,7 +834,7 @@ onUnmounted(() => {
                                                         </span>
                                                     </TooltipTrigger>
                                                     <TooltipContent side="bottom" class="max-w-[220px] text-center">
-                                                        Payment must be completed before printing the certificate.
+                                                        Complete payment before printing the certificate.
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </TooltipProvider>
@@ -1598,6 +1615,13 @@ onUnmounted(() => {
                                                     v-model="certificateForm.officer_of_the_day"
                                                     placeholder="e.g., CHARLITA G. MONTENEGRO, RSW"
                                                     class="h-9 w-full rounded-md border-2 border-amber-300 bg-white px-3 py-1 text-sm font-medium shadow-sm outline-none transition-[color,box-shadow] focus:border-amber-500 focus:ring-2 focus:ring-amber-400"
+                                                />
+                                                <input
+                                                    id="certificate_officer_of_the_day_position"
+                                                    type="text"
+                                                    v-model="certificateForm.officer_of_the_day_position"
+                                                    placeholder="e.g., Sangguniang Barangay Member"
+                                                    class="mt-2 h-9 w-full rounded-md border-2 border-amber-300 bg-white px-3 py-1 text-sm font-medium shadow-sm outline-none transition-[color,box-shadow] focus:border-amber-500 focus:ring-2 focus:ring-amber-400"
                                                 />
                                                 <p class="flex items-start gap-2 text-xs font-medium text-amber-700">
                                                     <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />

@@ -203,3 +203,46 @@
     }
 }
 
+/* ============================================================
+   Mobile App UX — prevent auto-zoom & native touch feel
+   ============================================================ */
+
+@layer base {
+    html {
+        /* Prevent font scaling in landscape on iOS/Android */
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
+
+    body {
+        /* Prevent accidental pull-to-refresh and overscroll bounce */
+        overscroll-behavior-y: none;
+    }
+
+    /* Remove the blue/grey tap flash on every touch */
+    a, button, input, select, textarea, label,
+    [role='button'], [role='link'], [tabindex] {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Disable double-tap-to-zoom delay on interactive elements */
+    a, button, [role='button'], [role='link'],
+    input, select, textarea, label {
+        touch-action: manipulation;
+    }
+}
+
+/*
+  Prevent iOS Safari auto-zoom on input focus.
+  Safari zooms the page whenever a focused input's computed font-size < 16px.
+  Setting font-size: 16px on mobile is the only non-accessibility-breaking fix
+  (viewport maximum-scale=1 blocks user zoom for accessibility users).
+*/
+@media screen and (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']):not([type='color']),
+    textarea,
+    select {
+        font-size: 16px !important;
+    }
+}
+

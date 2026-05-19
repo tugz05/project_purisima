@@ -319,6 +319,7 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
     // SMS Broadcast routes
     Route::get('sms', [\App\Http\Controllers\Staff\SmsAnnouncementController::class, 'index'])->name('sms.index');
     Route::post('sms', [\App\Http\Controllers\Staff\SmsAnnouncementController::class, 'store'])->name('sms.store');
+    Route::get('sms/{broadcast}/recipients', [\App\Http\Controllers\Staff\SmsAnnouncementController::class, 'recipients'])->name('sms.recipients');
 
     // Notification routes
     Route::prefix('notifications')->name('notifications.')->group(function () {

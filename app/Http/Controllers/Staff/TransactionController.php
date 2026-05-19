@@ -341,6 +341,7 @@ class TransactionController extends Controller
         $currentDate = now()->format('F d, Y');
         $currentDateFormatted = now()->format('jS \d\a\y \o\f F, Y');
         $officerOfTheDay = $transaction->officer_of_the_day;
+        $officerOfTheDayPosition = $transaction->officer_of_the_day_position;
 
         $printLayout = $this->manualCertificateWizardService->resolvePrintLayout($transaction->documentType);
 
@@ -359,6 +360,7 @@ class TransactionController extends Controller
             'currentDate' => $currentDate,
             'currentDateFormatted' => $currentDateFormatted,
             'officerOfTheDay' => $officerOfTheDay ?? null,
+            'officerOfTheDayPosition' => $officerOfTheDayPosition ?? null,
             'verificationUrl' => $verificationUrl,
             'previewQrUrl' => null,
         ]);

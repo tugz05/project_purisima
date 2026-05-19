@@ -127,12 +127,13 @@ const navItems = [
 </template>
 
 <style scoped>
-/* Smooth transitions for all interactive elements */
 nav a {
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
-/* Icon size utility */
 .h-5\.5 {
     height: 1.375rem;
 }

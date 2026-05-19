@@ -54,6 +54,7 @@ const fields = ref<SchemaField[]>([]);
 const fieldValues = ref<Record<string, string>>({});
 const documentContent = ref('');
 const officerOfTheDay = ref('');
+const officerOfTheDayPosition = ref('');
 
 const loadingTemplate = ref(false);
 const loadingAi = ref(false);
@@ -64,6 +65,7 @@ const saveForm = useForm({
     field_values: {} as Record<string, string>,
     document_content: '',
     officer_of_the_day: null as string | null,
+    officer_of_the_day_position: null as string | null,
 });
 
 const selectedDocName = computed(() => {
@@ -278,7 +280,12 @@ const openPrint = (): void => {
     officerInput.name = 'officer_of_the_day';
     officerInput.value = officerOfTheDay.value.trim();
 
-    form.append(tokenInput, documentTypeInput, contentInput, officerInput);
+    const officerPositionInput = document.createElement('input');
+    officerPositionInput.type = 'hidden';
+    officerPositionInput.name = 'officer_of_the_day_position';
+    officerPositionInput.value = officerOfTheDayPosition.value.trim();
+
+    form.append(tokenInput, documentTypeInput, contentInput, officerInput, officerPositionInput);
     document.body.appendChild(form);
     form.submit();
     document.body.removeChild(form);
@@ -325,6 +332,7 @@ const saveCertificate = (): void => {
     saveForm.field_values = { ...fieldValues.value };
     saveForm.document_content = documentContent.value;
     saveForm.officer_of_the_day = officerOfTheDay.value.trim() || null;
+    saveForm.officer_of_the_day_position = officerOfTheDayPosition.value.trim() || null;
 
     saveForm.post(finalize.url(), {
         preserveScroll: true,
@@ -485,12 +493,20 @@ const fieldStack = 'flex flex-col gap-2';
                             </div>
 
                             <div :class="fieldStack">
-                                <Label class="text-sm font-medium text-gray-700" for="ootd">Officer of the Day (optional, for print layout)</Label>
+                                <Label class="text-sm font-medium text-gray-700" for="ootd">Officer of the Day <span class="text-gray-400 font-normal">(optional)</span></Label>
                                 <Input
                                     id="ootd"
                                     v-model="officerOfTheDay"
                                     type="text"
-                                    placeholder="Leave empty for standard Punong Barangay signing line only"
+                                    placeholder="e.g., CHARLITA G. MONTENEGRO, RSW"
+                                    :class="inputClass"
+                                />
+                                <Label class="text-sm font-medium text-gray-700" for="ootd-position">Officer Position <span class="text-gray-400 font-normal">(optional)</span></Label>
+                                <Input
+                                    id="ootd-position"
+                                    v-model="officerOfTheDayPosition"
+                                    type="text"
+                                    placeholder="e.g., Sangguniang Barangay Member"
                                     :class="inputClass"
                                 />
                             </div>

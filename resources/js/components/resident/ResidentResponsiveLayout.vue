@@ -70,7 +70,7 @@ onUnmounted(() => {
     </AppShell>
 
     <!-- Mobile Layout with Bottom Navigation -->
-    <div v-else class="flex flex-col min-h-screen bg-gray-50 md:hidden">
+    <div v-else class="flex flex-col min-h-[100dvh] bg-gray-50 md:hidden">
         <!-- Mobile Header -->
         <header class="sticky top-0 z-40 divide-y divide-gray-200 border-b border-gray-200 bg-white">
             <PwaInstallButton />
@@ -147,7 +147,7 @@ onUnmounted(() => {
         </header>
 
         <!-- Mobile Content -->
-        <main class="flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
+        <main class="flex-1 overscroll-y-contain pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
             <slot />
         </main>
 

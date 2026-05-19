@@ -17,6 +17,7 @@ class StaffTransactionUpdateRequest extends FormRequest
             'status' => ['required', 'string', 'in:pending,in_progress,approved,rejected,completed'],
             'staff_notes' => ['nullable', 'string', 'max:1000'],
             'officer_of_the_day' => ['nullable', 'string', 'max:255'],
+            'officer_of_the_day_position' => ['nullable', 'string', 'max:255'],
             'rejection_reason' => ['required_if:status,rejected', 'nullable', 'string', 'max:500'],
             'document_content' => ['nullable', 'string'],
         ];
@@ -34,7 +35,11 @@ class StaffTransactionUpdateRequest extends FormRequest
         if (array_key_exists('officer_of_the_day', $this->all())) {
             $validated['officer_of_the_day'] = $this->input('officer_of_the_day');
         }
-        
+
+        if (array_key_exists('officer_of_the_day_position', $this->all())) {
+            $validated['officer_of_the_day_position'] = $this->input('officer_of_the_day_position');
+        }
+
         return $validated;
     }
 }
