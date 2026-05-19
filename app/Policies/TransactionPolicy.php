@@ -38,7 +38,7 @@ class TransactionPolicy
     {
         if ($user->role === 'resident') {
             return $user->id === $transaction->resident_id &&
-                   in_array($transaction->status, ['pending']);
+                   in_array($transaction->status, ['pending', 'rejected']);
         }
 
         if ($user->role === 'admin') {

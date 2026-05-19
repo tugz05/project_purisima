@@ -305,7 +305,56 @@ export function useFormHandlers() {
         url: string,
         onSuccess?: () => void
     ) => {
+        syncTransactionUploadIdsFromSlots(form);
+
+        const formData = new FormData();
+
+        formData.append('type', form.type);
+        formData.append('title', form.title);
+        formData.append('description', form.description || '');
+        formData.append('fee_amount', (Number(form.fee_amount) || 0).toString());
+
+        if (form.required_documents && Array.isArray(form.required_documents)) {
+            form.required_documents.forEach((doc: string, index: number) => {
+                formData.append(`required_documents[${index}]`, doc);
+            });
+        }
+
+        if (form.required_fields && typeof form.required_fields === 'object') {
+            Object.keys(form.required_fields).forEach((key) => {
+                const value = form.required_fields[key];
+                formData.append(`required_fields[${key}]`, value ?? '');
+            });
+        }
+
+        Object.keys(form.submitted_document_upload_ids || {}).forEach((docType) => {
+            const ids = form.submitted_document_upload_ids[docType];
+            if (!Array.isArray(ids)) {
+                return;
+            }
+            ids.forEach((id: string, index: number) => {
+                if (id) {
+                    formData.append(`submitted_document_upload_ids[${docType}][${index}]`, id);
+                }
+            });
+        });
+
+        Object.keys(form.submitted_documents || {}).forEach((docType) => {
+            const hasIds = (form.submitted_document_upload_ids?.[docType] || []).length > 0;
+            if (hasIds) {
+                return;
+            }
+            const docFiles = form.submitted_documents[docType];
+            if (docFiles && Array.isArray(docFiles)) {
+                docFiles.forEach((file: File, index: number) => {
+                    formData.append(`submitted_documents[${docType}][${index}]`, file);
+                });
+            }
+        });
+
         form.put(url, {
+            data: formData,
+            forceFormData: true,
             onSuccess: () => {
                 toast('Transaction Updated', {
                     description: 'Your document request has been updated successfully.',
@@ -316,6 +365,7 @@ export function useFormHandlers() {
                         }
                     }
                 });
+                clearTransactionDocumentUploadSlots();
                 if (onSuccess) onSuccess();
             },
             onError: () => {

@@ -1,25 +1,49 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, watch } from 'vue';
+import { Head, Link } from '@inertiajs/vue3';
 import resident from '@/routes/resident';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Check, FileText, Save } from 'lucide-vue-next';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import FileUpload from '@/components/ui/file-upload.vue';
+import InputError from '@/components/InputError.vue';
+import { ArrowLeft, AlertTriangle, Upload, X, Save, RotateCcw } from 'lucide-vue-next';
 import ResidentLayout from '@/layouts/resident/Layout.vue';
-import { Link } from '@inertiajs/vue3';
 import { type BreadcrumbItem } from '@/types';
 import { dashboard } from '@/routes';
 import { useFormHandlers } from '@/composables/useFormHandlers';
+
+interface TransactionInputField {
+    key: string;
+    label: string;
+    type: string;
+    required: boolean;
+    placeholder?: string | null;
+    options?: string[];
+}
 
 interface TransactionType {
     name: string;
     description: string;
     required_documents: string[];
     fee: number;
+    processing_days: number;
+    requires_payment: boolean;
+    requires_approval: boolean;
+    category: string;
+    required_fields?: string[];
+    input_fields?: TransactionInputField[];
+}
+
+interface SubmittedDocumentMeta {
+    document_type: string;
+    name: string;
+    path: string;
+    size?: number;
+    mime_type?: string;
 }
 
 interface Transaction {
@@ -27,12 +51,16 @@ interface Transaction {
     transaction_id: string;
     type: string;
     title: string;
-    description: string;
+    description: string | null;
     status: string;
+    rejection_reason?: string | null;
     fee_amount: number | string;
     fee_paid: boolean;
     submitted_at: string;
     created_at: string;
+    required_documents?: string[];
+    resident_input_data?: Record<string, string>;
+    submitted_documents?: SubmittedDocumentMeta[];
 }
 
 interface Props {
@@ -43,224 +71,290 @@ interface Props {
 const props = defineProps<Props>();
 
 const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard().url,
-    },
-    {
-        title: 'My Transactions',
-        href: resident.transactions.index().url,
-    },
-    {
-        title: `Edit Transaction ${props.transaction.transaction_id}`,
-        href: resident.transactions.edit(props.transaction.id).url,
-    },
+    { title: 'Dashboard', href: dashboard().url },
+    { title: 'My Transactions', href: resident.transactions.index().url },
+    { title: `Edit ${props.transaction.transaction_id}`, href: resident.transactions.edit(props.transaction.id).url },
 ];
 
-const selectedType = ref(props.transaction.type);
-const form = useForm({
-    type: props.transaction.type,
-    title: props.transaction.title,
-    description: props.transaction.description,
-    required_documents: [] as string[],
-    fee_amount: Number(props.transaction.fee_amount),
+const {
+    createTransactionForm,
+    updateFormForTransactionType,
+    submitTransactionUpdate,
+    addMultipleSubmittedDocuments,
+    removeSubmittedDocument,
+    transactionDocumentUploadSlots,
+} = useFormHandlers();
+
+const form = createTransactionForm();
+
+const isRejected = computed(() => props.transaction.status === 'rejected');
+
+const inputFieldsForForm = computed((): TransactionInputField[] => {
+    const t = form.type ? props.transactionTypes[form.type] : null;
+    if (!t) {
+        return [];
+    }
+    if (Array.isArray(t.input_fields) && t.input_fields.length > 0) {
+        return t.input_fields;
+    }
+    const rf = t.required_fields;
+    if (!Array.isArray(rf)) {
+        return [];
+    }
+    return rf.map((s: string, i: number) => ({
+        key: String(s)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_|_$/g, '') || `field_${i}`,
+        label: String(s),
+        type: 'text',
+        required: true,
+        placeholder: null,
+        options: [],
+    }));
 });
 
-const updateFormForType = (type: string) => {
-    selectedType.value = type;
-    const typeInfo = props.transactionTypes[type];
-    if (typeInfo) {
-        form.type = type;
-        form.title = typeInfo.name;
-        form.required_documents = typeInfo.required_documents;
-        form.fee_amount = typeInfo.fee;
+const transactionUploadsBusy = computed(() =>
+    Object.values(transactionDocumentUploadSlots.value).some((rows) => rows.some((r) => r.id === '' && !r.error)),
+);
+
+const hydrateFormFromTransaction = () => {
+    const type = props.transaction.type;
+
+    if (type && props.transactionTypes[type]) {
+        updateFormForTransactionType(type, form, props.transactionTypes);
+    } else {
+        form.type = type || '';
     }
-};
 
-// Use the composable for toast-enabled form submission
-const { submitTransactionUpdate } = useFormHandlers();
+    form.title = props.transaction.title || (type ? props.transactionTypes[type]?.name : '') || '';
+    form.description = props.transaction.description || '';
+    form.fee_amount = Number(props.transaction.fee_amount ?? props.transactionTypes[type]?.fee ?? 0) || 0;
 
-const submit = () => {
-    submitTransactionUpdate(form, resident.transactions.update(props.transaction.id).url, () => {
-        // Redirect back to transactions index
-        window.location.href = resident.transactions.index().url;
+    const answers = props.transaction.resident_input_data && typeof props.transaction.resident_input_data === 'object'
+        ? props.transaction.resident_input_data
+        : {};
+    Object.keys(answers).forEach((key) => {
+        form.required_fields[key] = (answers as any)[key] ?? '';
     });
 };
 
-const formatFeeAmount = (amount: number | string) => {
-    const numAmount = Number(amount);
-    return isNaN(numAmount) ? '0.00' : numAmount.toFixed(2);
+hydrateFormFromTransaction();
+
+watch(
+    () => form.type,
+    (newType, oldType) => {
+        if (!newType || newType === oldType) {
+            return;
+        }
+        if (props.transactionTypes[newType]) {
+            updateFormForTransactionType(newType, form, props.transactionTypes);
+        }
+    },
+);
+
+const handleFileUpload = (documentType: string, files: File[]) => {
+    void addMultipleSubmittedDocuments(form, documentType, files);
+};
+
+const removeFile = (documentType: string, index: number) => {
+    void removeSubmittedDocument(form, documentType, index);
+};
+
+const submit = () => {
+    submitTransactionUpdate(form, resident.transactions.update(props.transaction.id).url, () => {
+        window.location.href = resident.transactions.show(props.transaction.id).url;
+    });
 };
 </script>
 
 <template>
-    <Head :title="`Edit Transaction ${transaction.transaction_id}`" />
+    <Head :title="`Edit ${transaction.transaction_id}`" />
 
     <ResidentLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50">
-            <div class="mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-                <!-- Header Section -->
-                <div class="mb-8">
-                    <div class="flex items-center gap-4 mb-6">
-                        <Link
-                            :href="resident.transactions.index().url"
-                            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-all duration-200"
-                        >
-                            <ArrowLeft class="h-4 w-4" />
-                            Back to Transactions
-                        </Link>
+        <div class="max-w-4xl mx-auto">
+            <Card>
+                <CardHeader>
+                    <div class="flex items-center gap-4">
+                        <Button variant="ghost" size="sm" as-child>
+                            <Link :href="resident.transactions.index().url">
+                                <ArrowLeft class="h-4 w-4 mr-2" />
+                                Back to Transactions
+                            </Link>
+                        </Button>
+                        <div>
+                            <CardTitle class="flex items-center gap-2">
+                                <RotateCcw v-if="isRejected" class="h-5 w-5 text-red-600" />
+                                {{ isRejected ? 'Resubmit Transaction' : 'Edit Transaction' }}
+                            </CardTitle>
+                            <CardDescription v-if="isRejected">
+                                Update the details below and resubmit. This will send your request back for review (no need to create a new transaction).
+                            </CardDescription>
+                            <CardDescription v-else>
+                                Update your request details.
+                            </CardDescription>
+                        </div>
                     </div>
+                </CardHeader>
 
-                    <div class="text-center space-y-4">
-                        <div class="inline-flex items-center gap-3 px-6 py-3 bg-white rounded-2xl shadow-lg border border-gray-100">
-                            <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                                <FileText class="h-6 w-6 text-blue-600" />
-                            </div>
-                            <div class="text-left">
-                                <h1 class="text-2xl font-bold text-gray-900">Edit Transaction</h1>
-                                <p class="text-gray-600">Update your transaction details</p>
+                <CardContent>
+                    <div
+                        v-if="isRejected && transaction.rejection_reason"
+                        class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+                    >
+                        <div class="flex items-start gap-3">
+                            <AlertTriangle class="h-5 w-5 mt-0.5 shrink-0 text-red-600" />
+                            <div class="min-w-0">
+                                <p class="font-semibold">Rejected reason</p>
+                                <p class="mt-1 whitespace-pre-line break-words">{{ transaction.rejection_reason }}</p>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Main Content -->
-                <div class="space-y-8">
-                    <!-- Transaction Info Card -->
-                    <Card class="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-                        <CardHeader class="pb-6">
-                            <CardTitle class="text-xl font-bold text-gray-900 flex items-center gap-3">
-                                <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <FileText class="h-4 w-4 text-blue-600" />
-                                </div>
-                                Transaction Details
-                            </CardTitle>
-                            <CardDescription class="text-gray-600">
-                                Update the information for transaction {{ transaction.transaction_id }}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent class="space-y-6">
-                            <!-- Document Type Selection -->
-                            <div class="space-y-3">
-                                <Label class="text-sm font-semibold text-gray-700">Document Type</Label>
-                                <Select :model-value="form.type" @update:model-value="updateFormForType">
-                                    <SelectTrigger class="h-12 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                                        <SelectValue placeholder="Select document type" />
-                                    </SelectTrigger>
-                                    <SelectContent class="bg-white border border-gray-200 shadow-xl">
+                    <form @submit.prevent="submit" class="space-y-6">
+                        <!-- Transaction Type -->
+                        <div class="space-y-2">
+                            <Label>Document Type</Label>
+                            <Select v-model="form.type">
+                                <SelectTrigger class="w-full">
+                                    <SelectValue placeholder="Select a document type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        <SelectLabel>Available Documents</SelectLabel>
                                         <SelectItem
                                             v-for="(type, key) in transactionTypes"
                                             :key="key"
                                             :value="key"
-                                            class="py-3 hover:bg-blue-50 focus:bg-blue-50"
                                         >
-                                            <div class="flex items-center justify-between w-full">
-                                                <span class="font-medium">{{ type.name }}</span>
-                                                <span v-if="type.fee > 0" class="ml-3 text-sm font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-full">
-                                                    ₱{{ formatFeeAmount(type.fee) }}
-                                                </span>
-                                                <span v-else class="ml-3 text-sm font-bold text-green-600 bg-green-100 px-3 py-1 rounded-full">
-                                                    Free
-                                                </span>
-                                            </div>
+                                            {{ type.name }}
                                         </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                            <InputError :message="form.errors.type" />
+                        </div>
 
-                            <!-- Title Input -->
-                            <div class="space-y-3">
-                                <Label class="text-sm font-semibold text-gray-700">Title</Label>
-                                <Input
-                                    v-model="form.title"
-                                    placeholder="Enter transaction title"
-                                    class="h-12 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                                />
-                                <div v-if="form.errors.title" class="text-sm text-red-600">
-                                    {{ form.errors.title }}
+                        <!-- Title -->
+                        <div class="space-y-2">
+                            <Label>Title</Label>
+                            <Input v-model="form.title" placeholder="Enter request title" />
+                            <InputError :message="form.errors.title" />
+                        </div>
+
+                        <!-- Description -->
+                        <div class="space-y-2">
+                            <Label>Description (optional)</Label>
+                            <Textarea v-model="form.description" rows="4" placeholder="Add details about your request (optional)" />
+                            <InputError :message="form.errors.description" />
+                        </div>
+
+                        <!-- Dynamic Required Info -->
+                        <div v-if="inputFieldsForForm.length" class="space-y-4">
+                            <h3 class="font-semibold text-sm text-gray-900">Required Information</h3>
+                            <div class="space-y-4">
+                                <div v-for="field in inputFieldsForForm" :key="field.key" class="border rounded-lg p-4">
+                                    <Label class="text-sm font-medium">
+                                        {{ field.label }}
+                                        <span v-if="field.required" class="text-red-500">*</span>
+                                    </Label>
+                                    <div class="mt-2">
+                                        <Input
+                                            v-if="field.type === 'text'"
+                                            v-model="form.required_fields[field.key]"
+                                            :placeholder="field.placeholder || undefined"
+                                            :required="field.required"
+                                        />
+                                        <Textarea
+                                            v-else-if="field.type === 'textarea'"
+                                            v-model="form.required_fields[field.key]"
+                                            :placeholder="field.placeholder || undefined"
+                                            :required="field.required"
+                                            rows="3"
+                                        />
+                                        <Select v-else-if="field.type === 'select' && field.options?.length" v-model="form.required_fields[field.key]">
+                                            <SelectTrigger class="w-full">
+                                                <SelectValue :placeholder="field.placeholder || 'Select an option'" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <InputError :message="(form.errors as any)[`required_fields.${field.key}`]" />
+                                    </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <!-- Description Input -->
-                            <div class="space-y-3">
-                                <Label class="text-sm font-semibold text-gray-700">Description</Label>
-                                <Textarea
-                                    v-model="form.description"
-                                    placeholder="Provide additional details about your request"
-                                    rows="4"
-                                    class="bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
-                                />
-                                <div v-if="form.errors.description" class="text-sm text-red-600">
-                                    {{ form.errors.description }}
-                                </div>
-                            </div>
+                        <!-- Supporting Documents (Optional) -->
+                        <div v-if="form.required_documents.length > 0" class="space-y-3">
+                            <h3 class="font-semibold text-sm text-gray-900">Supporting Documents (Optional)</h3>
+                            <p class="text-xs text-gray-600">
+                                You can submit without uploading. If available, upload the following to help speed up processing.
+                            </p>
 
-                            <!-- Required Documents -->
-                            <div v-if="selectedType && transactionTypes[selectedType]?.required_documents?.length" class="space-y-4">
-                                <div class="p-4 bg-blue-50 rounded-xl border border-blue-200">
-                                    <h3 class="text-sm font-semibold text-blue-900 mb-3">Required Documents</h3>
-                                    <ul class="space-y-2">
-                                        <li v-for="doc in transactionTypes[selectedType].required_documents" :key="doc" class="flex items-center gap-2 text-sm text-blue-800">
-                                            <div class="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
-                                            {{ doc }}
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
+                            <div class="space-y-4">
+                                <div
+                                    v-for="document in form.required_documents"
+                                    :key="document"
+                                    class="border rounded-lg p-4"
+                                >
+                                    <Label class="text-sm font-medium">{{ document }}</Label>
+                                    <div class="mt-2">
+                                        <FileUpload
+                                            :accept="'.pdf,.doc,.docx,.jpg,.jpeg,.png'"
+                                            :multiple="true"
+                                            @upload="(files) => handleFileUpload(document, files)"
+                                        />
 
-                            <!-- Fee Information -->
-                            <div v-if="selectedType && transactionTypes[selectedType]?.fee > 0" class="space-y-4">
-                                <div class="p-4 bg-green-50 rounded-xl border border-green-200">
-                                    <div class="flex items-center justify-between">
-                                        <div>
-                                            <h3 class="text-sm font-semibold text-green-900">Processing Fee</h3>
-                                            <p class="text-xs text-green-700">This fee covers processing and documentation</p>
-                                        </div>
-                                        <div class="text-right">
-                                            <p class="text-xs text-green-600">Amount</p>
-                                            <p class="text-lg font-black text-green-800">₱{{ formatFeeAmount(transactionTypes[selectedType].fee) }}</p>
+                                        <div v-if="transactionDocumentUploadSlots[document]?.length" class="mt-2 space-y-2">
+                                            <div
+                                                v-for="(slot, index) in transactionDocumentUploadSlots[document]"
+                                                :key="slot.id || `u-${document}-${index}`"
+                                                class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+                                            >
+                                                <div class="flex items-center justify-between gap-2">
+                                                    <div class="flex items-center gap-2 min-w-0">
+                                                        <Upload class="h-4 w-4 shrink-0" />
+                                                        <span class="truncate">{{ slot.name }}</span>
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        :disabled="slot.id === ''"
+                                                        class="h-7 w-7 p-0"
+                                                        @click="removeFile(document, index)"
+                                                    >
+                                                        <X class="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                                <p v-if="slot.id === ''" class="text-xs text-blue-600 mt-1">Uploading... {{ slot.progress }}%</p>
+                                                <div v-if="slot.id === ''" class="mt-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+                                                    <div class="h-full bg-blue-600 rounded-full transition-[width]" :style="{ width: `${slot.progress}%` }" />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <!-- Free Service Notice -->
-                            <div v-if="selectedType && transactionTypes[selectedType]?.fee === 0" class="space-y-4">
-                                <div class="p-4 bg-green-50 rounded-xl border border-green-200">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                                            <Check class="h-5 w-5 text-green-600" stroke-width="2.5" />
-                                        </div>
-                                        <div>
-                                            <h3 class="text-sm font-semibold text-green-900">Free Service</h3>
-                                            <p class="text-xs text-green-700">This document is provided at no cost</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <!-- Action Buttons -->
-                    <div class="flex items-center justify-between gap-4 pt-6">
-                        <Link
-                            :href="resident.transactions.index().url"
-                            class="px-6 py-3 text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-xl shadow-sm hover:bg-gray-50 transition-all duration-200 font-medium"
-                        >
-                            Cancel
-                        </Link>
-
-                        <Button
-                            @click="submit"
-                            :disabled="form.processing || !form.type || !form.title || !form.description"
-                            class="px-8 py-3 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Save class="h-4 w-4 mr-2" />
-                            {{ form.processing ? 'Updating...' : 'Update Transaction' }}
-                        </Button>
-                    </div>
-                </div>
-            </div>
+                        <!-- Submit -->
+                        <div class="flex justify-end">
+                            <Button
+                                type="submit"
+                                :disabled="form.processing || !form.type || !form.title || transactionUploadsBusy"
+                                class="min-w-[140px]"
+                            >
+                                <Save class="h-4 w-4 mr-2" />
+                                {{ form.processing ? (isRejected ? 'Resubmitting...' : 'Updating...') : (isRejected ? 'Resubmit' : 'Update') }}
+                            </Button>
+                        </div>
+                    </form>
+                </CardContent>
+            </Card>
         </div>
     </ResidentLayout>
 </template>
+

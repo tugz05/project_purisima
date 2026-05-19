@@ -4,7 +4,7 @@ import resident from '@/routes/resident';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, User, Calendar, DollarSign } from 'lucide-vue-next';
+import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, User, Calendar, DollarSign, Pencil, RotateCcw } from 'lucide-vue-next';
 import ResidentLayout from '@/layouts/resident/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { dashboard } from '@/routes';
@@ -102,6 +102,16 @@ const formatFeeAmount = (amount: number | string) => {
                             <Button variant="outline" size="lg" class="shadow-sm">
                                 <ArrowLeft class="h-4 w-4 mr-2" />
                                 Back to Transactions
+                            </Button>
+                        </Link>
+                        <Link
+                            v-if="transaction.status === 'pending' || transaction.status === 'rejected'"
+                            :href="resident.transactions.edit(transaction.id).url"
+                        >
+                            <Button size="lg" class="shadow-sm">
+                                <RotateCcw v-if="transaction.status === 'rejected'" class="h-4 w-4 mr-2" />
+                                <Pencil v-else class="h-4 w-4 mr-2" />
+                                {{ transaction.status === 'rejected' ? 'Resubmit' : 'Edit' }}
                             </Button>
                         </Link>
                         <div class="space-y-1">

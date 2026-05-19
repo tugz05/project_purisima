@@ -100,7 +100,30 @@ class TransactionController extends Controller
     {
         $this->authorize('update', $transaction);
 
-        $transaction->update($request->validated());
+        $wasRejected = $transaction->status === 'rejected';
+
+        $transaction = $this->transactionService->updateResidentTransaction(
+            $transaction,
+            $request->validated(),
+            $request->user()
+        );
+
+        if ($wasRejected && $transaction->status === 'pending') {
+            $transaction->loadMissing(['documentType', 'resident']);
+
+            $this->notificationService->createNotificationForAllStaff(
+                'transaction_resubmitted',
+                'Transaction Resubmitted',
+                "Resubmitted {$transaction->documentType->name} request from {$transaction->resident->name}",
+                [
+                    'transaction_id' => $transaction->id,
+                    'resident_name' => $transaction->resident->name,
+                    'document_type' => $transaction->documentType->name,
+                ],
+                'high',
+                'transaction'
+            );
+        }
 
         return redirect()->route('resident.transactions.show', $transaction)
             ->with('success', 'Transaction updated successfully.');

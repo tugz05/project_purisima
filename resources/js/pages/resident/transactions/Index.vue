@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import { watch, nextTick, ref, onBeforeUnmount, computed } from 'vue';
 import resident from '@/routes/resident';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import FileUpload from '@/components/ui/file-upload.vue';
 import {
     Plus,
     FileText,
@@ -52,6 +53,9 @@ interface Transaction {
     status: string;
     staff_notes?: string;
     rejection_reason?: string;
+    resident_input_data?: Record<string, string>;
+    required_documents?: string[];
+    submitted_documents?: Array<Record<string, any>>;
     fee_amount: number | string;
     fee_paid: boolean;
     submitted_at: string;
@@ -105,7 +109,6 @@ const {
     createTransactionForm,
     updateFormForTransactionType,
     submitTransactionCreate,
-    submitTransactionUpdate,
     createFilterForm,
     applyFilters: applyFiltersUtil,
     addSubmittedDocument,
@@ -113,6 +116,17 @@ const {
     addMultipleSubmittedDocuments,
     transactionDocumentUploadSlots,
     clearTransactionDocumentUploadSlots,
+} = useFormHandlers();
+
+// Separate handler instance for edit/resubmit to avoid clobbering create uploads state
+const {
+    createTransactionForm: createEditTransactionForm,
+    updateFormForTransactionType: updateEditFormForTransactionType,
+    submitTransactionUpdate: submitEditTransactionUpdate,
+    addMultipleSubmittedDocuments: addMultipleSubmittedDocumentsEdit,
+    removeSubmittedDocument: removeSubmittedDocumentEdit,
+    transactionDocumentUploadSlots: editTransactionDocumentUploadSlots,
+    clearTransactionDocumentUploadSlots: clearEditTransactionDocumentUploadSlots,
 } = useFormHandlers();
 const { formatDateShort } = useUtils();
 
@@ -146,8 +160,38 @@ const inputFieldsForCreate = computed((): TransactionInputField[] => {
     }));
 });
 
+const inputFieldsForEdit = computed((): TransactionInputField[] => {
+    const code = editForm.value?.type;
+    const t = code ? props.transactionTypes[code] : null;
+    if (!t) {
+        return [];
+    }
+    if (Array.isArray(t.input_fields) && t.input_fields.length > 0) {
+        return t.input_fields;
+    }
+    const rf = t.required_fields;
+    if (!Array.isArray(rf)) {
+        return [];
+    }
+    return rf.map((s: string, i: number) => ({
+        key: String(s)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_|_$/g, '') || `field_${i}`,
+        label: String(s),
+        type: 'text',
+        required: true,
+        placeholder: null,
+        options: [],
+    }));
+});
+
 const transactionUploadsBusy = computed(() =>
     Object.values(transactionDocumentUploadSlots.value).some((rows) => rows.some((r) => r.id === '' && !r.error)),
+);
+
+const editTransactionUploadsBusy = computed(() =>
+    Object.values(editTransactionDocumentUploadSlots.value).some((rows) => rows.some((r) => r.id === '' && !r.error)),
 );
 
 // Sheet states
@@ -339,24 +383,64 @@ const openViewSheet = (transaction: Transaction) => {
 
 const openEditSheet = (transaction: Transaction) => {
     selectedTransaction.value = transaction;
-    editForm.value = useForm({
-        type: transaction.type,
-        title: transaction.title,
-        description: transaction.description,
-        required_documents: [] as string[],
-        fee_amount: Number(transaction.fee_amount),
+    clearEditTransactionDocumentUploadSlots();
+
+    const f = createEditTransactionForm();
+    if (transaction.type && props.transactionTypes[transaction.type]) {
+        updateEditFormForTransactionType(transaction.type, f, props.transactionTypes);
+    } else {
+        f.type = transaction.type;
+    }
+
+    f.title = transaction.title;
+    f.description = transaction.description || '';
+    f.fee_amount = Number(transaction.fee_amount) || 0;
+
+    const answers = transaction.resident_input_data && typeof transaction.resident_input_data === 'object'
+        ? transaction.resident_input_data
+        : {};
+    Object.keys(answers).forEach((key) => {
+        f.required_fields[key] = (answers as any)[key] ?? '';
     });
+
+    editForm.value = f;
     editSheetOpen.value = true;
 };
 
 const submitEdit = () => {
     if (editForm.value && selectedTransaction.value) {
-        submitTransactionUpdate(editForm.value, resident.transactions.update(selectedTransaction.value.id).url, () => {
+        submitEditTransactionUpdate(editForm.value, resident.transactions.update(selectedTransaction.value.id).url, () => {
             editSheetOpen.value = false;
             selectedTransaction.value = null;
             editForm.value = null;
         });
     }
+};
+
+watch(
+    () => editForm.value?.type,
+    (newType, oldType) => {
+        if (!editForm.value || !newType || newType === oldType) {
+            return;
+        }
+        if (props.transactionTypes[newType]) {
+            updateEditFormForTransactionType(newType, editForm.value, props.transactionTypes);
+        }
+    },
+);
+
+const handleEditFileUpload = (documentType: string, files: File[]) => {
+    if (!editForm.value) {
+        return;
+    }
+    void addMultipleSubmittedDocumentsEdit(editForm.value, documentType, files);
+};
+
+const removeEditFile = (documentType: string, index: number) => {
+    if (!editForm.value) {
+        return;
+    }
+    void removeSubmittedDocumentEdit(editForm.value, documentType, index);
 };
 
 // Watch for sheet close to clean up selectedType
@@ -367,6 +451,16 @@ watch(sheetOpen, (newValue) => {
             selectedType.value = '';
             createForm.reset();
             clearTransactionDocumentUploadSlots();
+        });
+    }
+});
+
+watch(editSheetOpen, (newValue) => {
+    if (!newValue) {
+        nextTick(() => {
+            clearEditTransactionDocumentUploadSlots();
+            selectedTransaction.value = null;
+            editForm.value = null;
         });
     }
 });
@@ -449,7 +543,7 @@ watch(sheetOpen, (newValue) => {
                                         </div>
 
                                         <div v-if="selectedType" class="space-y-4">
-                                            <Label class="text-base font-bold text-gray-800">Required Documents</Label>
+                                            <Label class="text-base font-bold text-gray-800">Supporting Documents (Optional)</Label>
 
                                             <!-- Individual Document Upload Sections -->
                                             <div v-if="transactionTypes[selectedType]?.required_documents?.length" class="space-y-4">
@@ -634,7 +728,7 @@ watch(sheetOpen, (newValue) => {
 
                                             <p class="flex items-center gap-2 text-sm text-blue-700 font-medium bg-blue-100 px-4 py-2 rounded-lg">
                                                 <ClipboardList class="h-4 w-4 shrink-0 text-blue-700" />
-                                                <span>Please upload all required documents before submitting your request.</span>
+                                                <span>You can submit without uploading. Uploading documents (if available) helps speed up processing.</span>
                                             </p>
                                         </div>
 
@@ -992,13 +1086,14 @@ watch(sheetOpen, (newValue) => {
                                     <div class="flex-shrink-0 p-6 sm:p-8 border-t border-gray-200 bg-white">
                                         <div class="flex flex-row gap-3 sm:gap-4">
                                             <Button
-                                                v-if="selectedTransaction?.status === 'pending'"
+                                                v-if="selectedTransaction?.status === 'pending' || selectedTransaction?.status === 'rejected'"
                                                 @click="openEditSheet(selectedTransaction); viewSheetOpen = false"
                                                 size="lg"
                                                 class="flex flex-1 h-12 sm:h-14 items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300"
                                             >
-                                                <Pencil class="h-5 w-5 shrink-0" />
-                                                Edit Request
+                                                <RotateCcw v-if="selectedTransaction?.status === 'rejected'" class="h-5 w-5 shrink-0" />
+                                                <Pencil v-else class="h-5 w-5 shrink-0" />
+                                                {{ selectedTransaction?.status === 'rejected' ? 'Resubmit Request' : 'Edit Request' }}
                                             </Button>
                                             <Button
                                                 variant="outline"
@@ -1021,9 +1116,14 @@ watch(sheetOpen, (newValue) => {
                                     <!-- Header -->
                                     <div class="flex-shrink-0 px-6 sm:px-8 py-6 border-b border-gray-200 bg-white">
                                         <SheetHeader class="pb-6">
-                                            <SheetTitle class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Edit Request</SheetTitle>
+                                            <SheetTitle class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+                                                {{ selectedTransaction?.status === 'rejected' ? 'Resubmit Request' : 'Edit Request' }}
+                                            </SheetTitle>
                                             <SheetDescription class="text-base sm:text-lg text-gray-600 leading-relaxed">
-                                                Update your document request information
+                                                {{ selectedTransaction?.status === 'rejected'
+                                                    ? 'Update the details below and resubmit. No need to create a new transaction.'
+                                                    : 'Update your document request information'
+                                                }}
                                             </SheetDescription>
                                         </SheetHeader>
                                     </div>
@@ -1031,6 +1131,19 @@ watch(sheetOpen, (newValue) => {
                                     <!-- Content -->
                                     <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6" v-if="editForm">
                                         <form @submit.prevent="submitEdit" class="space-y-6">
+                                            <div
+                                                v-if="selectedTransaction?.status === 'rejected' && selectedTransaction?.rejection_reason"
+                                                class="rounded-2xl border-2 border-red-200 bg-gradient-to-r from-red-50 to-rose-50 p-5"
+                                            >
+                                                <div class="flex items-start gap-3">
+                                                    <Ban class="h-5 w-5 mt-0.5 shrink-0 text-red-700" />
+                                                    <div class="min-w-0">
+                                                        <p class="font-bold text-red-900">Rejection reason</p>
+                                                        <p class="mt-1 text-sm text-red-800 whitespace-pre-line break-words">{{ selectedTransaction.rejection_reason }}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <!-- Document Type -->
                                             <div class="space-y-3">
                                                 <Label class="text-base font-bold text-gray-800">Document Type</Label>
@@ -1053,6 +1166,7 @@ watch(sheetOpen, (newValue) => {
                                                         </template>
                                                     </SelectContent>
                                                 </Select>
+                                                <p v-if="editForm.errors.type" class="text-sm text-red-600">{{ editForm.errors.type }}</p>
                                             </div>
 
                                             <!-- Title -->
@@ -1063,6 +1177,124 @@ watch(sheetOpen, (newValue) => {
                                                     placeholder="Enter document title"
                                                     class="h-12 sm:h-14 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
                                                 />
+                                                <p v-if="editForm.errors.title" class="text-sm text-red-600">{{ editForm.errors.title }}</p>
+                                            </div>
+
+                                            <!-- Description (optional) -->
+                                            <div class="space-y-3">
+                                                <Label class="text-base font-bold text-gray-800">Description (optional)</Label>
+                                                <Textarea
+                                                    v-model="editForm.description"
+                                                    rows="4"
+                                                    placeholder="Add details about your request (optional)"
+                                                    class="border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 resize-none"
+                                                />
+                                                <p v-if="editForm.errors.description" class="text-sm text-red-600">{{ editForm.errors.description }}</p>
+                                            </div>
+
+                                            <!-- Supporting Documents (Optional) -->
+                                            <div v-if="editForm.required_documents?.length" class="space-y-4">
+                                                <Label class="text-base font-bold text-gray-800">Supporting Documents (Optional)</Label>
+                                                <p class="text-sm text-gray-600">
+                                                    You can resubmit even without uploading. If available, upload these documents to help speed up processing.
+                                                </p>
+
+                                                <div class="space-y-4">
+                                                    <div
+                                                        v-for="doc in editForm.required_documents"
+                                                        :key="doc"
+                                                        class="border-2 border-gray-200 rounded-2xl p-5 bg-white"
+                                                    >
+                                                        <Label class="text-sm font-bold text-gray-800">{{ doc }}</Label>
+                                                        <div class="mt-3 space-y-3">
+                                                            <FileUpload
+                                                                :accept="'.pdf,.doc,.docx,.jpg,.jpeg,.png'"
+                                                                :multiple="true"
+                                                                @upload="(files) => handleEditFileUpload(doc, files)"
+                                                            />
+
+                                                            <div v-if="editTransactionDocumentUploadSlots[doc]?.length" class="space-y-2">
+                                                                <div
+                                                                    v-for="(slot, index) in editTransactionDocumentUploadSlots[doc]"
+                                                                    :key="slot.id || `e-${doc}-${index}`"
+                                                                    class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+                                                                >
+                                                                    <div class="flex items-center justify-between gap-2">
+                                                                        <div class="flex items-center gap-2 min-w-0">
+                                                                            <Upload class="h-4 w-4 shrink-0" />
+                                                                            <span class="truncate">{{ slot.name }}</span>
+                                                                        </div>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            :disabled="slot.id === ''"
+                                                                            class="h-7 w-7 p-0"
+                                                                            @click="removeEditFile(doc, index)"
+                                                                        >
+                                                                            <X class="h-3 w-3" />
+                                                                        </Button>
+                                                                    </div>
+                                                                    <p v-if="slot.id === ''" class="text-xs text-blue-600 mt-1">Uploading... {{ slot.progress }}%</p>
+                                                                    <div v-if="slot.id === ''" class="mt-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+                                                                        <div class="h-full bg-blue-600 rounded-full transition-[width]" :style="{ width: `${slot.progress}%` }" />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Required Information -->
+                                            <div v-if="inputFieldsForEdit.length" class="space-y-4">
+                                                <Label class="text-base font-bold text-gray-800">Required information</Label>
+
+                                                <div class="space-y-4">
+                                                    <div
+                                                        v-for="field in inputFieldsForEdit"
+                                                        :key="field.key"
+                                                        class="border-2 border-gray-200 rounded-2xl p-5 bg-white"
+                                                    >
+                                                        <Label class="text-sm font-bold text-gray-800 mb-2 block">
+                                                            {{ field.label }}
+                                                            <span v-if="field.required" class="text-red-500">*</span>
+                                                        </Label>
+
+                                                        <Input
+                                                            v-if="field.type === 'text'"
+                                                            v-model="editForm.required_fields[field.key]"
+                                                            :placeholder="field.placeholder || undefined"
+                                                            :required="field.required"
+                                                            class="h-12 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
+                                                        />
+                                                        <Textarea
+                                                            v-else-if="field.type === 'textarea'"
+                                                            v-model="editForm.required_fields[field.key]"
+                                                            :placeholder="field.placeholder || undefined"
+                                                            :required="field.required"
+                                                            rows="3"
+                                                            class="border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 resize-none"
+                                                        />
+                                                        <Select
+                                                            v-else-if="field.type === 'select' && field.options?.length"
+                                                            v-model="editForm.required_fields[field.key]"
+                                                        >
+                                                            <SelectTrigger class="h-12 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200">
+                                                                <SelectValue :placeholder="field.placeholder || 'Select an option'" />
+                                                            </SelectTrigger>
+                                                            <SelectContent class="rounded-xl border-2 border-gray-200 shadow-xl">
+                                                                <SelectItem v-for="opt in field.options" :key="opt" :value="opt" class="py-3">
+                                                                    {{ opt }}
+                                                                </SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+
+                                                        <p v-if="editForm.errors[`required_fields.${field.key}`]" class="text-sm text-red-600 mt-2">
+                                                            {{ editForm.errors[`required_fields.${field.key}`] }}
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </form>
                                     </div>
@@ -1072,14 +1304,17 @@ watch(sheetOpen, (newValue) => {
                                         <div class="flex flex-row gap-3 sm:gap-4">
                                             <Button
                                                 type="button"
-                                                :disabled="editForm?.processing"
+                                                :disabled="editForm?.processing || !editForm?.type || !editForm?.title || editTransactionUploadsBusy"
                                                 @click="submitEdit"
                                                 size="lg"
                                                 class="flex flex-1 h-12 sm:h-14 items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300"
                                             >
                                                 <Loader2 v-if="editForm?.processing" class="h-5 w-5 shrink-0 animate-spin" />
                                                 <Save v-else class="h-5 w-5 shrink-0" />
-                                                {{ editForm?.processing ? 'Updating...' : 'Update Request' }}
+                                                {{ editForm?.processing
+                                                    ? (selectedTransaction?.status === 'rejected' ? 'Resubmitting...' : 'Updating...')
+                                                    : (selectedTransaction?.status === 'rejected' ? 'Resubmit Request' : 'Update Request')
+                                                }}
                                             </Button>
                                             <Button
                                                 type="button"
@@ -1226,14 +1461,15 @@ watch(sheetOpen, (newValue) => {
                                         View Details
                                     </Button>
                                     <Button
-                                        v-if="transaction.status === 'pending'"
+                                        v-if="transaction.status === 'pending' || transaction.status === 'rejected'"
                                         @click="openEditSheet(transaction)"
                                         variant="outline"
                                         size="lg"
                                         class="flex w-full h-12 items-center justify-center gap-2 bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100 border-2 border-gray-200 text-gray-700 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                                     >
-                                        <Pencil class="h-5 w-5 shrink-0" />
-                                        Edit
+                                        <RotateCcw v-if="transaction.status === 'rejected'" class="h-5 w-5 shrink-0" />
+                                        <Pencil v-else class="h-5 w-5 shrink-0" />
+                                        {{ transaction.status === 'rejected' ? 'Resubmit' : 'Edit' }}
                                     </Button>
                                 </div>
                             </div>

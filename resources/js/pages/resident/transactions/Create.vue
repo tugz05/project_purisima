@@ -288,9 +288,12 @@ const getStatusClass = (status: string) => {
                                 </div>
                             </div>
 
-                            <!-- Required Documents Upload -->
+                            <!-- Supporting Documents Upload (Optional) -->
                             <div v-if="form.required_documents.length > 0">
-                                <h3 class="font-semibold text-sm text-gray-900 mb-3">Required Documents</h3>
+                                <h3 class="font-semibold text-sm text-gray-900 mb-1">Supporting Documents (Optional)</h3>
+                                <p class="text-xs text-gray-600 mb-3">
+                                    You can submit even without uploading. If available, upload these documents to help speed up processing.
+                                </p>
                                 <div class="space-y-4">
                                     <div
                                         v-for="document in form.required_documents"

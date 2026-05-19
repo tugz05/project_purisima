@@ -107,6 +107,102 @@ class TransactionService
     }
 
     /**
+     * Resident update/edit flow for an existing transaction (supports resubmission).
+     *
+     * - Maps `required_fields` -> `resident_input_data`
+     * - Consumes `submitted_document_upload_ids` and appends to `submitted_documents`
+     * - If the transaction was rejected, resets it back to pending (resubmitted)
+     */
+    public function updateResidentTransaction(Transaction $transaction, array $data, User $resident): Transaction
+    {
+        return DB::transaction(function () use ($transaction, $data, $resident) {
+            $existingDocuments = is_array($transaction->submitted_documents) ? $transaction->submitted_documents : [];
+            $newDocuments = [];
+
+            if (isset($data['submitted_document_upload_ids']) && is_array($data['submitted_document_upload_ids'])) {
+                foreach ($data['submitted_document_upload_ids'] as $documentType => $ids) {
+                    if (! is_array($ids)) {
+                        continue;
+                    }
+                    $cleanIds = array_values(array_filter($ids, fn ($id) => is_string($id) && $id !== ''));
+                    if ($cleanIds === []) {
+                        continue;
+                    }
+                    $metas = $this->pendingFileUploadService->consumeIds(
+                        $resident,
+                        $cleanIds,
+                        PendingFileUploadService::PURPOSE_TRANSACTION_SUBMISSION,
+                        'submitted-documents'
+                    );
+                    foreach ($metas as $meta) {
+                        $newDocuments[] = [
+                            'document_type' => $documentType,
+                            'name' => $meta['name'],
+                            'path' => $meta['path'],
+                            'size' => $meta['size'],
+                            'mime_type' => $meta['mime_type'],
+                        ];
+                    }
+                }
+            }
+
+            // Handle direct file uploads if present (legacy / fallback)
+            if (isset($data['submitted_documents']) && is_array($data['submitted_documents'])) {
+                foreach ($data['submitted_documents'] as $documentType => $files) {
+                    if (! is_array($files)) {
+                        continue;
+                    }
+                    foreach ($files as $file) {
+                        if ($file instanceof \Illuminate\Http\UploadedFile) {
+                            $path = $file->store('submitted-documents', 'public');
+                            $newDocuments[] = [
+                                'document_type' => $documentType,
+                                'name' => $file->getClientOriginalName(),
+                                'path' => $path,
+                                'size' => $file->getSize(),
+                                'mime_type' => $file->getMimeType(),
+                            ];
+                        }
+                    }
+                }
+            }
+
+            $typeCode = isset($data['type']) ? (string) $data['type'] : (string) $transaction->type;
+            $documentType = DocumentType::where('code', $typeCode)->first();
+            if (! $documentType) {
+                throw new \Exception("Document type with code '{$typeCode}' not found. Please select a valid document type.");
+            }
+
+            $updateData = [
+                'document_type_id' => $documentType->id,
+                'type' => $typeCode,
+                'title' => $data['title'] ?? $transaction->title,
+                'required_documents' => $data['required_documents'] ?? ($transaction->required_documents ?? []),
+                'fee_amount' => $data['fee_amount'] ?? $documentType->fee_amount ?? ($transaction->fee_amount ?? 0),
+                'resident_input_data' => $data['required_fields'] ?? ($transaction->resident_input_data ?? []),
+            ];
+
+            if ($newDocuments !== []) {
+                $updateData['submitted_documents'] = array_values(array_merge($existingDocuments, $newDocuments));
+            }
+
+            // Resubmission: rejected -> pending + clear rejection metadata
+            if ($transaction->status === 'rejected') {
+                $updateData['status'] = 'pending';
+                $updateData['rejection_reason'] = null;
+                $updateData['staff_id'] = null;
+                $updateData['processed_at'] = null;
+                $updateData['completed_at'] = null;
+                $updateData['submitted_at'] = now();
+            }
+
+            $transaction->update($updateData);
+
+            return $transaction->fresh();
+        });
+    }
+
+    /**
      * Create a walk-in / fully manual transaction (no linked resident account) and assign it in progress.
      */
     public function createManualEntryByStaff(array $data, User $staff): Transaction
