@@ -329,6 +329,17 @@ class TransactionService
                 ]);
             }
 
+            // Handle officer_of_the_day_position - ALWAYS process it if present in data
+            if (array_key_exists('officer_of_the_day_position', $data)) {
+                $posValue = $data['officer_of_the_day_position'];
+                if (is_string($posValue)) {
+                    $trimmed = trim($posValue);
+                    $updateData['officer_of_the_day_position'] = $trimmed !== '' ? $trimmed : null;
+                } else {
+                    $updateData['officer_of_the_day_position'] = $posValue ?: null;
+                }
+            }
+
             if (isset($data['rejection_reason'])) {
                 $updateData['rejection_reason'] = $data['rejection_reason'];
             }
