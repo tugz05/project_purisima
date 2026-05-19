@@ -351,9 +351,7 @@ Route::middleware(['auth', 'role:resident', 'registration.geo'])->prefix('reside
 
 // All other resident routes (require profile completion)
 Route::middleware(['auth', 'role:resident', 'registration.geo', 'profile.completed'])->prefix('resident')->name('resident.')->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('resident/Dashboard');
-    })->name('dashboard');
+    Route::get('dashboard', [\App\Http\Controllers\Resident\DashboardController::class, 'index'])->name('dashboard');
 
     // Household Members routes
     Route::resource('household-members', \App\Http\Controllers\Resident\HouseholdMemberController::class);

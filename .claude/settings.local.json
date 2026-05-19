@@ -25,7 +25,10 @@
       "Bash(php -l C:\\\\laragon\\\\www\\\\project_purisima\\\\app\\\\Http\\\\Controllers\\\\Staff\\\\SmsAnnouncementController.php)",
       "PowerShell(php -l \"C:\\\\laragon\\\\www\\\\project_purisima\\\\app\\\\Http\\\\Controllers\\\\Staff\\\\SmsAnnouncementController.php\")",
       "PowerShell(php -l \"C:\\\\laragon\\\\www\\\\project_purisima\\\\app\\\\Http\\\\Controllers\\\\Auth\\\\SmsPasswordResetController.php\")",
-      "PowerShell(php -l \"C:\\\\laragon\\\\www\\\\project_purisima\\\\app\\\\Services\\\\PaymentService.php\")"
+      "PowerShell(php -l \"C:\\\\laragon\\\\www\\\\project_purisima\\\\app\\\\Services\\\\PaymentService.php\")",
+      "PowerShell(php -l \"C:\\\\laragon\\\\www\\\\project_purisima\\\\app\\\\Http\\\\Controllers\\\\Resident\\\\DashboardController.php\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\laragon\\\\www\\\\project_purisima\\\\database\\\\migrations\")",
+      "Bash(Select-Object -First 30)"
     ]
   }
 }
