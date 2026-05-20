@@ -281,7 +281,7 @@ const statTiles = computed(() => [
     { label: 'Total',    value: props.stats.total       },
     { label: 'Pending',  value: props.stats.pending     },
     { label: 'Active',   value: props.stats.in_progress },
-    { label: 'Done',     value: props.stats.completed   },
+    { label: 'Completed',     value: props.stats.completed   },
 ]);
 
 // ── Transaction lookup table ──────────────────────────────────────────────────

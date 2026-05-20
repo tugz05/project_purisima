@@ -88,6 +88,13 @@ const transactionUploadsBusy = computed(() =>
     Object.values(transactionDocumentUploadSlots.value).some((rows) => rows.some((r) => r.id === '' && !r.error)),
 );
 
+const hasAllRequiredDocuments = computed(() => {
+    if (!form.required_documents.length) return true;
+    return form.required_documents.every(
+        (doc) => (transactionDocumentUploadSlots.value[doc]?.filter((s) => s.id !== '').length ?? 0) > 0,
+    );
+});
+
 watch(
     () => form.type,
     (newType) => {
@@ -291,19 +298,27 @@ const getStatusClass = (status: string) => {
                                 </div>
                             </div>
 
-                            <!-- Supporting Documents Upload (Optional) -->
+                            <!-- Required Supporting Documents -->
                             <div v-if="form.required_documents.length > 0">
-                                <h3 class="font-semibold text-sm text-gray-900 mb-1">Supporting Documents (Optional)</h3>
+                                <h3 class="font-semibold text-sm text-gray-900 mb-1">Required Supporting Documents</h3>
                                 <p class="text-xs text-gray-600 mb-3">
-                                    You can submit even without uploading. If available, upload these documents to help speed up processing.
+                                    All documents listed below must be uploaded before you can submit your request.
                                 </p>
                                 <div class="space-y-4">
                                     <div
                                         v-for="document in form.required_documents"
                                         :key="document"
                                         class="border rounded-lg p-4"
+                                        :class="(transactionDocumentUploadSlots[document]?.filter((s) => s.id !== '').length ?? 0) === 0 ? 'border-red-300 bg-red-50/40' : 'border-green-300 bg-green-50/40'"
                                     >
-                                        <Label class="text-sm font-medium">{{ document }}</Label>
+                                        <div class="flex items-center justify-between mb-1">
+                                            <Label class="text-sm font-medium">{{ document }} <span class="text-red-500">*</span></Label>
+                                            <span
+                                                v-if="(transactionDocumentUploadSlots[document]?.filter((s) => s.id !== '').length ?? 0) === 0"
+                                                class="text-xs text-red-600 font-medium"
+                                            >Required</span>
+                                            <span v-else class="text-xs text-green-600 font-medium">Uploaded</span>
+                                        </div>
                                         <div class="mt-2">
                                             <FileUpload
                                                 :accept="'.pdf,.doc,.docx,.jpg,.jpeg,.png'"
@@ -345,10 +360,16 @@ const getStatusClass = (status: string) => {
                         </div>
 
                         <!-- Submit Button -->
-                        <div class="flex justify-end">
+                        <div class="flex flex-col items-end gap-1">
+                            <p
+                                v-if="form.type && form.required_documents.length > 0 && !hasAllRequiredDocuments"
+                                class="text-xs text-red-600"
+                            >
+                                Please upload all required supporting documents before submitting.
+                            </p>
                             <Button
                                 type="submit"
-                                :disabled="form.processing || !form.type || transactionUploadsBusy"
+                                :disabled="form.processing || !form.type || transactionUploadsBusy || !hasAllRequiredDocuments"
                                 class="min-w-[120px]"
                             >
                                 {{ form.processing ? 'Submitting...' : 'Submit Request' }}
