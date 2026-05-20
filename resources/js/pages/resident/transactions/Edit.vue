@@ -235,12 +235,18 @@ const submit = () => {
                             <InputError :message="form.errors.type" />
                         </div>
 
-                        <!-- Title -->
-                        <div class="space-y-2">
-                            <Label>Title</Label>
-                            <Input v-model="form.title" placeholder="Enter request title" />
-                            <InputError :message="form.errors.title" />
-                        </div>
+                        <!-- Title --> 
+                        <div class="space-y-2"> 
+                            <Label>Title</Label> 
+                            <Input 
+                                v-model="form.title" 
+                                placeholder="Auto-generated from document type" 
+                                readonly 
+                                class="read-only:bg-gray-50 read-only:text-gray-700 read-only:cursor-not-allowed" 
+                            /> 
+                            <p class="text-xs text-gray-500">Title is auto-filled based on the selected document type.</p> 
+                            <InputError :message="form.errors.title" /> 
+                        </div> 
 
                         <!-- Description -->
                         <div class="space-y-2">
@@ -357,4 +363,3 @@ const submit = () => {
         </div>
     </ResidentLayout>
 </template>
-

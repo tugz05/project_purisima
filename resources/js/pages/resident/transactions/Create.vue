@@ -173,16 +173,19 @@ const getStatusClass = (status: string) => {
 
                         <!-- Transaction Details -->
                         <div v-if="form.type" class="space-y-4">
-                            <div>
-                                <Label for="title">Title</Label>
-                                <Input
-                                    id="title"
-                                    v-model="form.title"
-                                    type="text"
-                                    placeholder="Enter transaction title"
-                                />
-                                <InputError :message="form.errors.title" class="mt-2" />
-                            </div>
+                            <div> 
+                                <Label for="title">Title</Label> 
+                                <Input 
+                                    id="title" 
+                                    v-model="form.title" 
+                                    type="text" 
+                                    placeholder="Auto-generated from document type" 
+                                    readonly 
+                                    class="read-only:bg-gray-50 read-only:text-gray-700 read-only:cursor-not-allowed" 
+                                /> 
+                                <p class="mt-1 text-xs text-gray-500">Title is auto-filled based on the selected document type.</p> 
+                                <InputError :message="form.errors.title" class="mt-2" /> 
+                            </div> 
 
                             <div>
                                 <Label for="description">Description</Label>

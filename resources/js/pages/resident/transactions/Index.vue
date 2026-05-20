@@ -564,16 +564,18 @@ watch(sheetOpen, (newValue) => {
                                             </Select>
                                         </div>
 
-                                        <div v-if="selectedType" class="space-y-3">
-                                            <Label for="title" class="text-base font-bold text-gray-800">Title</Label>
-                                            <Input
-                                                id="title"
-                                                v-model="createForm.title"
-                                                placeholder="Enter document title"
-                                                class="h-12 sm:h-14 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 text-base"
-                                                required
-                                            />
-                                        </div>
+                                        <div v-if="selectedType" class="space-y-3"> 
+                                            <Label for="title" class="text-base font-bold text-gray-800">Title</Label> 
+                                            <Input 
+                                                id="title" 
+                                                v-model="createForm.title" 
+                                                placeholder="Auto-generated from document type" 
+                                                readonly 
+                                                class="h-12 sm:h-14 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 text-base read-only:bg-gray-50 read-only:text-gray-700 read-only:cursor-not-allowed" 
+                                                required 
+                                            /> 
+                                            <p class="text-xs text-gray-500">Auto-filled based on the selected document type.</p> 
+                                        </div> 
 
                                         <div v-if="selectedType" class="space-y-4">
                                             <Label class="text-base font-bold text-gray-800">Supporting Documents (Optional)</Label>
@@ -1240,15 +1242,17 @@ watch(sheetOpen, (newValue) => {
                                             </div>
 
                                             <!-- Title -->
-                                            <div class="space-y-3">
-                                                <Label class="text-base font-bold text-gray-800">Title</Label>
-                                                <Input
-                                                    v-model="editForm.title"
-                                                    placeholder="Enter document title"
-                                                    class="h-12 sm:h-14 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
-                                                />
-                                                <p v-if="editForm.errors.title" class="text-sm text-red-600">{{ editForm.errors.title }}</p>
-                                            </div>
+                                            <div class="space-y-3"> 
+                                                <Label class="text-base font-bold text-gray-800">Title</Label> 
+                                                <Input 
+                                                    v-model="editForm.title" 
+                                                    placeholder="Auto-generated from document type" 
+                                                    readonly 
+                                                    class="h-12 sm:h-14 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 read-only:bg-gray-50 read-only:text-gray-700 read-only:cursor-not-allowed" 
+                                                /> 
+                                                <p class="text-xs text-gray-500">Title is read-only for residents.</p> 
+                                                <p v-if="editForm.errors.title" class="text-sm text-red-600">{{ editForm.errors.title }}</p> 
+                                            </div> 
 
                                             <!-- Description (optional) -->
                                             <div class="space-y-3">
