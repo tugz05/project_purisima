@@ -12,9 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import RichTextEditor from '@/components/RichTextEditor.vue';
 import { FileCheck, Loader2, Printer, Save, Sparkles, FileText } from 'lucide-vue-next';
 import InputError from '@/components/InputError.vue';
-import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
-import staff from '@/routes/staff';
-import { finalize, generateAi, loadTemplate, print, schema } from '@/routes/staff/certificates/manual';
+import { useBreadcrumbs } from '@/composables/useBreadcrumbs'; 
+import staff from '@/routes/staff'; 
+import { finalize, generateAi, loadTemplate, print, schema } from '@/routes/staff/certificates/manual'; 
 
 interface DocumentTypeOption {
     id: number;
@@ -49,9 +49,9 @@ const schemaError = ref<string | null>(null);
 const printLayout = ref<'clearance' | 'standard' | ''>('');
 const templateName = ref<string | null>(null);
 const fieldsSource = ref<'layout_only' | 'layout_with_extras' | ''>('');
-const extraFieldCount = ref(0);
-const fields = ref<SchemaField[]>([]);
-const fieldValues = ref<Record<string, string>>({});
+const extraFieldCount = ref(0); 
+const fields = ref<SchemaField[]>([]); 
+const fieldValues = ref<Record<string, string>>({}); 
 const documentContent = ref('');
 const officerOfTheDay = ref('');
 const officerOfTheDayPosition = ref('');
@@ -68,12 +68,29 @@ const saveForm = useForm({
     officer_of_the_day_position: null as string | null,
 });
 
-const selectedDocName = computed(() => {
-    if (!selectedDocumentTypeId.value) {
-        return '';
+const selectedDocName = computed(() => { 
+    if (!selectedDocumentTypeId.value) { 
+        return ''; 
+    } 
+    const id = Number(selectedDocumentTypeId.value); 
+    return props.documentTypes.find((d) => d.id === id)?.name ?? ''; 
+}); 
+
+const baseFields = computed(() => {
+    if (extraFieldCount.value > 0 && extraFieldCount.value < fields.value.length) {
+        return fields.value.slice(0, -extraFieldCount.value);
     }
-    const id = Number(selectedDocumentTypeId.value);
-    return props.documentTypes.find((d) => d.id === id)?.name ?? '';
+    if (extraFieldCount.value >= fields.value.length) {
+        return [];
+    }
+    return fields.value;
+});
+
+const documentTypeQuestionFields = computed(() => {
+    if (extraFieldCount.value > 0 && extraFieldCount.value <= fields.value.length) {
+        return fields.value.slice(fields.value.length - extraFieldCount.value);
+    }
+    return [];
 });
 
 function getCsrfToken(): string {
@@ -347,26 +364,26 @@ const selectTriggerClass = 'h-10 w-full border-gray-200 focus:border-blue-500 fo
 const fieldStack = 'flex flex-col gap-2';
 </script>
 
-<template>
-    <Head title="Walk-in certificate" />
-
-    <StaffLayout :breadcrumbs="staffManualCertificateBreadcrumbs">
-        <div class="min-h-full w-full bg-gradient-to-br from-gray-50 to-teal-50/20">
-            <div class="mx-auto w-full max-w-[100rem] space-y-6 px-4 py-4 sm:px-6 lg:px-8 md:py-6">
-                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 shadow-xl">
+<template> 
+    <Head title="Walk-in transaction" /> 
+ 
+    <StaffLayout :breadcrumbs="staffManualCertificateBreadcrumbs"> 
+        <div class="min-h-full w-full bg-gradient-to-br from-gray-50 to-teal-50/20"> 
+            <div class="mx-auto w-full max-w-[100rem] space-y-6 px-4 py-4 sm:px-6 lg:px-8 md:py-6"> 
+                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 shadow-xl"> 
                     <div class="absolute inset-0 bg-black/10" />
                     <div class="relative px-5 py-6 sm:px-8 sm:py-8">
                         <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                            <div class="min-w-0 flex-1 text-white">
-                                <div class="flex max-w-4xl flex-col gap-2">
-                                    <h1 class="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">Walk-in certificate</h1>
-                                    <p class="text-sm leading-relaxed text-teal-50 sm:text-base">
-                                        Pick a document type to load the matching official print layout (Barangay clearance or standard certificate—the
-                                        same shells as the print preview page). Build the body, then use Save certificate to create the walk-in
-                                        transaction or print a draft anytime.
-                                    </p>
-                                </div>
-                            </div>
+                            <div class="min-w-0 flex-1 text-white"> 
+                                <div class="flex max-w-4xl flex-col gap-2"> 
+                                    <h1 class="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">Walk-in transaction</h1> 
+                                    <p class="text-sm leading-relaxed text-teal-50 sm:text-base"> 
+                                        Pick a document type to load the matching official print layout (Barangay clearance or standard certificate—the 
+                                        same shells as the print preview page). Staff should answer the document type questions first, then build the 
+                                        body and save to create the walk-in transaction (or print a draft anytime). 
+                                    </p> 
+                                </div> 
+                            </div> 
                             <Button
                                 as-child
                                 variant="secondary"
@@ -384,20 +401,20 @@ const fieldStack = 'flex flex-col gap-2';
 
                 <div v-else class="grid grid-cols-1 gap-6 xl:grid-cols-12">
                     <Card class="border-gray-200 shadow-lg xl:col-span-5">
-                        <CardHeader class="gap-2 border-b border-gray-100">
-                            <CardTitle class="flex items-center gap-2 text-lg text-gray-900">
-                                <FileCheck class="h-5 w-5 text-teal-600" />
-                                1. Document type &amp; fields
-                            </CardTitle>
-                            <CardDescription>
-                                Every document type always shows the base fields for its print layout (standard or barangay clearance). Extra fields
-                                configured on the document type appear below those and are included when you insert the default body, generate with AI,
-                                or save—same AI engine as transaction certificates.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent class="space-y-6 pt-2 pb-6">
-                            <div :class="fieldStack">
-                                <Label class="text-sm font-medium text-gray-700" for="doc_type">Document type</Label>
+                        <CardHeader class="gap-2 border-b border-gray-100"> 
+                            <CardTitle class="flex items-center gap-2 text-lg text-gray-900"> 
+                                <FileCheck class="h-5 w-5 text-teal-600" /> 
+                                1. Document type &amp; questions 
+                            </CardTitle> 
+                            <CardDescription> 
+                                For walk-in transactions, staff must fill up the required base fields and the document type questions below. These 
+                                answers are included when you insert the default body, generate with AI, or save—same AI engine as transaction 
+                                certificates. 
+                            </CardDescription> 
+                        </CardHeader> 
+                        <CardContent class="space-y-6 pt-2 pb-6"> 
+                            <div :class="fieldStack"> 
+                                <Label class="text-sm font-medium text-gray-700" for="doc_type">Document type</Label> 
                                 <Select v-model="selectedDocumentTypeId">
                                     <SelectTrigger id="doc_type" :class="selectTriggerClass">
                                         <SelectValue placeholder="Select document type" />
@@ -439,61 +456,121 @@ const fieldStack = 'flex flex-col gap-2';
                                 from this document type’s settings are included below and sent to AI with the base fields.
                             </div>
 
-                            <div v-if="schemaLoading" class="flex items-center gap-2 text-sm text-gray-600">
-                                <Loader2 class="h-4 w-4 animate-spin" />
-                                Loading field definitions…
-                            </div>
-                            <p v-else-if="schemaError" class="text-sm text-red-600">{{ schemaError }}</p>
-
-                            <div v-else-if="fields.length > 0" class="space-y-4">
-                                <div
-                                    v-for="field in fields"
-                                    :key="field.name"
-                                    :class="fieldStack"
-                                >
-                                    <Label class="text-sm font-medium text-gray-700" :for="`f-${field.name}`">
-                                        {{ field.label }}
-                                        <span v-if="field.required" class="text-red-500">*</span>
-                                    </Label>
-                                    <Input
-                                        v-if="field.type === 'text' || field.type === 'number' || field.type === 'email' || field.type === 'time'"
-                                        :id="`f-${field.name}`"
-                                        v-model="fieldValues[field.name]"
-                                        :type="field.type === 'number' ? 'number' : field.type === 'email' ? 'email' : field.type === 'time' ? 'time' : 'text'"
-                                        :placeholder="field.placeholder"
-                                        :class="inputClass"
-                                    />
-                                    <Input
-                                        v-else-if="field.type === 'date'"
-                                        :id="`f-${field.name}`"
-                                        v-model="fieldValues[field.name]"
-                                        type="date"
-                                        :class="inputClass"
-                                    />
-                                    <select
-                                        v-else-if="field.type === 'select'"
-                                        :id="`f-${field.name}`"
-                                        v-model="fieldValues[field.name]"
-                                        class="h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 shadow-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                    >
-                                        <option value="">Select…</option>
-                                        <option v-for="opt in field.options ?? []" :key="opt" :value="opt">
-                                            {{ opt }}
-                                        </option>
-                                    </select>
-                                    <Textarea
-                                        v-else
-                                        :id="`f-${field.name}`"
-                                        v-model="fieldValues[field.name]"
-                                        :placeholder="field.placeholder"
-                                        rows="3"
-                                        :class="inputClass"
-                                    />
-                                </div>
-                            </div>
-
-                            <div :class="fieldStack">
-                                <Label class="text-sm font-medium text-gray-700" for="ootd">Officer of the Day <span class="text-gray-400 font-normal">(optional)</span></Label>
+                            <div v-if="schemaLoading" class="flex items-center gap-2 text-sm text-gray-600"> 
+                                <Loader2 class="h-4 w-4 animate-spin" /> 
+                                Loading field definitions… 
+                            </div> 
+                            <p v-else-if="schemaError" class="text-sm text-red-600">{{ schemaError }}</p> 
+ 
+                            <div v-else-if="fields.length > 0" class="space-y-4"> 
+                                <div v-if="baseFields.length > 0" class="space-y-4"> 
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Base fields (print layout)</p> 
+                                    <div 
+                                        v-for="field in baseFields" 
+                                        :key="field.name" 
+                                        :class="fieldStack" 
+                                    > 
+                                        <Label class="text-sm font-medium text-gray-700" :for="`f-${field.name}`"> 
+                                            {{ field.label }} 
+                                            <span v-if="field.required" class="text-red-500">*</span> 
+                                        </Label> 
+                                        <Input 
+                                            v-if="field.type === 'text' || field.type === 'number' || field.type === 'email' || field.type === 'time'" 
+                                            :id="`f-${field.name}`" 
+                                            v-model="fieldValues[field.name]" 
+                                            :type="field.type === 'number' ? 'number' : field.type === 'email' ? 'email' : field.type === 'time' ? 'time' : 'text'" 
+                                            :placeholder="field.placeholder" 
+                                            :class="inputClass" 
+                                        /> 
+                                        <Input 
+                                            v-else-if="field.type === 'date'" 
+                                            :id="`f-${field.name}`" 
+                                            v-model="fieldValues[field.name]" 
+                                            type="date" 
+                                            :class="inputClass" 
+                                        /> 
+                                        <select 
+                                            v-else-if="field.type === 'select'" 
+                                            :id="`f-${field.name}`" 
+                                            v-model="fieldValues[field.name]" 
+                                            class="h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 shadow-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none" 
+                                        > 
+                                            <option value="">Select…</option> 
+                                            <option v-for="opt in field.options ?? []" :key="opt" :value="opt"> 
+                                                {{ opt }} 
+                                            </option> 
+                                        </select> 
+                                        <Textarea 
+                                            v-else 
+                                            :id="`f-${field.name}`" 
+                                            v-model="fieldValues[field.name]" 
+                                            :placeholder="field.placeholder" 
+                                            rows="3" 
+                                            :class="inputClass" 
+                                        /> 
+                                    </div> 
+                                </div> 
+ 
+                                <div 
+                                    v-if="documentTypeQuestionFields.length > 0" 
+                                    class="space-y-4 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4" 
+                                > 
+                                    <div class="flex flex-col gap-1"> 
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-cyan-900">Document type questions (staff fill-up)</p> 
+                                        <p class="text-xs text-cyan-900/80"> 
+                                            These questions come from the selected document type’s settings and must be answered by staff for walk-in 
+                                            transactions. 
+                                        </p> 
+                                    </div> 
+                                    <div 
+                                        v-for="field in documentTypeQuestionFields" 
+                                        :key="field.name" 
+                                        :class="fieldStack" 
+                                    > 
+                                        <Label class="text-sm font-medium text-gray-700" :for="`f-${field.name}`"> 
+                                            {{ field.label }} 
+                                            <span v-if="field.required" class="text-red-500">*</span> 
+                                        </Label> 
+                                        <Input 
+                                            v-if="field.type === 'text' || field.type === 'number' || field.type === 'email' || field.type === 'time'" 
+                                            :id="`f-${field.name}`" 
+                                            v-model="fieldValues[field.name]" 
+                                            :type="field.type === 'number' ? 'number' : field.type === 'email' ? 'email' : field.type === 'time' ? 'time' : 'text'" 
+                                            :placeholder="field.placeholder" 
+                                            :class="inputClass" 
+                                        /> 
+                                        <Input 
+                                            v-else-if="field.type === 'date'" 
+                                            :id="`f-${field.name}`" 
+                                            v-model="fieldValues[field.name]" 
+                                            type="date" 
+                                            :class="inputClass" 
+                                        /> 
+                                        <select 
+                                            v-else-if="field.type === 'select'" 
+                                            :id="`f-${field.name}`" 
+                                            v-model="fieldValues[field.name]" 
+                                            class="h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 shadow-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none" 
+                                        > 
+                                            <option value="">Select…</option> 
+                                            <option v-for="opt in field.options ?? []" :key="opt" :value="opt"> 
+                                                {{ opt }} 
+                                            </option> 
+                                        </select> 
+                                        <Textarea 
+                                            v-else 
+                                            :id="`f-${field.name}`" 
+                                            v-model="fieldValues[field.name]" 
+                                            :placeholder="field.placeholder" 
+                                            rows="3" 
+                                            :class="inputClass" 
+                                        /> 
+                                    </div> 
+                                </div> 
+                            </div> 
+ 
+                            <div :class="fieldStack"> 
+                                <Label class="text-sm font-medium text-gray-700" for="ootd">Officer of the Day <span class="text-gray-400 font-normal">(optional)</span></Label> 
                                 <Input
                                     id="ootd"
                                     v-model="officerOfTheDay"

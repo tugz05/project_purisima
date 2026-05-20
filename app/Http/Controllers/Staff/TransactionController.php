@@ -89,24 +89,7 @@ class TransactionController extends Controller
         try {
             $oldStatus = $transaction->status;
 
-            // Get validated data and ensure officer_of_the_day is included
             $validated = $request->validated();
-
-            // Explicitly include officer_of_the_day if it exists in the request (even if null/empty)
-            // Use array_key_exists to check for the key, not has() which returns false for empty strings
-            if (array_key_exists('officer_of_the_day', $request->all())) {
-                $officerValue = $request->input('officer_of_the_day');
-                // Convert empty string to null, otherwise use the trimmed value
-                $validated['officer_of_the_day'] = is_string($officerValue) && trim($officerValue) === '' ? null : $officerValue;
-            }
-
-            Log::info('Updating transaction', [
-                'transaction_id' => $transaction->id,
-                'officer_of_the_day_in_request' => array_key_exists('officer_of_the_day', $request->all()),
-                'officer_of_the_day_value' => $request->input('officer_of_the_day'),
-                'officer_of_the_day_in_validated' => $validated['officer_of_the_day'] ?? 'NOT IN VALIDATED',
-                'validated_keys' => array_keys($validated),
-            ]);
 
             $this->transactionService->updateStatus(
                 $transaction,
@@ -114,13 +97,6 @@ class TransactionController extends Controller
                 $request->user(),
                 $validated
             );
-
-            // Refresh to verify it was saved
-            $transaction->refresh();
-            Log::info('After update - officer_of_the_day value', [
-                'saved_value' => $transaction->officer_of_the_day,
-                'transaction_id' => $transaction->id,
-            ]);
 
             // Create notification for transaction status change
             if ($oldStatus !== $request->status) {

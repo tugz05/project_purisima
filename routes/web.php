@@ -257,7 +257,7 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
     Route::get('dashboard', [\App\Http\Controllers\Staff\DashboardController::class, 'index'])->name('dashboard');
     Route::get('dashboard/report', [\App\Http\Controllers\Staff\DashboardController::class, 'printReport'])->name('dashboard.report');
 
-    // Walk-in certificate (no transaction record): dynamic fields → template / AI → print
+    // Walk-in transaction (manual): dynamic fields → template / AI → save / print
     Route::get('certificates/manual/schema', [\App\Http\Controllers\Staff\ManualCertificateController::class, 'schema'])->name('certificates.manual.schema');
     Route::post('certificates/manual/load-template', [\App\Http\Controllers\Staff\ManualCertificateController::class, 'loadTemplate'])->name('certificates.manual.load-template');
     Route::post('certificates/manual/generate-ai', [\App\Http\Controllers\Staff\ManualCertificateController::class, 'generateAi'])->name('certificates.manual.generate-ai');

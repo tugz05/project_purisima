@@ -32,12 +32,12 @@ export function useBreadcrumbs() {
         ])
     );
 
-    const staffManualCertificateBreadcrumbs = computed(() =>
-        createBreadcrumbs([
-            { title: 'Dashboard', href: DASHBOARD_URL },
-            { title: 'Walk-in certificate', href: staff.certificates.manual.url() },
-        ])
-    );
+    const staffManualCertificateBreadcrumbs = computed(() => 
+        createBreadcrumbs([ 
+            { title: 'Dashboard', href: DASHBOARD_URL }, 
+            { title: 'Walk-in transaction', href: staff.certificates.manual.url() }, 
+        ]) 
+    ); 
 
     const staffTransactionShowBreadcrumbs = computed(() => (transactionId: string) =>
         createBreadcrumbs([

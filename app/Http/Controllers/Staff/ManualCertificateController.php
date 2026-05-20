@@ -154,11 +154,11 @@ class ManualCertificateController extends Controller
         ]);
     }
 
-    /**
-     * Persist the walk-in certificate as a transaction after staff finish editing the body.
-     */
-    public function finalize(ManualCertificateFinalizeRequest $request): RedirectResponse
-    {
+    /** 
+     * Persist the walk-in transaction after staff finish editing the body. 
+     */ 
+    public function finalize(ManualCertificateFinalizeRequest $request): RedirectResponse 
+    { 
         try {
             $validated = $request->validated();
             $documentType = DocumentType::findOrFail($validated['document_type_id']);
@@ -229,25 +229,25 @@ class ManualCertificateController extends Controller
             $this->certificateVerificationService->ensureVerificationToken($transaction);
             $transaction = $transaction->fresh();
             $transaction->load('documentType');
-            $this->notificationService->createNotificationForAllStaff(
-                'transaction_created',
-                'Walk-in certificate saved as transaction',
-                "Staff saved {$documentType->name} for {$payload['manual_full_name']} from the walk-in certificate wizard (transaction #{$transaction->id}).",
-                [
-                    'transaction_id' => $transaction->id,
-                    'resident_name' => $payload['manual_full_name'],
-                    'document_type' => $documentType->name,
-                ],
-                'normal',
-                'transaction'
-            );
-
-            return redirect()->route('staff.transactions.show', $transaction)
-                ->with('success', 'Walk-in certificate saved as a transaction. You can keep editing or print from the transaction page.');
-        } catch (\Exception $e) {
-            Log::error('Manual certificate finalize failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+            $this->notificationService->createNotificationForAllStaff( 
+                'transaction_created', 
+                'Walk-in transaction created', 
+                "Staff saved {$documentType->name} for {$payload['manual_full_name']} from the walk-in transaction wizard (transaction #{$transaction->id}).", 
+                [ 
+                    'transaction_id' => $transaction->id, 
+                    'resident_name' => $payload['manual_full_name'], 
+                    'document_type' => $documentType->name, 
+                ], 
+                'normal', 
+                'transaction' 
+            ); 
+ 
+            return redirect()->route('staff.transactions.show', $transaction) 
+                ->with('success', 'Walk-in transaction created. You can keep editing or print from the transaction page.'); 
+        } catch (\Exception $e) { 
+            Log::error('Manual certificate finalize failed', [ 
+                'error' => $e->getMessage(), 
+                'trace' => $e->getTraceAsString(), 
             ]);
 
             return redirect()->back()

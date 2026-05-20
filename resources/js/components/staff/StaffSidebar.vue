@@ -26,12 +26,12 @@ const mainNavItems = computed((): NavItem[] => {
             href: '/staff/transactions',
             icon: FileText,
             badge: pendingTx > 0 ? pendingTx : undefined,
-        },
-        {
-            title: 'Walk-in certificate',
-            href: staff.certificates.manual.url(),
-            icon: FileCheck,
-        },
+        }, 
+        { 
+            title: 'Walk-in transaction', 
+            href: staff.certificates.manual.url(), 
+            icon: FileCheck, 
+        }, 
         {
             title: 'Payments',
             href: staff.payments.history.url(),
@@ -98,7 +98,6 @@ const footerNavItems: NavItem[] = [];
     </Sidebar>
     <slot />
     </template>
-
 
 
 

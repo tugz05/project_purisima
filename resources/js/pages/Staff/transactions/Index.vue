@@ -206,14 +206,14 @@ const getStatusColor = (status: string) => {
                                 variant="secondary"
                                 class="shrink-0 bg-white/15 text-white border-white/30 hover:bg-white/25"
                             >
-                                <Link :href="staff.certificates.manual.url()">
-                                    <UserPlus class="h-4 w-4 mr-2" />
-                                    Walk-in certificate
-                                </Link>
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                                <Link :href="staff.certificates.manual.url()"> 
+                                    <UserPlus class="h-4 w-4 mr-2" /> 
+                                    Walk-in transaction 
+                                </Link> 
+                            </Button> 
+                        </div> 
+                    </div> 
+                </div> 
 
                 <!-- Filters Section -->
                 <Card class="border-gray-200 shadow-lg">

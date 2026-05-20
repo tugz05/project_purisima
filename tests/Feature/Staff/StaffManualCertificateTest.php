@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia;
 
-test('staff can view walk-in certificate page', function () {
+test('staff can view walk-in transaction page', function () { 
     $staff = User::factory()->create(['role' => 'staff']);
 
     $this->actingAs($staff)
@@ -15,7 +15,7 @@ test('staff can view walk-in certificate page', function () {
         ->assertOk();
 });
 
-test('resident cannot access walk-in certificate page', function () {
+test('resident cannot access walk-in transaction page', function () { 
     $resident = User::factory()->create(['role' => 'resident']);
 
     $this->actingAs($resident)

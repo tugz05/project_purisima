@@ -6,7 +6,7 @@ use App\Models\DocumentType;
 use Illuminate\Support\Str;
 
 /**
- * Walk-in certificate wizard: two printable shells (see PrintCertificate.vue — clearance vs standard).
+ * Walk-in transaction wizard: two printable shells (see PrintCertificate.vue — clearance vs standard).
  * Staff always get layout-appropriate base fields (name, address, purpose, …); document_types.required_fields
  * adds extra inputs (unique keys only) that are included in default body, AI, and finalize.
  */

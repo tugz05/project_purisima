@@ -630,7 +630,7 @@ const generateWithAI = async () => {
     }
 };
 
-const saveCertificate = () => {
+const saveCertificate = (afterSuccess?: () => void) => {
     // Ensure officer_of_the_day is always a string (never null/undefined)
     const officerValue = String(certificateForm.officer_of_the_day || '').trim();
     
@@ -664,6 +664,7 @@ const saveCertificate = () => {
             }
             toast.success('Certificate content saved successfully!');
             certificateSheetOpen.value = false;
+            afterSuccess?.();
         },
         onError: (errors) => {
             console.error('Save errors:', errors);
@@ -673,6 +674,26 @@ const saveCertificate = () => {
 };
 
 const printCertificate = () => {
+    const existingOfficer = props.transaction.officer_of_the_day || '';
+    const existingPosition = props.transaction.officer_of_the_day_position || '';
+    const existingContent = props.transaction.generated_document_data?.content || '';
+
+    const officerNow = String(certificateForm.officer_of_the_day || '').trim();
+    const positionNow = String(certificateForm.officer_of_the_day_position || '').trim();
+    const contentNow = String(certificateForm.document_content || '').trim();
+
+    const needsSave =
+        officerNow !== String(existingOfficer || '').trim() ||
+        positionNow !== String(existingPosition || '').trim() ||
+        contentNow !== String(existingContent || '').trim();
+
+    if (needsSave) {
+        saveCertificate(() => {
+            window.open(`/staff/transactions/${props.transaction.id}/print-certificate`, '_blank');
+        });
+        return;
+    }
+
     window.open(`/staff/transactions/${props.transaction.id}/print-certificate`, '_blank');
 };
 
@@ -932,13 +953,13 @@ onUnmounted(() => {
                                     <div class="flex items-center gap-2 mb-2">
                                         <ClipboardList class="h-4 w-4 text-cyan-600" />
                                         <Label class="text-sm font-medium text-gray-700">Required request fields</Label>
-                                    </div>
-                                    <p class="text-xs text-gray-500 mb-3">
-                                        Extra questions defined for this document type and what the resident entered.
-                                    </p>
-                                    <div class="space-y-2">
-                                        <div
-                                            v-for="row in staffRequestFieldRows"
+                                    </div> 
+                                    <p class="text-xs text-gray-500 mb-3"> 
+                                        Extra questions defined for this document type and the provided answers (resident or staff for walk-in transactions). 
+                                    </p> 
+                                    <div class="space-y-2"> 
+                                        <div 
+                                            v-for="row in staffRequestFieldRows" 
                                             :key="row.key"
                                             class="flex flex-col gap-2 p-3 rounded-lg border border-cyan-100 bg-gradient-to-br from-cyan-50/80 to-sky-50/40"
                                         >
@@ -1520,15 +1541,15 @@ onUnmounted(() => {
                                         <p v-else class="text-sm italic text-gray-500">No requestor details.</p>
 
                                         <!-- Required request fields (same data as Documents card, compact) -->
-                                        <div v-if="staffRequestFieldRows.length > 0" class="flex flex-col gap-2 border-t border-gray-200 pt-4">
-                                            <Label class="block text-xs font-medium uppercase tracking-wide text-gray-500">
-                                                Required request fields
-                                            </Label>
-                                            <p class="text-[11px] text-gray-400">Configured questions and answers</p>
-                                            <div class="space-y-2">
-                                                <div
-                                                    v-for="row in staffRequestFieldRows"
-                                                    :key="row.key"
+                                        <div v-if="staffRequestFieldRows.length > 0" class="flex flex-col gap-2 border-t border-gray-200 pt-4"> 
+                                            <Label class="block text-xs font-medium uppercase tracking-wide text-gray-500"> 
+                                                Required request fields 
+                                            </Label> 
+                                            <p class="text-[11px] text-gray-400">Configured questions and answers (resident/staff)</p> 
+                                            <div class="space-y-2"> 
+                                                <div 
+                                                    v-for="row in staffRequestFieldRows" 
+                                                    :key="row.key" 
                                                     class="bg-white rounded-lg p-2.5 border border-gray-200"
                                                 >
                                                     <div class="flex flex-wrap items-center gap-1.5 mb-1">
@@ -1684,4 +1705,3 @@ onUnmounted(() => {
         </Sheet>
     </StaffLayout>
 </template>
-
